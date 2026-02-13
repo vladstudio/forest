@@ -11,7 +11,7 @@ export async function plant(ctx: ForestContext, ticketIdArg?: string): Promise<v
   if (ticketIdArg) {
     ticketId = ticketIdArg;
   } else if (ctx.config.integrations.linear && await linear.isAvailable()) {
-    const issues = await linear.listMyIssues(['unstarted', 'started', 'backlog']);
+    const issues = await linear.listMyIssues(['unstarted', 'started', 'backlog'], ctx.config.integrations.linearTeam);
     if (!issues.length) { vscode.window.showInformationMessage('No issues found.'); return; }
     const pick = await vscode.window.showQuickPick(
       issues.map(i => ({ label: `${i.id}  ${i.title}`, description: i.state, issueId: i.id })),

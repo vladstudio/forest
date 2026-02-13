@@ -18,7 +18,7 @@ export async function seed(ctx: ForestContext): Promise<void> {
     ) as any;
 
     try {
-      ticketId = await linear.createIssue({ title, priority: priority?.value });
+      ticketId = await linear.createIssue({ title, priority: priority?.value, team: ctx.config.integrations.linearTeam });
     } catch (e: any) {
       vscode.window.showErrorMessage(`Failed to create Linear issue: ${e.message}`);
       return;

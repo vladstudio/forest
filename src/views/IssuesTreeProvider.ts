@@ -19,7 +19,7 @@ export class IssuesTreeProvider implements vscode.TreeDataProvider<IssueItem> {
   async getChildren(): Promise<IssueItem[]> {
     if (!this.config.integrations.linear || !(await linear.isAvailable())) return [];
     if (Date.now() - this.lastFetch > this.TTL) {
-      this.issues = await linear.listMyIssues(['unstarted', 'started', 'backlog']);
+      this.issues = await linear.listMyIssues(['unstarted', 'started', 'backlog'], this.config.integrations.linearTeam);
       this.lastFetch = Date.now();
     }
     const state = await this.stateManager.load();

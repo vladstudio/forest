@@ -26,7 +26,7 @@ export interface ForestConfig {
   browsers: BrowserConfig[];
   ports: { baseRange: [number, number]; mapping: Record<string, string> };
   env: Record<string, string>;
-  integrations: { linear: boolean; github: boolean };
+  integrations: { linear: boolean; github: boolean; linearTeam?: string };
   branchFormat: string;
   baseBranch: string;
   maxTrees: number;

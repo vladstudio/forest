@@ -21,10 +21,13 @@ export async function isAvailable(): Promise<boolean> {
  */
 export async function listMyIssues(
   states: string[] = ['unstarted', 'started'],
+  team?: string,
 ): Promise<LinearIssue[]> {
   try {
+    const args = ['issue', 'list', ...states.flatMap(s => ['-s', s]), '--sort', 'priority', '--no-pager'];
+    if (team) args.push('--team', team);
     const { stdout } = await exec(
-      'linear', ['issue', 'list', ...states.flatMap(s => ['-s', s]), '--no-pager'],
+      'linear', args,
       { timeout: 15_000 },
     );
     return parseIssueTable(stdout);
@@ -70,7 +73,7 @@ export async function createIssue(opts: {
   label?: string;
   team?: string;
 }): Promise<string> {
-  const args = ['issue', 'create', '-t', opts.title, '-a', 'self', '--start', '--no-interactive'];
+  const args = ['issue', 'create', '-t', opts.title, '-a', 'self', '--start', '--no-interactive', '--no-pager'];
   if (opts.priority) args.push('--priority', String(opts.priority));
   if (opts.label) args.push('-l', opts.label);
   if (opts.team) args.push('--team', opts.team);
