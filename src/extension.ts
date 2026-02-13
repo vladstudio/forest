@@ -1,13 +1,14 @@
 import * as vscode from 'vscode';
 import { loadConfig } from './config';
+import { ShortcutItem } from './views/items';
 import { StateManager, TreeState } from './state';
 import { ForestContext, getRepoPath } from './context';
 import { PortManager } from './managers/PortManager';
-import { TerminalManager } from './managers/TerminalManager';
-import { BrowserManager } from './managers/BrowserManager';
+import { ShortcutManager } from './managers/ShortcutManager';
 import { StatusBarManager } from './managers/StatusBarManager';
 import { IssuesTreeProvider } from './views/IssuesTreeProvider';
 import { TreesTreeProvider } from './views/TreesTreeProvider';
+import { ShortcutsTreeProvider } from './views/ShortcutsTreeProvider';
 import { seed } from './commands/seed';
 import { plant } from './commands/plant';
 import { switchTree } from './commands/switch';
@@ -32,15 +33,20 @@ export async function activate(context: vscode.ExtensionContext) {
   const state = stateManager.loadSync();
   const currentTree = curPath ? Object.values(state.trees).find(t => t.path === curPath) : undefined;
 
+  vscode.commands.executeCommand('setContext', 'forest.isTree', !!currentTree);
+
   const portManager = new PortManager(config, stateManager);
-  const terminalManager = new TerminalManager(config, currentTree);
-  const browserManager = new BrowserManager(config, currentTree);
+  const shortcutManager = new ShortcutManager(config, currentTree);
   const statusBarManager = new StatusBarManager(currentTree);
   const issuesProvider = new IssuesTreeProvider(config, stateManager);
-  const treesProvider = new TreesTreeProvider(config, stateManager);
+  const treesProvider = new TreesTreeProvider(stateManager);
+  const shortcutsProvider = new ShortcutsTreeProvider(config, shortcutManager);
 
-  vscode.window.registerTreeDataProvider('forest.issues', issuesProvider);
-  vscode.window.registerTreeDataProvider('forest.trees', treesProvider);
+  context.subscriptions.push(
+    vscode.window.registerTreeDataProvider('forest.issues', issuesProvider),
+    vscode.window.registerTreeDataProvider('forest.trees', treesProvider),
+    vscode.window.registerTreeDataProvider('forest.shortcuts', shortcutsProvider),
+  );
 
   // Update noTrees context
   const updateNoTrees = async () => {
@@ -51,8 +57,8 @@ export async function activate(context: vscode.ExtensionContext) {
   updateNoTrees();
 
   const ctx: ForestContext = {
-    config, stateManager, portManager, terminalManager,
-    browserManager, statusBarManager, issuesProvider, treesProvider, currentTree,
+    config, stateManager, portManager, shortcutManager,
+    statusBarManager, issuesProvider, treesProvider, currentTree,
   };
 
   // Register commands
@@ -89,12 +95,15 @@ export async function activate(context: vscode.ExtensionContext) {
       });
     }
   });
+  const unwrap = (arg: any) => arg instanceof ShortcutItem ? arg.shortcut : arg;
+  reg('forest.openShortcut', (arg: any) => shortcutManager.open(unwrap(arg)));
+  reg('forest.stopShortcut', (arg: any) => shortcutManager.stop(unwrap(arg)));
+  reg('forest.restartShortcut', (arg: any) => shortcutManager.restart(unwrap(arg)));
 
-  // If this is a tree window, set up terminals + browser
+  // If this is a tree window, open launch shortcuts
   if (currentTree) {
     statusBarManager.show();
-    terminalManager.ensureConfiguredTerminals();
-    browserManager.openConfiguredBrowsers();
+    shortcutManager.openOnLaunchShortcuts();
   }
 
   // Watch state for changes from other windows
@@ -104,6 +113,7 @@ export async function activate(context: vscode.ExtensionContext) {
       if (updated) {
         ctx.currentTree = updated;
         statusBarManager.update(updated);
+        shortcutManager.updateTree(updated);
       }
     }
     issuesProvider.refresh();
@@ -111,7 +121,7 @@ export async function activate(context: vscode.ExtensionContext) {
     updateNoTrees();
   });
 
-  context.subscriptions.push(terminalManager, statusBarManager, browserManager);
+  context.subscriptions.push(shortcutManager, statusBarManager, stateManager);
 }
 
 export function deactivate() {}

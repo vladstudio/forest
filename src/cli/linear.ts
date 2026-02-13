@@ -63,7 +63,9 @@ export async function getIssue(issueId: string): Promise<LinearIssue | null> {
       'linear', ['issue', 'view', issueId, '--json', '--no-pager', '--no-download'],
       { timeout: 10_000 },
     );
-    return JSON.parse(stdout);
+    const data = JSON.parse(stdout);
+    if (!data?.id || !data?.title) return null;
+    return { id: data.id, title: data.title, state: data.state ?? 'Unknown', priority: data.priority ?? 3 };
   } catch { return null; }
 }
 

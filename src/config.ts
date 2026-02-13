@@ -3,27 +3,18 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 
-export interface TerminalConfig {
-  name: string;
-  command?: string;
-  autostart: boolean;
-  env?: Record<string, string>;
-}
-
-export interface BrowserConfig {
-  name: string;
-  url: string;
-  waitForPort?: boolean;
-  waitTimeout?: number;
-}
+interface ShortcutBase { name: string; openOnLaunch?: number | false; }
+interface TerminalShortcut extends ShortcutBase { type: 'terminal'; command?: string; env?: Record<string, string>; }
+interface BrowserShortcut extends ShortcutBase { type: 'browser'; url: string; }
+interface FileShortcut extends ShortcutBase { type: 'file'; path: string; }
+export type ShortcutConfig = TerminalShortcut | BrowserShortcut | FileShortcut;
 
 export interface ForestConfig {
   version: number;
   treesDir: string;
   copy: string[];
   setup: string | string[];
-  terminals: TerminalConfig[];
-  browsers: BrowserConfig[];
+  shortcuts: ShortcutConfig[];
   ports: { baseRange: [number, number]; mapping: Record<string, string> };
   env: Record<string, string>;
   integrations: { linear: boolean; github: boolean; linearTeam?: string };
@@ -34,9 +25,9 @@ export interface ForestConfig {
 
 const DEFAULTS: Partial<ForestConfig> = {
   copy: [],
-  terminals: [],
-  browsers: [],
+  shortcuts: [],
   env: {},
+  ports: { baseRange: [3000, 4000], mapping: {} },
   integrations: { linear: true, github: true },
   branchFormat: '${ticketId}-${slug}',
   baseBranch: 'origin/main',
@@ -70,12 +61,15 @@ export async function loadConfig(): Promise<ForestConfig | null> {
     }
   }
 
-  // Resolve ~ in treesDir
-  if (merged.treesDir) {
-    merged.treesDir = merged.treesDir.replace(/^~/, os.homedir());
-    const repoName = path.basename(ws.uri.fsPath);
-    merged.treesDir = merged.treesDir.replace('${repo}', repoName);
+  if (!merged.treesDir) {
+    vscode.window.showErrorMessage('Forest: "treesDir" is required in .forest/config.json');
+    return null;
   }
+
+  // Resolve ~ in treesDir
+  merged.treesDir = merged.treesDir.replace(/^~/, os.homedir());
+  const repoName = path.basename(ws.uri.fsPath);
+  merged.treesDir = merged.treesDir.replace('${repo}', repoName);
 
   return merged as ForestConfig;
 }
@@ -83,15 +77,15 @@ export async function loadConfig(): Promise<ForestConfig | null> {
 function mergeConfig(base: any, local: any): any {
   const result = { ...base };
   for (const key of Object.keys(local)) {
-    if (key === 'terminals' && Array.isArray(local[key])) {
-      // Merge terminals by name
-      const baseTerminals = [...(base.terminals || [])];
-      for (const lt of local[key]) {
-        const idx = baseTerminals.findIndex((t: any) => t.name === lt.name);
-        if (idx >= 0) baseTerminals[idx] = { ...baseTerminals[idx], ...lt };
-        else baseTerminals.push(lt);
+    if (key === 'shortcuts' && Array.isArray(local[key])) {
+      // Merge named arrays by name
+      const baseArr = [...(base[key] || [])];
+      for (const item of local[key]) {
+        const idx = baseArr.findIndex((b: any) => b.name === item.name);
+        if (idx >= 0) baseArr[idx] = { ...baseArr[idx], ...item };
+        else baseArr.push(item);
       }
-      result.terminals = baseTerminals;
+      result[key] = baseArr;
     } else if (typeof local[key] === 'object' && !Array.isArray(local[key]) && local[key] !== null) {
       result[key] = { ...(base[key] || {}), ...local[key] };
     } else {

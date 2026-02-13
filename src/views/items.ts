@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import type { LinearIssue } from '../cli/linear';
 import type { TreeState } from '../state';
+import type { ShortcutConfig } from '../config';
 
 export class IssueItem extends vscode.TreeItem {
   contextValue = 'issue';
@@ -10,6 +11,32 @@ export class IssueItem extends vscode.TreeItem {
     this.tooltip = `${issue.id}: ${issue.title}\nState: ${issue.state}`;
     this.iconPath = new vscode.ThemeIcon('circle-outline');
     this.command = { command: 'forest.plant', title: 'Plant Tree', arguments: [issue.id] };
+  }
+}
+
+type ShortcutState = 'running' | 'stopped' | 'idle';
+
+export class ShortcutItem extends vscode.TreeItem {
+  constructor(public readonly shortcut: ShortcutConfig, state: ShortcutState) {
+    super(shortcut.name, vscode.TreeItemCollapsibleState.None);
+
+    if (shortcut.type === 'terminal') {
+      const running = state === 'running';
+      this.contextValue = running ? 'shortcut-terminal-running' : 'shortcut-terminal-stopped';
+      this.iconPath = new vscode.ThemeIcon(
+        'terminal',
+        running ? new vscode.ThemeColor('charts.green') : undefined,
+      );
+      if (running) this.description = 'running';
+    } else if (shortcut.type === 'browser') {
+      this.contextValue = 'shortcut-browser';
+      this.iconPath = new vscode.ThemeIcon('globe');
+    } else {
+      this.contextValue = 'shortcut-file';
+      this.iconPath = new vscode.ThemeIcon('file');
+    }
+
+    this.command = { command: 'forest.openShortcut', title: 'Open', arguments: [shortcut] };
   }
 }
 

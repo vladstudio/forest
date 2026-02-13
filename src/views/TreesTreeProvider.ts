@@ -1,5 +1,4 @@
 import * as vscode from 'vscode';
-import type { ForestConfig } from '../config';
 import type { StateManager } from '../state';
 import { TreeItemView } from './items';
 import { getRepoPath } from '../context';
@@ -8,7 +7,7 @@ export class TreesTreeProvider implements vscode.TreeDataProvider<TreeItemView> 
   private _onDidChange = new vscode.EventEmitter<TreeItemView | undefined>();
   readonly onDidChangeTreeData = this._onDidChange.event;
 
-  constructor(private config: ForestConfig, private stateManager: StateManager) {}
+  constructor(private stateManager: StateManager) {}
 
   refresh(): void { this._onDidChange.fire(undefined); }
 

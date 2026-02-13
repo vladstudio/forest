@@ -26,15 +26,11 @@ export async function ship(ctx: ForestContext): Promise<void> {
       progress.report({ message: 'Pushing branch...' });
       await git.pushBranch(tree.path, tree.branch);
 
-      // Create PR
-      progress.report({ message: 'Creating PR...' });
+      // Create PR + update Linear
       let prUrl: string | null = null;
       if (ctx.config.integrations.linear && await linear.isAvailable()) {
+        progress.report({ message: 'Creating PR...' });
         prUrl = await linear.createPR(tree.ticketId, ctx.config.baseBranch);
-      }
-
-      // Update Linear state
-      if (ctx.config.integrations.linear && await linear.isAvailable()) {
         linear.updateIssueState(tree.ticketId, 'In Review').catch(() => {});
       }
 

@@ -34,5 +34,6 @@ export async function execShell(
 }
 
 export async function commandExists(name: string): Promise<boolean> {
-  try { await exec('which', [name]); return true; } catch { return false; }
+  const cmd = process.platform === 'win32' ? 'where.exe' : 'which';
+  try { await exec(cmd, [name]); return true; } catch { return false; }
 }

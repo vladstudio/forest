@@ -34,7 +34,8 @@
     "views": {
       "forest": [
         { "id": "forest.issues", "name": "My Issues", "when": "forest.active && forest.linearEnabled" },
-        { "id": "forest.trees", "name": "Trees", "when": "forest.active" }
+        { "id": "forest.trees", "name": "Trees", "when": "forest.active" },
+        { "id": "forest.shortcuts", "name": "Shortcuts", "when": "forest.active && forest.isTree" }
       ]
     },
     "viewsWelcome": [
@@ -56,7 +57,10 @@
       { "command": "forest.copyBranch", "title": "Copy Branch Name", "category": "Forest", "icon": "$(copy)" },
       { "command": "forest.setStatus", "title": "Set Tree Status", "category": "Forest", "icon": "$(tag)" },
       { "command": "forest.refreshIssues", "title": "Refresh Issues", "category": "Forest", "icon": "$(refresh)" },
-      { "command": "forest.refreshTrees", "title": "Refresh Trees", "category": "Forest", "icon": "$(refresh)" }
+      { "command": "forest.refreshTrees", "title": "Refresh Trees", "category": "Forest", "icon": "$(refresh)" },
+      { "command": "forest.openShortcut", "title": "Open Shortcut", "category": "Forest", "icon": "$(play)" },
+      { "command": "forest.stopShortcut", "title": "Stop Terminal", "category": "Forest", "icon": "$(debug-stop)" },
+      { "command": "forest.restartShortcut", "title": "Restart Terminal", "category": "Forest", "icon": "$(debug-restart)" }
     ],
     "menus": {
       "view/title": [
@@ -73,7 +77,15 @@
         { "command": "forest.setStatus", "when": "viewItem == tree", "group": "2_status" },
         { "command": "forest.ship", "when": "viewItem == tree", "group": "3_lifecycle" },
         { "command": "forest.water", "when": "viewItem == tree", "group": "3_lifecycle" },
-        { "command": "forest.fell", "when": "viewItem == tree", "group": "4_danger" }
+        { "command": "forest.fell", "when": "viewItem == tree", "group": "4_danger" },
+        { "command": "forest.stopShortcut", "when": "viewItem == shortcut-terminal-running", "group": "inline" },
+        { "command": "forest.stopShortcut", "when": "viewItem == shortcut-terminal-running", "group": "1_actions" },
+        { "command": "forest.restartShortcut", "when": "viewItem == shortcut-terminal-running", "group": "1_actions" }
+      ]
+      "commandPalette": [
+        { "command": "forest.openShortcut", "when": "false" },
+        { "command": "forest.stopShortcut", "when": "false" },
+        { "command": "forest.restartShortcut", "when": "false" }
       ]
     },
     "keybindings": []
