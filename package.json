@@ -1,0 +1,81 @@
+{
+  "name": "forest",
+  "displayName": "Forest",
+  "description": "Manage parallel feature development with git worktrees",
+  "version": "0.1.0",
+  "publisher": "forest-dev",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other"],
+  "keywords": ["git", "worktree", "linear", "workflow", "monorepo"],
+  "main": "./dist/extension.js",
+  "activationEvents": ["workspaceContains:.forest/config.json"],
+  "scripts": {
+    "vscode:prepublish": "bun run package",
+    "compile": "bun run check-types && node esbuild.js",
+    "watch": "concurrently \"node esbuild.js --watch\" \"tsc --noEmit --watch --project tsconfig.json\"",
+    "package": "bun run check-types && node esbuild.js --production",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "concurrently": "^9.0.0",
+    "esbuild": "^0.24.0",
+    "eslint": "^9.0.0",
+    "typescript": "^5.7.0"
+  },
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        { "id": "forest", "title": "Forest", "icon": "resources/forest.svg" }
+      ]
+    },
+    "views": {
+      "forest": [
+        { "id": "forest.issues", "name": "My Issues", "when": "forest.active && forest.linearEnabled" },
+        { "id": "forest.trees", "name": "Trees", "when": "forest.active" }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "forest.trees",
+        "contents": "No trees planted yet.\n[Plant a Tree](command:forest.plant)\n[Seed a New Ticket](command:forest.seed)",
+        "when": "forest.active && forest.noTrees"
+      }
+    ],
+    "commands": [
+      { "command": "forest.seed", "title": "Seed — New Ticket + Tree", "category": "Forest", "icon": "$(add)" },
+      { "command": "forest.plant", "title": "Plant — Tree from Existing Ticket", "category": "Forest", "icon": "$(git-branch)" },
+      { "command": "forest.switch", "title": "Switch Tree", "category": "Forest", "icon": "$(arrow-swap)" },
+      { "command": "forest.ship", "title": "Ship — Push + PR", "category": "Forest", "icon": "$(rocket)" },
+      { "command": "forest.fell", "title": "Fell — Merge + Cleanup", "category": "Forest", "icon": "$(check-all)" },
+      { "command": "forest.water", "title": "Water — Refresh Dependencies", "category": "Forest", "icon": "$(refresh)" },
+      { "command": "forest.survey", "title": "Survey — List All Trees", "category": "Forest", "icon": "$(list-tree)" },
+      { "command": "forest.openInLinear", "title": "Open in Linear", "category": "Forest", "icon": "$(link-external)" },
+      { "command": "forest.copyBranch", "title": "Copy Branch Name", "category": "Forest", "icon": "$(copy)" },
+      { "command": "forest.setStatus", "title": "Set Tree Status", "category": "Forest", "icon": "$(tag)" },
+      { "command": "forest.refreshIssues", "title": "Refresh Issues", "category": "Forest", "icon": "$(refresh)" },
+      { "command": "forest.refreshTrees", "title": "Refresh Trees", "category": "Forest", "icon": "$(refresh)" }
+    ],
+    "menus": {
+      "view/title": [
+        { "command": "forest.refreshIssues", "when": "view == forest.issues", "group": "navigation" },
+        { "command": "forest.seed", "when": "view == forest.issues", "group": "navigation" },
+        { "command": "forest.refreshTrees", "when": "view == forest.trees", "group": "navigation" },
+        { "command": "forest.plant", "when": "view == forest.trees", "group": "navigation" }
+      ],
+      "view/item/context": [
+        { "command": "forest.plant", "when": "view == forest.issues && viewItem == issue", "group": "inline" },
+        { "command": "forest.switch", "when": "view == forest.trees && viewItem == tree", "group": "inline" },
+        { "command": "forest.openInLinear", "when": "viewItem == tree || viewItem == issue", "group": "1_navigation" },
+        { "command": "forest.copyBranch", "when": "viewItem == tree", "group": "1_navigation" },
+        { "command": "forest.setStatus", "when": "viewItem == tree", "group": "2_status" },
+        { "command": "forest.ship", "when": "viewItem == tree", "group": "3_lifecycle" },
+        { "command": "forest.water", "when": "viewItem == tree", "group": "3_lifecycle" },
+        { "command": "forest.fell", "when": "viewItem == tree", "group": "4_danger" }
+      ]
+    },
+    "keybindings": []
+  }
+}
