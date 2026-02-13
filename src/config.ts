@@ -58,17 +58,17 @@ export async function loadConfig(): Promise<ForestConfig | null> {
     return null;
   }
 
-  // Merge local overrides
+  // Merge: defaults → config → local
+  let merged: any = mergeConfig(DEFAULTS, config);
   const localPath = path.join(ws.uri.fsPath, '.forest', 'local.json');
   if (fs.existsSync(localPath)) {
     try {
       const local = JSON.parse(fs.readFileSync(localPath, 'utf8'));
-      config = mergeConfig(config, local);
-    } catch {}
+      merged = mergeConfig(merged, local);
+    } catch {
+      vscode.window.showWarningMessage('Forest: local.json has syntax errors, ignoring overrides.');
+    }
   }
-
-  // Apply defaults
-  const merged = { ...DEFAULTS, ...config } as ForestConfig;
 
   // Resolve ~ in treesDir
   if (merged.treesDir) {
@@ -77,7 +77,7 @@ export async function loadConfig(): Promise<ForestConfig | null> {
     merged.treesDir = merged.treesDir.replace('${repo}', repoName);
   }
 
-  return merged;
+  return merged as ForestConfig;
 }
 
 function mergeConfig(base: any, local: any): any {

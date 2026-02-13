@@ -98,13 +98,20 @@ export async function activate(context: vscode.ExtensionContext) {
   }
 
   // Watch state for changes from other windows
-  stateManager.onDidChange(() => {
+  stateManager.onDidChange((newState) => {
+    if (ctx.currentTree) {
+      const updated = stateManager.getTree(newState, getRepoPath(), ctx.currentTree.ticketId);
+      if (updated) {
+        ctx.currentTree = updated;
+        statusBarManager.update(updated);
+      }
+    }
     issuesProvider.refresh();
     treesProvider.refresh();
     updateNoTrees();
   });
 
-  context.subscriptions.push(terminalManager, statusBarManager);
+  context.subscriptions.push(terminalManager, statusBarManager, browserManager);
 }
 
 export function deactivate() {}

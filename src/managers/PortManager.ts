@@ -16,13 +16,13 @@ export class PortManager {
   }
 
   private getMaxOffset(): number {
-    return Math.max(...Object.values(this.config.ports.mapping).map(v => parseInt(v.replace('+', ''))), 0);
+    return Math.max(...Object.values(this.config.ports.mapping).map(v => parseInt(v.replace('+', '')) || 0), 0);
   }
 
   resolvePorts(base: number): Record<string, number> {
     const result: Record<string, number> = {};
     for (const [name, off] of Object.entries(this.config.ports.mapping)) {
-      result[name] = base + parseInt(off.replace('+', ''));
+      result[name] = base + (parseInt(off.replace('+', '')) || 0);
     }
     return result;
   }

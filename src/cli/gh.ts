@@ -14,12 +14,12 @@ export async function mergePR(
   const flags: string[] = [];
   if (opts?.squash !== false) flags.push('--squash');
   if (opts?.deleteBranch !== false) flags.push('--delete-branch');
-  await exec(`gh pr merge ${flags.join(' ')}`, { cwd: worktreePath, timeout: 30_000 });
+  await exec('gh', ['pr', 'merge', ...flags], { cwd: worktreePath, timeout: 30_000 });
 }
 
 export async function getPRUrl(worktreePath: string): Promise<string | null> {
   try {
-    const { stdout } = await exec('gh pr view --json url --jq .url', { cwd: worktreePath, timeout: 10_000 });
+    const { stdout } = await exec('gh', ['pr', 'view', '--json', 'url', '--jq', '.url'], { cwd: worktreePath, timeout: 10_000 });
     return stdout || null;
   } catch { return null; }
 }

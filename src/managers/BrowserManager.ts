@@ -1,9 +1,11 @@
 import * as vscode from 'vscode';
 import type { ForestConfig } from '../config';
 import type { TreeState } from '../state';
-import { isPortOpen } from '../utils/ports';
+import { isPortOpen, resolvePortVars } from '../utils/ports';
 
 export class BrowserManager {
+  private pendingTimers = new Set<ReturnType<typeof setTimeout>>();
+
   constructor(private config: ForestConfig, private currentTree: TreeState | undefined) {}
 
   async openConfiguredBrowsers(): Promise<void> {
@@ -28,7 +30,8 @@ export class BrowserManager {
         return;
       }
       if (await isPortOpen(port)) { this.openBrowser(url); return; }
-      setTimeout(check, 2000);
+      const timer = setTimeout(() => { this.pendingTimers.delete(timer); check(); }, 2000);
+      this.pendingTimers.add(timer);
     };
     check();
   }
@@ -45,14 +48,16 @@ export class BrowserManager {
 
   private resolveUrl(url: string): string {
     if (!this.currentTree) return url;
-    return url.replace(/\$\{ports\.(\w+)\}/g, (_, name) => {
-      const offset = parseInt(this.config.ports.mapping[name]?.replace('+', '') ?? '0');
-      return String(this.currentTree!.portBase + offset);
-    });
+    return resolvePortVars(url, this.config.ports.mapping, this.currentTree.portBase);
   }
 
   private extractPort(url: string): number | null {
     const m = url.match(/:(\d+)/);
     return m ? parseInt(m[1]) : null;
+  }
+
+  dispose(): void {
+    this.pendingTimers.forEach(t => clearTimeout(t));
+    this.pendingTimers.clear();
   }
 }

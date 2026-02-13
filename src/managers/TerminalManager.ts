@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import type { ForestConfig, TerminalConfig } from '../config';
 import type { TreeState } from '../state';
+import { resolvePortVars } from '../utils/ports';
 
 export class TerminalManager {
   private managed = new Map<string, vscode.Terminal>();
@@ -59,10 +60,7 @@ export class TerminalManager {
 
   private resolvePorts(value: string): string {
     if (!this.currentTree) return value;
-    return value.replace(/\$\{ports\.(\w+)\}/g, (_, name) => {
-      const offset = parseInt(this.config.ports.mapping[name]?.replace('+', '') ?? '0');
-      return String(this.currentTree!.portBase + offset);
-    });
+    return resolvePortVars(value, this.config.ports.mapping, this.currentTree.portBase);
   }
 
   dispose(): void { this.disposables.forEach(d => d.dispose()); }

@@ -13,8 +13,7 @@ export async function seed(ctx: ForestContext): Promise<void> {
   if (ctx.config.integrations.linear && await linear.isAvailable()) {
     // Pick priority
     const priority = await vscode.window.showQuickPick(
-      [{ label: 'Urgent', value: 1 }, { label: 'High', value: 2 }, { label: 'Normal', value: 3 }, { label: 'Low', value: 4 }]
-        .map(p => ({ label: p.label, value: p.value })),
+      [{ label: 'Urgent', value: 1 }, { label: 'High', value: 2 }, { label: 'Normal', value: 3 }, { label: 'Low', value: 4 }],
       { placeHolder: 'Priority (optional — Enter to skip)' },
     ) as any;
 

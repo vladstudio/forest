@@ -22,10 +22,9 @@ export async function isAvailable(): Promise<boolean> {
 export async function listMyIssues(
   states: string[] = ['unstarted', 'started'],
 ): Promise<LinearIssue[]> {
-  const stateFlags = states.map(s => `-s ${s}`).join(' ');
   try {
     const { stdout } = await exec(
-      `linear issue list ${stateFlags} --no-pager`,
+      'linear', ['issue', 'list', ...states.flatMap(s => ['-s', s]), '--no-pager'],
       { timeout: 15_000 },
     );
     return parseIssueTable(stdout);
@@ -44,9 +43,7 @@ function parseIssueTable(output: string): LinearIssue[] {
     const id = match[1];
     const rest = match[2].trim();
     // Title is the main text before metadata columns
-    // The table has: priority_icon | ID | title | labels | estimate | assignee | state | updated
-    // We just grab what we can — title is the largest chunk
-    const parts = rest.split(/\s{2,}/); // columns separated by 2+ spaces
+    const parts = rest.split(/\s{2,}/);
     issues.push({
       id,
       title: parts[0] || rest,
@@ -60,7 +57,7 @@ function parseIssueTable(output: string): LinearIssue[] {
 export async function getIssue(issueId: string): Promise<LinearIssue | null> {
   try {
     const { stdout } = await exec(
-      `linear issue view ${issueId} --json --no-pager --no-download`,
+      'linear', ['issue', 'view', issueId, '--json', '--no-pager', '--no-download'],
       { timeout: 10_000 },
     );
     return JSON.parse(stdout);
@@ -73,25 +70,25 @@ export async function createIssue(opts: {
   label?: string;
   team?: string;
 }): Promise<string> {
-  const args = [`-t "${opts.title}"`, '-a self', '--start', '--no-interactive'];
-  if (opts.priority) args.push(`--priority ${opts.priority}`);
-  if (opts.label) args.push(`-l "${opts.label}"`);
-  if (opts.team) args.push(`--team "${opts.team}"`);
-  const { stdout } = await exec(`linear issue create ${args.join(' ')}`, { timeout: 15_000 });
+  const args = ['issue', 'create', '-t', opts.title, '-a', 'self', '--start', '--no-interactive'];
+  if (opts.priority) args.push('--priority', String(opts.priority));
+  if (opts.label) args.push('-l', opts.label);
+  if (opts.team) args.push('--team', opts.team);
+  const { stdout } = await exec('linear', args, { timeout: 15_000 });
   const match = stdout.match(/([A-Z]+-\d+)/);
   if (!match) throw new Error(`Could not parse ticket ID from: ${stdout}`);
   return match[1];
 }
 
 export async function updateIssueState(issueId: string, state: string): Promise<void> {
-  await exec(`linear issue update ${issueId} -s "${state}"`, { timeout: 10_000 });
+  await exec('linear', ['issue', 'update', issueId, '-s', state], { timeout: 10_000 });
 }
 
 export async function createPR(issueId: string, baseBranch: string): Promise<string | null> {
   try {
     const base = baseBranch.replace(/^origin\//, '');
     const { stdout } = await exec(
-      `linear issue pr ${issueId} --base "${base}"`,
+      'linear', ['issue', 'pr', issueId, '--base', base],
       { timeout: 30_000 },
     );
     const urlMatch = stdout.match(/(https:\/\/github\.com\/[^\s]+)/);
@@ -103,7 +100,7 @@ export async function createPR(issueId: string, baseBranch: string): Promise<str
 
 export async function getIssueUrl(issueId: string): Promise<string | null> {
   try {
-    const { stdout } = await exec(`linear issue url ${issueId}`, { timeout: 5_000 });
+    const { stdout } = await exec('linear', ['issue', 'url', issueId], { timeout: 5_000 });
     return stdout || null;
   } catch { return null; }
 }

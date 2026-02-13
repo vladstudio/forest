@@ -19,5 +19,10 @@ export class StatusBarManager {
     this.item.show();
   }
 
+  update(tree: TreeState): void {
+    this.currentTree = tree;
+    this.show();
+  }
+
   dispose(): void { this.item.dispose(); }
 }
