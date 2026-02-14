@@ -70,7 +70,8 @@ export class ShortcutManager {
     for (const sc of this.config.shortcuts) {
       if (!sc.openOnLaunch) continue;
       if (sc.type === 'terminal') {
-        if (!this.terminals.has(sc.name)) this.openTerminal(sc);
+        const viewCol = typeof sc.openOnLaunch === 'number' && sc.openOnLaunch > 1 ? sc.openOnLaunch as vscode.ViewColumn : undefined;
+        if (!this.terminals.has(sc.name)) this.openTerminal(sc, viewCol);
       } else {
         this.open(sc, sc.openOnLaunch as vscode.ViewColumn);
       }
@@ -112,7 +113,7 @@ export class ShortcutManager {
     }
   }
 
-  private openTerminal(sc: ShortcutConfig & { type: 'terminal' }): void {
+  private openTerminal(sc: ShortcutConfig & { type: 'terminal' }, location?: vscode.ViewColumn): void {
     const existing = this.terminals.get(sc.name);
     if (existing) { existing.show(); return; }
 
@@ -127,7 +128,9 @@ export class ShortcutManager {
       name: `[Forest] ${sc.name}`,
       cwd: this.currentTree?.path,
       env,
+      ...(location ? { location: { viewColumn: location } } : {}),
     });
+    terminal.show(false);
     if (sc.command) terminal.sendText(this.resolveVars(sc.command));
     this.terminals.set(sc.name, terminal);
     this._onDidChange.fire();

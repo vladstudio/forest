@@ -69,9 +69,16 @@ export class TreeItemView extends vscode.TreeItem {
     }
     this.description = parts.join(' \u00b7 ');
 
+    const statusColor: Record<string, string> = {
+      dev: 'charts.blue',
+      testing: 'charts.yellow',
+      review: 'charts.orange',
+      done: 'charts.green',
+    };
+    const color = statusColor[tree.status] ? new vscode.ThemeColor(statusColor[tree.status]) : undefined;
     this.iconPath = isCurrent
-      ? new vscode.ThemeIcon('arrow-right', new vscode.ThemeColor('charts.green'))
-      : new vscode.ThemeIcon('git-branch');
+      ? new vscode.ThemeIcon('arrow-right', color ?? new vscode.ThemeColor('charts.green'))
+      : new vscode.ThemeIcon('git-branch', color);
     this.tooltip = [
       `${tree.ticketId}: ${tree.title}`,
       `Branch: ${tree.branch}`,

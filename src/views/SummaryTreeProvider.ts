@@ -1,9 +1,9 @@
 import * as vscode from 'vscode';
 
 class SummaryItem extends vscode.TreeItem {
-  constructor(text: string) {
+  constructor(text: string, fullText?: string) {
     super(text, vscode.TreeItemCollapsibleState.None);
-    this.tooltip = text;
+    this.tooltip = fullText ? new vscode.MarkdownString(fullText) : text;
   }
 }
 
@@ -18,7 +18,8 @@ export class SummaryTreeProvider implements vscode.TreeDataProvider<SummaryItem>
   }
 
   getChildren(): SummaryItem[] {
-    return this.lines.map(line => new SummaryItem(line.trim()));
+    const full = this.lines.join(' ');
+    return this.lines.map(line => new SummaryItem(line.trim(), full));
   }
 
   getTreeItem(el: SummaryItem): vscode.TreeItem { return el; }
