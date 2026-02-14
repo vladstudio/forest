@@ -44,12 +44,12 @@ Add `.forest/config.json` to your repo root (tip: ask Claude to generate one for
     "APP_PORT": "${ports.app}",
     "API_PORT": "${ports.api}"
   },
-  "integrations": { "linear": true, "github": true, "linearTeam": "ENG" },
+  "integrations": { "linear": true, "github": true, "linearTeam": "KAD" },
   "linearStatuses": {
-    "issueList": ["Triage", "Backlog", "Todo"],
-    "onNew": "In Progress",
-    "onShip": "In Review",
-    "onCleanup": "Done"
+    "issueList": ["triage", "backlog", "unstarted"],
+    "onNew": "started",
+    "onShip": "started",
+    "onCleanup": "completed"
   },
   "branchFormat": "${ticketId}-${slug}",
   "baseBranch": "origin/main",
@@ -92,8 +92,8 @@ To set up Forest, ask Claude (or any AI) to read this README and generate `.fore
 | `ports.baseRange` | no | `[3000, 4000]` | Port range to allocate from |
 | `ports.mapping` | no | `{}` | Named ports as offsets: `{ "app": "+0", "api": "+1" }` |
 | `env` | no | `{}` | Extra env vars injected into tree. Supports `${ports.X}` |
-| `integrations` | no | `{ linear: true, github: true }` | Toggle integrations. `linearTeam` sets team name |
-| `linearStatuses` | no | see below | Linear states for issue list and lifecycle transitions |
+| `integrations` | no | `{ linear: true, github: true }` | Toggle integrations. `linearTeam` is the team **key** (e.g. `KAD`), not the display name — run `linear team list` to find it |
+| `linearStatuses` | no | see below | Linear states for issue list and lifecycle transitions. **Must use lowercase** Linear CLI state names: `triage`, `backlog`, `unstarted`, `started`, `completed`, `canceled` |
 | `branchFormat` | no | `${ticketId}-${slug}` | Branch naming. Supports `${ticketId}`, `${slug}` |
 | `baseBranch` | no | `origin/main` | Branch to rebase on |
 | `maxTrees` | no | `10` | Max concurrent worktrees |
@@ -162,14 +162,16 @@ On tree window open (if AI is configured), Forest auto-generates a 1-2 sentence 
 
 ### Configurable Linear Statuses
 
-Customize which Linear states to show in the issues sidebar and which states to set on new/ship/cleanup:
+Customize which Linear states to show in the issues sidebar and which states to set on new/ship/cleanup.
+
+**Important:** Use the lowercase state names from the Linear CLI, not the display names from the Linear UI. Run `linear issue list --help` to see valid values: `triage`, `backlog`, `unstarted`, `started`, `completed`, `canceled`. For `linearTeam`, use the team **key** (e.g. `KAD`), not the display name — find it with `linear team list`.
 
 ```json
 "linearStatuses": {
-  "issueList": ["Triage", "Backlog", "Todo"],
-  "onNew": "In Progress",
-  "onShip": "In Review",
-  "onCleanup": "Done"
+  "issueList": ["triage", "backlog", "unstarted"],
+  "onNew": "started",
+  "onShip": "started",
+  "onCleanup": "completed"
 }
 ```
 

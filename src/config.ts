@@ -34,7 +34,7 @@ const DEFAULTS: Partial<ForestConfig> = {
   branchFormat: '${ticketId}-${slug}',
   baseBranch: 'origin/main',
   maxTrees: 10,
-  linearStatuses: { issueList: ['Triage', 'Backlog', 'Todo'], onNew: 'In Progress', onShip: 'In Review', onCleanup: 'Done' },
+  linearStatuses: { issueList: ['triage', 'backlog', 'unstarted'], onNew: 'started', onShip: 'started', onCleanup: 'completed' },
 };
 
 export async function loadConfig(): Promise<ForestConfig | null> {

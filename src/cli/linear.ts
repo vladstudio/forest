@@ -75,7 +75,7 @@ export async function createIssue(opts: {
   label?: string;
   team?: string;
 }): Promise<string> {
-  const args = ['issue', 'create', '-t', opts.title, '-a', 'self', '--start', '--no-interactive', '--no-pager'];
+  const args = ['issue', 'create', '-t', opts.title, '-a', 'self', '--start', '--no-interactive'];
   if (opts.priority) args.push('--priority', String(opts.priority));
   if (opts.label) args.push('-l', opts.label);
   if (opts.team) args.push('--team', opts.team);
