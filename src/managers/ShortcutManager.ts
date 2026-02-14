@@ -154,20 +154,28 @@ export class ShortcutManager {
   }
 
   private async waitAndOpenBrowser(port: number, url: string, viewColumn?: vscode.ViewColumn): Promise<void> {
+    if (await isPortOpen(port)) { this.openSimpleBrowser(url, viewColumn); return; }
+
     const timeout = 120_000;
     const start = Date.now();
-    const check = async (): Promise<void> => {
-      if (this.disposed) return;
-      if (Date.now() - start > timeout) {
-        const c = await vscode.window.showWarningMessage(`Timed out waiting for port ${port}.`, 'Open Anyway');
-        if (c) this.openSimpleBrowser(url, viewColumn);
-        return;
-      }
-      if (await isPortOpen(port)) { this.openSimpleBrowser(url, viewColumn); return; }
-      const timer = setTimeout(() => { this.pendingTimers.delete(timer); check(); }, 2000);
-      this.pendingTimers.add(timer);
-    };
-    check();
+    vscode.window.withProgress(
+      { location: vscode.ProgressLocation.Notification, title: `Waiting for port ${port}…`, cancellable: true },
+      (_progress, token) => new Promise<void>(resolve => {
+        const check = async (): Promise<void> => {
+          if (this.disposed || token.isCancellationRequested) { resolve(); return; }
+          if (Date.now() - start > timeout) {
+            resolve();
+            const c = await vscode.window.showWarningMessage(`Timed out waiting for port ${port}.`, 'Open Anyway');
+            if (c) this.openSimpleBrowser(url, viewColumn);
+            return;
+          }
+          if (await isPortOpen(port)) { resolve(); this.openSimpleBrowser(url, viewColumn); return; }
+          const timer = setTimeout(() => { this.pendingTimers.delete(timer); check(); }, 2000);
+          this.pendingTimers.add(timer);
+        };
+        check();
+      }),
+    );
   }
 
   private async openSimpleBrowser(url: string, viewColumn?: vscode.ViewColumn): Promise<void> {
