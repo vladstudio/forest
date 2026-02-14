@@ -43,9 +43,8 @@ export class ShortcutManager {
 
   restart(sc: ShortcutConfig): void {
     if (sc.type !== 'terminal') return;
-    const name = sc.name;
     const sub = vscode.window.onDidCloseTerminal(t => {
-      if (t.name === `ψ ${name}`) {
+      if (t.name === sc.name) {
         sub.dispose();
         this.open(sc);
       }
@@ -57,12 +56,11 @@ export class ShortcutManager {
   async openOnLaunchShortcuts(): Promise<void> {
     if (!this.currentTree) return;
     // Adopt existing terminals
-    const prefix = 'ψ ';
     for (const sc of this.config.shortcuts) {
       if (sc.type !== 'terminal') continue;
       const adopted: vscode.Terminal[] = [];
       for (const t of vscode.window.terminals) {
-        if (t.name === `${prefix}${sc.name}` || t.name.startsWith(`${prefix}${sc.name} (`)) {
+        if (t.name === sc.name || t.name.startsWith(`${sc.name} `)) {
           adopted.push(t);
         }
       }
@@ -131,7 +129,7 @@ export class ShortcutManager {
     }
     Object.assign(env, sc.env);
     const terminal = vscode.window.createTerminal({
-      name: `ψ ${sc.name}`,
+      name: sc.name,
       cwd: this.currentTree?.path,
       env,
       ...(location ? { location: { viewColumn: location } } : {}),

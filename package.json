@@ -232,11 +232,6 @@
           "group": "inline"
         },
         {
-          "command": "forest.switch",
-          "when": "view == forest.trees && viewItem == tree",
-          "group": "inline"
-        },
-        {
           "command": "forest.openInLinear",
           "when": "viewItem == tree || viewItem == issue",
           "group": "1_navigation"
