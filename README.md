@@ -98,7 +98,7 @@ To set up Forest, ask Claude (or any AI) to read this README and generate `.fore
 | `ports.baseRange` | no       | `[3000, 4000]`                   | Port range to allocate from                                                                                                                                                 |
 | `ports.mapping`   | no       | `{}`                             | Named ports as offsets: `{ "app": "+0", "api": "+1" }`                                                                                                                      |
 | `env`             | no       | `{}`                             | Extra env vars injected into tree. Supports `${ports.X}`                                                                                                                    |
-| `linear`          | no       | `{ enabled: true }`             | Linear integration. `team` is the team **key** (e.g. `ENG`), not the display name — run `linear team list` to find it. `statuses` controls issue list and lifecycle transitions (**must use lowercase** Linear CLI state names: `triage`, `backlog`, `unstarted`, `started`, `completed`, `canceled`) |
+| `linear`          | no       | `{ enabled: true }`             | Linear integration. `team` is the team **key** (e.g. `ENG`), not the display name — run `linear team list` to find it. `statuses` controls issue list and lifecycle transitions including `onCancel` (**must use lowercase** Linear CLI state names: `triage`, `backlog`, `unstarted`, `started`, `completed`, `canceled`) |
 | `github`          | no       | `{ enabled: true }`             | GitHub integration toggle                                                                                                                                                   |
 | `branchFormat`    | no       | `${ticketId}-${slug}`            | Branch naming. Supports `${ticketId}`, `${slug}`                                                                                                                            |
 | `baseBranch`      | no       | `origin/main`                    | Branch to rebase on                                                                                                                                                         |
@@ -112,9 +112,17 @@ To set up Forest, ask Claude (or any AI) to read this README and generate `.fore
 
 ## Features
 
+### Tree Grouping
+
+The Trees sidebar groups trees by status:
+
+- **In Progress** — no PR created yet
+- **In Review** — PR is open
+- **Done** — PR has been merged
+
 ### Tree Health Indicators
 
-The Trees sidebar shows live health info for each tree:
+Each tree shows live health info:
 
 ```
 ENG-1234  Fix login bug   3↓ · 2h
@@ -158,6 +166,10 @@ Shortcuts support these variables in commands, URLs, and file paths:
 
 Setup commands stream their output in real-time to the **Forest** output channel, so you can watch `npm install` progress instead of staring at a spinner.
 
+### Browser Wait-for-Port
+
+Browser shortcuts targeting `localhost` automatically wait up to 2 minutes for the port to open before launching, with a progress notification. No more refreshing a blank page while the dev server starts.
+
 ### Port Conflict Detection
 
 When a tree window opens, Forest checks if any allocated ports are already in use and warns you — including which other tree might be using them.
@@ -165,6 +177,10 @@ When a tree window opens, Forest checks if any allocated ports are already in us
 ### Pre-Warm Template
 
 After the first tree runs setup, `node_modules` is saved as a template. Subsequent trees get an instant copy (APFS clonefile on macOS, hardlinks on Linux) before running setup, dramatically speeding up tree creation.
+
+### Direnv Support
+
+If a `.envrc` file exists in the tree, Forest automatically runs `direnv allow` during setup.
 
 Rebuild the template manually: `Forest: Warm Template` from the command palette.
 
