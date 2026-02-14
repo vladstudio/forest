@@ -37,22 +37,18 @@ export async function listMyIssues(
 /** Parse `linear issue list` table output into structured data. */
 function parseIssueTable(output: string): LinearIssue[] {
   const issues: LinearIssue[] = [];
-  // Strip ANSI escape codes
   const clean = output.replace(/\x1b\[[0-9;]*m/g, '');
   for (const line of clean.split('\n')) {
-    // Match issue ID pattern: LETTERS-DIGITS
     const match = line.match(/([A-Z]+-\d+)\s+(.+)/);
     if (!match) continue;
     const id = match[1];
-    const rest = match[2].trim();
-    // Title is the main text before metadata columns
-    const parts = rest.split(/\s{2,}/);
-    issues.push({
-      id,
-      title: parts[0] || rest,
-      state: parts.length > 1 ? parts[parts.length - 2] || 'Unknown' : 'Unknown',
-      priority: 3,
-    });
+    const rest = match[2];
+    // State is the word before the "N timeunit ago" timestamp at end of line
+    const stateMatch = rest.match(/(\S+)\s+\d+\s+\w+\s+ago\s*$/);
+    const state = stateMatch?.[1] || 'Unknown';
+    // Title is everything up to the first run of 2+ spaces
+    const title = rest.match(/^(.+?)  /)?.[1]?.trim() || rest.trim();
+    issues.push({ id, title, state, priority: 3 });
   }
   return issues;
 }

@@ -45,7 +45,12 @@ export class IssuesTreeProvider implements vscode.TreeDataProvider<IssueTreeNode
       if (grouped.size <= 1) return filtered.map(i => new IssueItem(i));
 
       // Order groups by config order, then any extras
-      const order = this.config.linear.statuses.issueList.map(s => s.toLowerCase());
+      // Map CLI state names to display names used by `linear issue list`
+      const displayName: Record<string, string> = {
+        triage: 'triage', backlog: 'backlog', unstarted: 'todo',
+        started: 'in progress', completed: 'done', canceled: 'canceled',
+      };
+      const order = this.config.linear.statuses.issueList.map(s => displayName[s.toLowerCase()] || s.toLowerCase());
       const sorted = [...grouped.keys()].sort((a, b) => {
         const ai = order.indexOf(a);
         const bi = order.indexOf(b);
