@@ -172,6 +172,7 @@ function generateWorkspaceFile(treePath: string, ticketId: string, title: string
     folders: [{ path: '.' }],
     settings: {
       'window.title': `${ticketId}: ${title} — \${activeEditorShort}`,
+      'terminal.integrated.enablePersistentSessions': false,
       'workbench.colorCustomizations': {
         'titleBar.activeBackground': color,
         'titleBar.activeForeground': '#ffffff',

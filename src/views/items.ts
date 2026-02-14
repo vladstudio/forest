@@ -23,12 +23,14 @@ export class ShortcutItem extends vscode.TreeItem {
 
     if (shortcut.type === 'terminal') {
       const running = state === 'running';
-      this.contextValue = running ? 'shortcut-terminal-running' : 'shortcut-terminal-stopped';
+      this.contextValue = running
+        ? (shortcut.allowMultiple ? 'shortcut-terminal-multi' : 'shortcut-terminal-running')
+        : 'shortcut-terminal-stopped';
       this.iconPath = new vscode.ThemeIcon(
         'terminal',
         running ? new vscode.ThemeColor('charts.green') : undefined,
       );
-      if (running) this.description = 'running';
+      if (running && !shortcut.allowMultiple) this.description = 'running';
     } else if (shortcut.type === 'browser') {
       this.contextValue = 'shortcut-browser';
       this.iconPath = new vscode.ThemeIcon('globe');

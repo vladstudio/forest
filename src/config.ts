@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 
-interface ShortcutBase { name: string; openOnLaunch?: number | false; }
+interface ShortcutBase { name: string; openOnLaunch?: number | false; allowMultiple?: boolean; }
 interface TerminalShortcut extends ShortcutBase { type: 'terminal'; command?: string; env?: Record<string, string>; }
 interface BrowserShortcut extends ShortcutBase { type: 'browser'; url: string; }
 interface FileShortcut extends ShortcutBase { type: 'file'; path: string; }

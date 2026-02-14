@@ -32,8 +32,8 @@ Add `.forest/config.json` to your repo root (tip: ask Claude to generate one for
   "setup": "bun install --frozen-lockfile",
   "shortcuts": [
     { "name": "dev", "type": "terminal", "command": "bunx turbo dev", "openOnLaunch": 1 },
-    { "name": "claude", "type": "terminal", "command": "claude", "openOnLaunch": 1 },
-    { "name": "shell", "type": "terminal" },
+    { "name": "claude", "type": "terminal", "command": "claude", "openOnLaunch": 1, "allowMultiple": true },
+    { "name": "shell", "type": "terminal", "allowMultiple": true },
     { "name": "App", "type": "browser", "url": "http://localhost:${ports.app}", "openOnLaunch": 2 }
   ],
   "ports": {
@@ -98,7 +98,7 @@ To set up Forest, ask Claude (or any AI) to read this README and generate `.fore
 | `baseBranch` | no | `origin/main` | Branch to rebase on |
 | `maxTrees` | no | `10` | Max concurrent worktrees |
 
-**Shortcut types:** `terminal` (with optional `command`, `env`), `browser` (with `url`), `file` (with `path`). All support `openOnLaunch: N` (priority order, `false` to disable).
+**Shortcut types:** `terminal` (with optional `command`, `env`, `allowMultiple`), `browser` (with `url`), `file` (with `path`). All support `openOnLaunch: N` (priority order, `false` to disable). Terminal shortcuts with `allowMultiple: true` open a new instance on each click (no stop/restart buttons).
 
 **Variable expansion in shortcuts:** `${ticketId}`, `${branch}`, `${ports.X}`.
 

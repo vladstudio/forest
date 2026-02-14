@@ -6,7 +6,7 @@ import type { StateManager } from '../state';
 import { isPortOpen, resolvePortVars } from '../utils/ports';
 
 export class ShortcutManager {
-  private terminals = new Map<string, vscode.Terminal>();
+  private terminals = new Map<string, vscode.Terminal[]>();
   private pendingTimers = new Set<ReturnType<typeof setTimeout>>();
   private disposed = false;
   private disposables: vscode.Disposable[] = [];
@@ -23,7 +23,8 @@ export class ShortcutManager {
 
   getState(sc: ShortcutConfig): 'running' | 'stopped' | 'idle' {
     if (sc.type !== 'terminal') return 'idle';
-    return this.terminals.has(sc.name) ? 'running' : 'stopped';
+    const list = this.terminals.get(sc.name);
+    return list && list.length > 0 ? 'running' : 'stopped';
   }
 
   open(sc: ShortcutConfig, viewColumn?: vscode.ViewColumn): void {
@@ -36,15 +37,15 @@ export class ShortcutManager {
 
   stop(sc: ShortcutConfig): void {
     if (sc.type !== 'terminal') return;
-    const t = this.terminals.get(sc.name);
-    if (t) t.dispose();
+    const list = this.terminals.get(sc.name);
+    if (list) for (const t of [...list]) t.dispose();
   }
 
   restart(sc: ShortcutConfig): void {
     if (sc.type !== 'terminal') return;
     const name = sc.name;
     const sub = vscode.window.onDidCloseTerminal(t => {
-      if (t.name === `[Forest] ${name}`) {
+      if (t.name === `ψ ${name}`) {
         sub.dispose();
         this.open(sc);
       }
@@ -56,12 +57,16 @@ export class ShortcutManager {
   async openOnLaunchShortcuts(): Promise<void> {
     if (!this.currentTree) return;
     // Adopt existing terminals
-    const existing = new Map(vscode.window.terminals.map(t => [t.name, t]));
+    const prefix = 'ψ ';
     for (const sc of this.config.shortcuts) {
       if (sc.type !== 'terminal') continue;
-      const name = `[Forest] ${sc.name}`;
-      const t = existing.get(name);
-      if (t) this.terminals.set(sc.name, t);
+      const adopted: vscode.Terminal[] = [];
+      for (const t of vscode.window.terminals) {
+        if (t.name === `${prefix}${sc.name}` || t.name.startsWith(`${prefix}${sc.name} (`)) {
+          adopted.push(t);
+        }
+      }
+      if (adopted.length > 0) this.terminals.set(sc.name, adopted);
     }
 
     // Check port conflicts before launching terminals
@@ -71,7 +76,8 @@ export class ShortcutManager {
       if (!sc.openOnLaunch) continue;
       if (sc.type === 'terminal') {
         const viewCol = typeof sc.openOnLaunch === 'number' && sc.openOnLaunch > 1 ? sc.openOnLaunch as vscode.ViewColumn : undefined;
-        if (!this.terminals.has(sc.name)) this.openTerminal(sc, viewCol);
+        const existing = this.terminals.get(sc.name);
+        if (!existing || existing.length === 0) this.openTerminal(sc, viewCol);
       } else {
         this.open(sc, sc.openOnLaunch as vscode.ViewColumn);
       }
@@ -114,8 +120,11 @@ export class ShortcutManager {
   }
 
   private openTerminal(sc: ShortcutConfig & { type: 'terminal' }, location?: vscode.ViewColumn): void {
-    const existing = this.terminals.get(sc.name);
-    if (existing) { existing.show(); return; }
+    const list = this.terminals.get(sc.name) ?? [];
+    if (!sc.allowMultiple && list.length > 0) { list[0].show(); return; }
+
+    const count = list.length;
+    const termName = count > 0 ? `ψ ${sc.name} ${count + 1}` : `ψ ${sc.name}`;
 
     const env: Record<string, string> = {};
     if (this.currentTree && this.config.env) {
@@ -125,14 +134,15 @@ export class ShortcutManager {
     }
     Object.assign(env, sc.env);
     const terminal = vscode.window.createTerminal({
-      name: `[Forest] ${sc.name}`,
+      name: termName,
       cwd: this.currentTree?.path,
       env,
       ...(location ? { location: { viewColumn: location } } : {}),
     });
     terminal.show(false);
     if (sc.command) terminal.sendText(this.resolveVars(sc.command));
-    this.terminals.set(sc.name, terminal);
+    list.push(terminal);
+    this.terminals.set(sc.name, list);
     this._onDidChange.fire();
   }
 
@@ -184,9 +194,11 @@ export class ShortcutManager {
   }
 
   private handleTerminalClose(terminal: vscode.Terminal): void {
-    for (const [name, managed] of this.terminals) {
-      if (managed !== terminal) continue;
-      this.terminals.delete(name);
+    for (const [name, list] of this.terminals) {
+      const idx = list.indexOf(terminal);
+      if (idx < 0) continue;
+      list.splice(idx, 1);
+      if (list.length === 0) this.terminals.delete(name);
       this._onDidChange.fire();
       break;
     }
