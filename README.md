@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="forest.png" width="128" alt="Forest">
+</p>
+
 # Forest
 
 VSCode extension for parallel feature development using git worktrees. One Linear ticket = one branch = one worktree = one VSCode window.
@@ -101,7 +105,7 @@ To set up Forest, ask Claude (or any AI) to read this README and generate `.fore
 
 **Shortcut types:** `terminal` (with optional `command`, `env`, `allowMultiple`), `browser` (with `url`), `file` (with `path`). All support `openOnLaunch: N` (priority order, `false` to disable). Terminal shortcuts with `allowMultiple: true` open a new instance on each click (no stop/restart buttons).
 
-**Variable expansion in shortcuts:** `${ticketId}`, `${branch}`, `${ports.X}`.
+**Variable expansion in shortcuts:** `${ticketId}`, `${branch}`, `${slug}`, `${repo}`, `${treePath}`, `${prNumber}`, `${prUrl}`, `${ports.X}`.
 
 **`local.json`** (gitignored) merges over `config.json` — use for per-dev AI keys and overrides.
 
@@ -130,11 +134,23 @@ Trees in `review` status with a PR are polled every 5 minutes. When a PR is merg
 
 ### Shortcut Variable Expansion
 
-Shortcuts support `${ticketId}` and `${branch}` variables in commands, URLs, and file paths:
+Shortcuts support these variables in commands, URLs, and file paths:
+
+| Variable | Description | Example value |
+|----------|-------------|---------------|
+| `${ticketId}` | Linear ticket ID | `KAD-123` |
+| `${branch}` | Full branch name | `KAD-123-fix-login` |
+| `${slug}` | Branch name without ticket prefix | `fix-login` |
+| `${repo}` | Repository name | `my-app` |
+| `${treePath}` | Absolute path to the worktree | `/Users/you/forest/my-app/KAD-123` |
+| `${prNumber}` | PR number (after ship) | `42` |
+| `${prUrl}` | PR URL (after ship) | `https://github.com/org/repo/pull/42` |
+| `${ports.X}` | Allocated port for named mapping | `14000` |
 
 ```json
 { "name": "Linear", "type": "browser", "url": "https://linear.app/team/issue/${ticketId}" },
-{ "name": "PR", "type": "terminal", "command": "gh pr view ${branch} --web" }
+{ "name": "PR", "type": "browser", "url": "${prUrl}" },
+{ "name": "logs", "type": "terminal", "command": "tail -f ${treePath}/logs/dev.log" }
 ```
 
 ### Streaming Setup Output

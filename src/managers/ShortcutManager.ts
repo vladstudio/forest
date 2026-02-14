@@ -123,9 +123,6 @@ export class ShortcutManager {
     const list = this.terminals.get(sc.name) ?? [];
     if (!sc.allowMultiple && list.length > 0) { list[0].show(); return; }
 
-    const count = list.length;
-    const termName = count > 0 ? `ψ ${sc.name} ${count + 1}` : `ψ ${sc.name}`;
-
     const env: Record<string, string> = {};
     if (this.currentTree && this.config.env) {
       for (const [k, v] of Object.entries(this.config.env)) {
@@ -134,7 +131,7 @@ export class ShortcutManager {
     }
     Object.assign(env, sc.env);
     const terminal = vscode.window.createTerminal({
-      name: termName,
+      name: `ψ ${sc.name}`,
       cwd: this.currentTree?.path,
       env,
       ...(location ? { location: { viewColumn: location } } : {}),
@@ -206,9 +203,19 @@ export class ShortcutManager {
 
   private resolveVars(value: string): string {
     if (!this.currentTree) return value;
+    const tree = this.currentTree;
+    const slug = tree.branch.startsWith(tree.ticketId)
+      ? tree.branch.slice(tree.ticketId.length).replace(/^-/, '')
+      : tree.branch;
+    const prNumber = tree.prUrl?.match(/\/pull\/(\d+)/)?.[1] ?? '';
     return value
-      .replace(/\$\{ticketId\}/g, this.currentTree.ticketId)
-      .replace(/\$\{branch\}/g, this.currentTree.branch);
+      .replace(/\$\{ticketId\}/g, tree.ticketId)
+      .replace(/\$\{branch\}/g, tree.branch)
+      .replace(/\$\{repo\}/g, path.basename(tree.repoPath))
+      .replace(/\$\{treePath\}/g, tree.path)
+      .replace(/\$\{slug\}/g, slug)
+      .replace(/\$\{prNumber\}/g, prNumber)
+      .replace(/\$\{prUrl\}/g, tree.prUrl ?? '');
   }
 
   private resolvePorts(value: string): string {
