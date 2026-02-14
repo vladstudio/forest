@@ -80,7 +80,7 @@
     "viewsWelcome": [
       {
         "view": "forest.setup",
-        "contents": "Forest is not configured for this workspace.\n\nAsk your AI agent:\n\n`Set up Forest (https://github.com/vladstudio/forest) for this project. Create .forest/config.json with the required configuration.`"
+        "contents": "Forest is not configured for this workspace.\n\nAsk your AI agent:\n\n`Set up Forest (https://github.com/vladstudio/forest) for this project. Create .forest/config.json with the required configuration.`\n\n[Copy to Clipboard](command:forest.copySetupPrompt)"
       },
       {
         "view": "forest.trees",
@@ -89,6 +89,11 @@
       }
     ],
     "commands": [
+      {
+        "command": "forest.copySetupPrompt",
+        "title": "Copy Setup Prompt",
+        "category": "Forest"
+      },
       {
         "command": "forest.newIssueTree",
         "title": "New Linear Issue + Tree",
