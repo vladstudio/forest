@@ -167,11 +167,12 @@ export async function activate(context: vscode.ExtensionContext) {
       if (prev.ticketId === currentTree?.ticketId) continue;
       if (!currentIds.has(prev.ticketId)) {
         git.removeWorktree(prev.repoPath, prev.path)
-          .then(() => outputChannel.appendLine(`[Forest] Cleaned worktree: ${prev.ticketId}`))
-          .catch(e => outputChannel.appendLine(`[Forest] Worktree cleanup failed (${prev.ticketId}): ${e.message}`));
-        git.deleteBranch(prev.repoPath, prev.branch)
+          .then(() => {
+            outputChannel.appendLine(`[Forest] Cleaned worktree: ${prev.ticketId}`);
+            return git.deleteBranch(prev.repoPath, prev.branch);
+          })
           .then(() => outputChannel.appendLine(`[Forest] Deleted branch: ${prev.branch}`))
-          .catch(e => outputChannel.appendLine(`[Forest] Branch cleanup failed (${prev.branch}): ${e.message}`));
+          .catch(e => outputChannel.appendLine(`[Forest] Cleanup failed (${prev.ticketId}): ${e.message}`));
       }
     }
     previousTrees = currentTrees;
