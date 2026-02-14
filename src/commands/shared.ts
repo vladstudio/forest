@@ -104,6 +104,11 @@ export async function createTree(opts: {
 
       const hadTemplate = copyModulesFromTemplate(config, treePath);
 
+      // Auto-allow direnv if .envrc exists
+      if (fs.existsSync(path.join(treePath, '.envrc'))) {
+        try { await execShell('direnv allow', { cwd: treePath, timeout: 10_000 }); } catch {}
+      }
+
       progress.report({ message: 'Running setup...' });
       await runSetupCommands(config, treePath);
 

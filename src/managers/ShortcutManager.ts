@@ -185,11 +185,6 @@ export class ShortcutManager {
       if (managed !== terminal) continue;
       this.terminals.delete(name);
       this._onDidChange.fire();
-      const sc = this.config.shortcuts.find(s => s.type === 'terminal' && s.name === name);
-      if (sc && sc.type === 'terminal' && sc.command) {
-        vscode.window.showWarningMessage(`Terminal "${name}" exited. Restart?`, 'Restart', 'Ignore')
-          .then(c => { if (c === 'Restart') this.open(sc); });
-      }
       break;
     }
   }

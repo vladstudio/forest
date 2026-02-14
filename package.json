@@ -72,6 +72,11 @@
           "id": "forest.shortcuts",
           "name": "Shortcuts",
           "when": "forest.active && forest.isTree"
+        },
+        {
+          "id": "forest.summary",
+          "name": "Summary",
+          "when": "forest.active && forest.isTree"
         }
       ]
     },

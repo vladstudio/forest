@@ -5,6 +5,7 @@ import type { ForestConfig } from './config';
 import type { StateManager, TreeState } from './state';
 import type { IssuesTreeProvider } from './views/IssuesTreeProvider';
 import type { TreesTreeProvider } from './views/TreesTreeProvider';
+import type { SummaryTreeProvider } from './views/SummaryTreeProvider';
 import type { ShortcutManager } from './managers/ShortcutManager';
 import type { PortManager } from './managers/PortManager';
 import type { StatusBarManager } from './managers/StatusBarManager';
@@ -17,6 +18,7 @@ export interface ForestContext {
   statusBarManager: StatusBarManager;
   issuesProvider: IssuesTreeProvider;
   treesProvider: TreesTreeProvider;
+  summaryProvider: SummaryTreeProvider;
   outputChannel: vscode.OutputChannel;
   currentTree: TreeState | undefined;
 }

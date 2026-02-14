@@ -158,7 +158,20 @@ Supported providers: `gemini` (default model: `gemini-2.0-flash-lite`) and `open
 
 ### AI Tree Summary
 
-On tree window open (if AI is configured), Forest auto-generates a 1-2 sentence summary of your tree: branch status, commits behind, PR state, and uncommitted changes. Also available via `Forest: Tree Summary — AI`.
+On tree window open (if AI is configured), Forest auto-generates a 1-2 sentence summary of your tree: branch status, commits behind, PR state, and uncommitted changes. The summary appears in the **Summary** section of the Forest sidebar. Also available via `Forest: Tree Summary — AI`.
+
+### Claude Code Trust
+
+Claude Code asks for trust confirmation when opening a new workspace. Since each tree creates a new directory, you'd get this prompt for every tree. To avoid it, add your `treesDir` to Claude's trusted directories:
+
+In `~/.claude/settings.json`:
+```json
+{
+  "trustedDirectories": ["/Users/you/forest"]
+}
+```
+
+Replace the path with your actual `treesDir` (without the `${repo}` part).
 
 ### Configurable Linear Statuses
 

@@ -30,8 +30,8 @@ export async function treeSummary(ctx: ForestContext): Promise<void> {
       'Summarize this git tree status in 1-2 sentences. Be concise.',
       context,
     );
-    vscode.window.showInformationMessage(summary);
+    ctx.summaryProvider.setSummary(summary);
   } catch (e: any) {
-    vscode.window.showErrorMessage(`AI error: ${e.message}`);
+    ctx.summaryProvider.setSummary(`Error: ${e.message}`);
   }
 }
