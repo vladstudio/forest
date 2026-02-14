@@ -20,14 +20,9 @@ export async function pushBranch(worktreePath: string, branch: string): Promise<
   await exec('git', ['push', '-u', 'origin', branch], { cwd: worktreePath });
 }
 
-export async function rebase(worktreePath: string, baseRef: string): Promise<void> {
+export async function pullMerge(worktreePath: string, baseRef: string): Promise<void> {
   await exec('git', ['fetch', 'origin'], { cwd: worktreePath });
-  try {
-    await exec('git', ['rebase', baseRef], { cwd: worktreePath, timeout: 60_000 });
-  } catch (e) {
-    await exec('git', ['rebase', '--abort'], { cwd: worktreePath }).catch(() => {});
-    throw e;
-  }
+  await exec('git', ['merge', baseRef], { cwd: worktreePath, timeout: 60_000 });
 }
 
 export async function hasUncommittedChanges(worktreePath: string): Promise<boolean> {

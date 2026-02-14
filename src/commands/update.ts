@@ -14,11 +14,11 @@ export async function update(ctx: ForestContext, treeArg?: import('../state').Tr
   await vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: `Updating ${tree.ticketId}...` },
     async (progress) => {
-      progress.report({ message: 'Rebasing on latest...' });
+      progress.report({ message: 'Pulling latest...' });
       try {
-        await git.rebase(tree.path, config.baseBranch);
+        await git.pullMerge(tree.path, config.baseBranch);
       } catch (e: any) {
-        vscode.window.showErrorMessage(`Rebase failed: ${e.message}. Resolve conflicts manually.`);
+        vscode.window.showErrorMessage(`Merge failed: ${e.message}. Resolve conflicts manually.`);
         return;
       }
 

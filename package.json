@@ -144,7 +144,7 @@
       },
       {
         "command": "forest.update",
-        "title": "Update — Rebase + Refresh",
+        "title": "Update — Pull + Refresh",
         "category": "Forest",
         "icon": "$(refresh)"
       },
