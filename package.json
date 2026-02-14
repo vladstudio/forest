@@ -3,16 +3,18 @@
   "displayName": "Forest",
   "description": "Manage parallel feature development with git worktrees",
   "version": "0.1.0",
-  "publisher": "forest-dev",
+  "publisher": "vladstudio",
+  "icon": "forest.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/vladstudio/forest"
   },
+  "license": "MIT",
   "engines": {
     "vscode": "^1.85.0"
   },
   "categories": [
-    "Other"
+    "SCM Providers"
   ],
   "keywords": [
     "git",
