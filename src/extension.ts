@@ -24,7 +24,17 @@ import * as gh from './cli/gh';
 
 export async function activate(context: vscode.ExtensionContext) {
   const config = await loadConfig();
-  if (!config) return;
+  if (!config) {
+    // Register empty provider so the setup welcome message is shown
+    const emptyProvider: vscode.TreeDataProvider<never> = {
+      getTreeItem: () => { throw new Error('no items'); },
+      getChildren: () => [],
+    };
+    context.subscriptions.push(
+      vscode.window.registerTreeDataProvider('forest.setup', emptyProvider),
+    );
+    return;
+  }
 
   vscode.commands.executeCommand('setContext', 'forest.active', true);
   vscode.commands.executeCommand('setContext', 'forest.linearEnabled', config.integrations.linear);

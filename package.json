@@ -23,7 +23,7 @@
   ],
   "main": "./dist/extension.js",
   "activationEvents": [
-    "workspaceContains:.forest/config.json"
+    "onStartupFinished"
   ],
   "scripts": {
     "vscode:prepublish": "bun run package",
@@ -54,6 +54,11 @@
     "views": {
       "forest": [
         {
+          "id": "forest.setup",
+          "name": "Setup",
+          "when": "!forest.active"
+        },
+        {
           "id": "forest.issues",
           "name": "My Issues",
           "when": "forest.active && forest.linearEnabled"
@@ -71,6 +76,10 @@
       ]
     },
     "viewsWelcome": [
+      {
+        "view": "forest.setup",
+        "contents": "Forest is not configured for this workspace.\n\nAsk your AI agent:\n\n`Set up Forest (https://github.com/vladstudio/forest) for this project. Create .forest/config.json with the required configuration.`"
+      },
       {
         "view": "forest.trees",
         "contents": "No trees yet.\n[New Tree](command:forest.newTree)\n[New Issue + Tree](command:forest.newIssueTree)",

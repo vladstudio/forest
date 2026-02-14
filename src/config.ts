@@ -25,6 +25,19 @@ export interface ForestConfig {
   ai?: { provider: 'gemini' | 'openai'; apiKey?: string; model?: string };
 }
 
+/** Resolve the main repo root, even when opened inside a worktree. */
+function getMainRepoPath(wsPath: string): string {
+  const gitPath = path.join(wsPath, '.git');
+  try {
+    if (fs.statSync(gitPath).isFile()) {
+      const content = fs.readFileSync(gitPath, 'utf8').trim();
+      const gitdir = content.replace('gitdir: ', '');
+      return path.resolve(gitdir, '..', '..', '..');
+    }
+  } catch {}
+  return wsPath;
+}
+
 const DEFAULTS: Partial<ForestConfig> = {
   copy: [],
   shortcuts: [],
@@ -41,7 +54,8 @@ export async function loadConfig(): Promise<ForestConfig | null> {
   const ws = vscode.workspace.workspaceFolders?.[0];
   if (!ws) return null;
 
-  const configPath = path.join(ws.uri.fsPath, '.forest', 'config.json');
+  const repoRoot = getMainRepoPath(ws.uri.fsPath);
+  const configPath = path.join(repoRoot, '.forest', 'config.json');
   if (!fs.existsSync(configPath)) return null;
 
   let config: any;
@@ -54,7 +68,7 @@ export async function loadConfig(): Promise<ForestConfig | null> {
 
   // Merge: defaults → config → local
   let merged: any = mergeConfig(DEFAULTS, config);
-  const localPath = path.join(ws.uri.fsPath, '.forest', 'local.json');
+  const localPath = path.join(repoRoot, '.forest', 'local.json');
   if (fs.existsSync(localPath)) {
     try {
       const local = JSON.parse(fs.readFileSync(localPath, 'utf8'));
@@ -71,7 +85,7 @@ export async function loadConfig(): Promise<ForestConfig | null> {
 
   // Resolve ~ in treesDir
   merged.treesDir = merged.treesDir.replace(/^~/, os.homedir());
-  const repoName = path.basename(ws.uri.fsPath);
+  const repoName = path.basename(repoRoot);
   merged.treesDir = merged.treesDir.replace('${repo}', repoName);
 
   return merged as ForestConfig;
