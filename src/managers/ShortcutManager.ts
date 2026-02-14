@@ -92,7 +92,7 @@ export class ShortcutManager {
     if (!this.stateManager) return undefined;
     const state = this.stateManager.loadSync();
     for (const tree of Object.values(state.trees)) {
-      if (tree === this.currentTree || tree.ticketId === this.currentTree?.ticketId) continue;
+      if (tree.ticketId === this.currentTree?.ticketId) continue;
       for (const offset of Object.values(this.config.ports.mapping)) {
         const off = parseInt(offset.replace('+', '')) || 0;
         if (tree.portBase + off === port) return tree;

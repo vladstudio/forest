@@ -124,19 +124,26 @@ export async function activate(context: vscode.ExtensionContext) {
   }
 
   // Auto-fell polling: check merged PRs every 5 minutes
+  let autoFellRunning = false;
   const autoFellInterval = setInterval(async () => {
-    if (!(await gh.isAvailable())) return;
-    const s = await stateManager.load();
-    const trees = stateManager.getTreesForRepo(s, getRepoPath());
-    for (const tree of trees) {
-      if (tree.status !== 'review' || !tree.prUrl) continue;
-      if (await gh.prIsMerged(tree.repoPath, tree.branch)) {
-        const action = await vscode.window.showInformationMessage(
-          `${tree.ticketId} PR was merged. Clean up?`,
-          'Fell', 'Dismiss',
-        );
-        if (action === 'Fell') await fellMerged(ctx, tree);
+    if (autoFellRunning) return;
+    autoFellRunning = true;
+    try {
+      if (!(await gh.isAvailable())) return;
+      const s = await stateManager.load();
+      const trees = stateManager.getTreesForRepo(s, getRepoPath());
+      for (const tree of trees) {
+        if (tree.status !== 'review' || !tree.prUrl) continue;
+        if (await gh.prIsMerged(tree.repoPath, tree.branch)) {
+          const action = await vscode.window.showInformationMessage(
+            `${tree.ticketId} PR was merged. Clean up?`,
+            'Fell', 'Dismiss',
+          );
+          if (action === 'Fell') await fellMerged(ctx, tree);
+        }
       }
+    } finally {
+      autoFellRunning = false;
     }
   }, 5 * 60 * 1000);
   context.subscriptions.push({ dispose: () => clearInterval(autoFellInterval) });

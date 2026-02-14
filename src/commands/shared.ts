@@ -136,7 +136,7 @@ export function copyModulesFromTemplate(config: ForestConfig, treePath: string):
   if (!fs.existsSync(src)) return false;
   try {
     const flag = os.platform() === 'darwin' ? '-Rc' : '-al';
-    require('child_process').execSync(`cp ${flag} ${src} ${dst}`, { stdio: 'ignore' });
+    require('child_process').execFileSync('cp', [flag, src, dst], { stdio: 'ignore' });
     return true;
   } catch { return false; }
 }
@@ -150,7 +150,7 @@ export function saveTemplate(config: ForestConfig, treePath: string): void {
   try {
     if (fs.existsSync(dst)) fs.rmSync(dst, { recursive: true });
     const flag = os.platform() === 'darwin' ? '-Rc' : '-al';
-    require('child_process').execSync(`cp ${flag} ${src} ${dst}`, { stdio: 'ignore' });
+    require('child_process').execFileSync('cp', [flag, src, dst], { stdio: 'ignore' });
   } catch {}
 }
 
