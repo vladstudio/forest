@@ -3,9 +3,11 @@ import type { TreeState } from '../state';
 
 export class StatusBarManager {
   private item: vscode.StatusBarItem;
+  private summaryItem: vscode.StatusBarItem;
 
   constructor(private currentTree: TreeState | undefined) {
     this.item = vscode.window.createStatusBarItem('forest.tree', vscode.StatusBarAlignment.Left, 100);
+    this.summaryItem = vscode.window.createStatusBarItem('forest.summary', vscode.StatusBarAlignment.Left, 99);
   }
 
   show(): void {
@@ -19,10 +21,21 @@ export class StatusBarManager {
     this.item.show();
   }
 
+  setSummary(text: string): void {
+    if (!text) {
+      this.summaryItem.hide();
+      return;
+    }
+    this.summaryItem.text = `$(info) ${text}`;
+    this.summaryItem.tooltip = text;
+    this.summaryItem.command = 'forest.treeSummary';
+    this.summaryItem.show();
+  }
+
   update(tree: TreeState): void {
     this.currentTree = tree;
     this.show();
   }
 
-  dispose(): void { this.item.dispose(); }
+  dispose(): void { this.item.dispose(); this.summaryItem.dispose(); }
 }

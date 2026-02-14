@@ -9,7 +9,6 @@ import { StatusBarManager } from './managers/StatusBarManager';
 import { IssuesTreeProvider } from './views/IssuesTreeProvider';
 import { TreesTreeProvider } from './views/TreesTreeProvider';
 import { ShortcutsTreeProvider } from './views/ShortcutsTreeProvider';
-import { SummaryTreeProvider } from './views/SummaryTreeProvider';
 import { newIssueTree } from './commands/newIssueTree';
 import { newTree } from './commands/newTree';
 import { switchTree } from './commands/switch';
@@ -57,13 +56,10 @@ export async function activate(context: vscode.ExtensionContext) {
   const issuesProvider = new IssuesTreeProvider(config, stateManager);
   const treesProvider = new TreesTreeProvider(stateManager, config);
   const shortcutsProvider = new ShortcutsTreeProvider(config, shortcutManager);
-  const summaryProvider = new SummaryTreeProvider();
-
   context.subscriptions.push(
     vscode.window.registerTreeDataProvider('forest.issues', issuesProvider),
     vscode.window.registerTreeDataProvider('forest.trees', treesProvider),
     vscode.window.registerTreeDataProvider('forest.shortcuts', shortcutsProvider),
-    vscode.window.registerTreeDataProvider('forest.summary', summaryProvider),
   );
 
   // Update noTrees context
@@ -76,7 +72,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   const ctx: ForestContext = {
     config, stateManager, portManager, shortcutManager,
-    statusBarManager, issuesProvider, treesProvider, summaryProvider, outputChannel, currentTree,
+    statusBarManager, issuesProvider, treesProvider, outputChannel, currentTree,
   };
 
   // Register commands
