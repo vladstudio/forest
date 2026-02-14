@@ -174,10 +174,6 @@ Configure an AI provider in `.forest/local.json`, then run `Forest: Commit — A
 
 Supported providers: `gemini` (default model: `gemini-2.0-flash-lite`) and `openai` (default: `gpt-4o-mini`).
 
-### AI Tree Summary
-
-On tree window open (if AI is configured), Forest auto-generates a 1-2 sentence summary of your tree: branch status, commits behind, PR state, and uncommitted changes. The summary appears in the **Summary** section of the Forest sidebar. Also available via `Forest: Tree Summary — AI`.
-
 ### Claude Code Trust
 
 Claude Code asks for trust confirmation when opening a new workspace. Since each tree creates a new directory, you'd get this prompt for every tree. To avoid it, add `~/.forest/trees` to Claude's trusted directories:
@@ -239,7 +235,6 @@ Switch between trees from the sidebar. All processes keep running in background 
 | `Forest: Update`                  | Rebase + refresh deps                |
 | `Forest: List`                    | List all trees                       |
 | `Forest: Commit — AI Message`     | AI-generated commit from staged diff |
-| `Forest: Tree Summary — AI`       | AI summary of current tree           |
 | `Forest: Warm Template`           | Rebuild node_modules template        |
 
 ## Install locally

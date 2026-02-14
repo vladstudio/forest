@@ -197,12 +197,6 @@
         "icon": "$(git-commit)"
       },
       {
-        "command": "forest.treeSummary",
-        "title": "Tree Summary — AI",
-        "category": "Forest",
-        "icon": "$(info)"
-      },
-      {
         "command": "forest.warmTemplate",
         "title": "Warm Template",
         "category": "Forest",

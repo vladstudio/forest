@@ -17,7 +17,6 @@ import { cleanup, cancel, cleanupMerged } from './commands/cleanup';
 import { update } from './commands/update';
 import { list } from './commands/list';
 import { commit } from './commands/commit';
-import { treeSummary } from './commands/treeSummary';
 import { warmTemplate } from './commands/shared';
 import * as git from './cli/git';
 import * as gh from './cli/gh';
@@ -102,7 +101,6 @@ export async function activate(context: vscode.ExtensionContext) {
   reg('forest.update', (arg?: TreeItemView) => update(ctx, arg instanceof TreeItemView ? arg.tree : undefined));
   reg('forest.list', () => list(ctx));
   reg('forest.commit', () => commit(ctx));
-  reg('forest.treeSummary', () => treeSummary(ctx));
   reg('forest.warmTemplate', () => warmTemplate());
   reg('forest.refreshIssues', () => issuesProvider.refresh());
   reg('forest.refreshTrees', () => treesProvider.refresh());
@@ -121,10 +119,6 @@ export async function activate(context: vscode.ExtensionContext) {
     shortcutManager.openOnLaunchShortcuts();
     vscode.commands.executeCommand('forest.trees.focus');
 
-    // Auto-run tree summary if AI configured
-    if (config.ai?.apiKey) {
-      treeSummary(ctx);
-    }
   }
 
   // Auto-cleanup polling: check merged PRs every 5 minutes
