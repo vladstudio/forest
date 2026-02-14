@@ -4,11 +4,24 @@
   "description": "Manage parallel feature development with git worktrees",
   "version": "0.1.0",
   "publisher": "forest-dev",
-  "engines": { "vscode": "^1.85.0" },
-  "categories": ["Other"],
-  "keywords": ["git", "worktree", "linear", "workflow", "monorepo"],
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "git",
+    "worktree",
+    "linear",
+    "workflow",
+    "monorepo"
+  ],
   "main": "./dist/extension.js",
-  "activationEvents": ["workspaceContains:.forest/config.json", "onCommand:forest.init"],
+  "activationEvents": [
+    "workspaceContains:.forest/config.json",
+    "onCommand:forest.init"
+  ],
   "scripts": {
     "vscode:prepublish": "bun run package",
     "compile": "bun run check-types && node esbuild.js",
@@ -28,14 +41,30 @@
   "contributes": {
     "viewsContainers": {
       "activitybar": [
-        { "id": "forest", "title": "Forest", "icon": "resources/forest.svg" }
+        {
+          "id": "forest",
+          "title": "Forest",
+          "icon": "resources/forest.svg"
+        }
       ]
     },
     "views": {
       "forest": [
-        { "id": "forest.issues", "name": "My Issues", "when": "forest.active && forest.linearEnabled" },
-        { "id": "forest.trees", "name": "Trees", "when": "forest.active" },
-        { "id": "forest.shortcuts", "name": "Shortcuts", "when": "forest.active && forest.isTree" }
+        {
+          "id": "forest.issues",
+          "name": "My Issues",
+          "when": "forest.active && forest.linearEnabled"
+        },
+        {
+          "id": "forest.trees",
+          "name": "Trees",
+          "when": "forest.active"
+        },
+        {
+          "id": "forest.shortcuts",
+          "name": "Shortcuts",
+          "when": "forest.active && forest.isTree"
+        }
       ]
     },
     "viewsWelcome": [
@@ -46,50 +75,214 @@
       }
     ],
     "commands": [
-      { "command": "forest.seed", "title": "Seed — New Ticket + Tree", "category": "Forest", "icon": "$(add)" },
-      { "command": "forest.plant", "title": "Plant — Tree from Existing Ticket", "category": "Forest", "icon": "$(git-branch)" },
-      { "command": "forest.switch", "title": "Switch Tree", "category": "Forest", "icon": "$(arrow-swap)" },
-      { "command": "forest.ship", "title": "Ship — Push + PR", "category": "Forest", "icon": "$(rocket)" },
-      { "command": "forest.fell", "title": "Fell — Merge + Cleanup", "category": "Forest", "icon": "$(check-all)" },
-      { "command": "forest.water", "title": "Water — Refresh Dependencies", "category": "Forest", "icon": "$(refresh)" },
-      { "command": "forest.survey", "title": "Survey — List All Trees", "category": "Forest", "icon": "$(list-tree)" },
-      { "command": "forest.openInLinear", "title": "Open in Linear", "category": "Forest", "icon": "$(link-external)" },
-      { "command": "forest.copyBranch", "title": "Copy Branch Name", "category": "Forest", "icon": "$(copy)" },
-      { "command": "forest.setStatus", "title": "Set Tree Status", "category": "Forest", "icon": "$(tag)" },
-      { "command": "forest.refreshIssues", "title": "Refresh Issues", "category": "Forest", "icon": "$(refresh)" },
-      { "command": "forest.refreshTrees", "title": "Refresh Trees", "category": "Forest", "icon": "$(refresh)" },
-      { "command": "forest.openShortcut", "title": "Open Shortcut", "category": "Forest", "icon": "$(play)" },
-      { "command": "forest.stopShortcut", "title": "Stop Terminal", "category": "Forest", "icon": "$(debug-stop)" },
-      { "command": "forest.restartShortcut", "title": "Restart Terminal", "category": "Forest", "icon": "$(debug-restart)" },
-      { "command": "forest.commit", "title": "Commit — AI Message", "category": "Forest", "icon": "$(git-commit)" },
-      { "command": "forest.treeSummary", "title": "Tree Summary — AI", "category": "Forest", "icon": "$(info)" },
-      { "command": "forest.warmTemplate", "title": "Warm Template", "category": "Forest", "icon": "$(flame)" },
-      { "command": "forest.init", "title": "Initialize Forest Config", "category": "Forest", "icon": "$(gear)" }
+      {
+        "command": "forest.seed",
+        "title": "Seed — New Ticket + Tree",
+        "category": "Forest",
+        "icon": "$(add)"
+      },
+      {
+        "command": "forest.plant",
+        "title": "Plant — Tree from Existing Ticket",
+        "category": "Forest",
+        "icon": "$(git-branch)"
+      },
+      {
+        "command": "forest.switch",
+        "title": "Switch Tree",
+        "category": "Forest",
+        "icon": "$(arrow-swap)"
+      },
+      {
+        "command": "forest.ship",
+        "title": "Ship — Push + PR",
+        "category": "Forest",
+        "icon": "$(rocket)"
+      },
+      {
+        "command": "forest.fell",
+        "title": "Fell — Merge + Cleanup",
+        "category": "Forest",
+        "icon": "$(check-all)"
+      },
+      {
+        "command": "forest.water",
+        "title": "Water — Refresh Dependencies",
+        "category": "Forest",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "forest.survey",
+        "title": "Survey — List All Trees",
+        "category": "Forest",
+        "icon": "$(list-tree)"
+      },
+      {
+        "command": "forest.openInLinear",
+        "title": "Open in Linear",
+        "category": "Forest",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "forest.copyBranch",
+        "title": "Copy Branch Name",
+        "category": "Forest",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "forest.setStatus",
+        "title": "Set Tree Status",
+        "category": "Forest",
+        "icon": "$(tag)"
+      },
+      {
+        "command": "forest.refreshIssues",
+        "title": "Refresh Issues",
+        "category": "Forest",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "forest.refreshTrees",
+        "title": "Refresh Trees",
+        "category": "Forest",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "forest.openShortcut",
+        "title": "Open Shortcut",
+        "category": "Forest",
+        "icon": "$(play)"
+      },
+      {
+        "command": "forest.stopShortcut",
+        "title": "Stop Terminal",
+        "category": "Forest",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "forest.restartShortcut",
+        "title": "Restart Terminal",
+        "category": "Forest",
+        "icon": "$(debug-restart)"
+      },
+      {
+        "command": "forest.commit",
+        "title": "Commit — AI Message",
+        "category": "Forest",
+        "icon": "$(git-commit)"
+      },
+      {
+        "command": "forest.treeSummary",
+        "title": "Tree Summary — AI",
+        "category": "Forest",
+        "icon": "$(info)"
+      },
+      {
+        "command": "forest.warmTemplate",
+        "title": "Warm Template",
+        "category": "Forest",
+        "icon": "$(flame)"
+      },
+      {
+        "command": "forest.init",
+        "title": "Init",
+        "category": "Forest",
+        "icon": "$(gear)"
+      }
     ],
     "menus": {
       "view/title": [
-        { "command": "forest.refreshIssues", "when": "view == forest.issues", "group": "navigation" },
-        { "command": "forest.seed", "when": "view == forest.issues", "group": "navigation" },
-        { "command": "forest.refreshTrees", "when": "view == forest.trees", "group": "navigation" },
-        { "command": "forest.plant", "when": "view == forest.trees", "group": "navigation" }
+        {
+          "command": "forest.refreshIssues",
+          "when": "view == forest.issues",
+          "group": "navigation"
+        },
+        {
+          "command": "forest.seed",
+          "when": "view == forest.issues",
+          "group": "navigation"
+        },
+        {
+          "command": "forest.refreshTrees",
+          "when": "view == forest.trees",
+          "group": "navigation"
+        },
+        {
+          "command": "forest.plant",
+          "when": "view == forest.trees",
+          "group": "navigation"
+        }
       ],
       "view/item/context": [
-        { "command": "forest.plant", "when": "view == forest.issues && viewItem == issue", "group": "inline" },
-        { "command": "forest.switch", "when": "view == forest.trees && viewItem == tree", "group": "inline" },
-        { "command": "forest.openInLinear", "when": "viewItem == tree || viewItem == issue", "group": "1_navigation" },
-        { "command": "forest.copyBranch", "when": "viewItem == tree", "group": "1_navigation" },
-        { "command": "forest.setStatus", "when": "viewItem == tree", "group": "2_status" },
-        { "command": "forest.ship", "when": "viewItem == tree", "group": "3_lifecycle" },
-        { "command": "forest.water", "when": "viewItem == tree", "group": "3_lifecycle" },
-        { "command": "forest.fell", "when": "viewItem == tree", "group": "4_danger" },
-        { "command": "forest.stopShortcut", "when": "viewItem == shortcut-terminal-running", "group": "inline" },
-        { "command": "forest.stopShortcut", "when": "viewItem == shortcut-terminal-running", "group": "1_actions" },
-        { "command": "forest.restartShortcut", "when": "viewItem == shortcut-terminal-running", "group": "1_actions" }
+        {
+          "command": "forest.plant",
+          "when": "view == forest.issues && viewItem == issue",
+          "group": "inline"
+        },
+        {
+          "command": "forest.switch",
+          "when": "view == forest.trees && viewItem == tree",
+          "group": "inline"
+        },
+        {
+          "command": "forest.openInLinear",
+          "when": "viewItem == tree || viewItem == issue",
+          "group": "1_navigation"
+        },
+        {
+          "command": "forest.copyBranch",
+          "when": "viewItem == tree",
+          "group": "1_navigation"
+        },
+        {
+          "command": "forest.setStatus",
+          "when": "viewItem == tree",
+          "group": "2_status"
+        },
+        {
+          "command": "forest.ship",
+          "when": "viewItem == tree",
+          "group": "3_lifecycle"
+        },
+        {
+          "command": "forest.water",
+          "when": "viewItem == tree",
+          "group": "3_lifecycle"
+        },
+        {
+          "command": "forest.fell",
+          "when": "viewItem == tree",
+          "group": "4_danger"
+        },
+        {
+          "command": "forest.stopShortcut",
+          "when": "viewItem == shortcut-terminal-running",
+          "group": "inline"
+        },
+        {
+          "command": "forest.stopShortcut",
+          "when": "viewItem == shortcut-terminal-running",
+          "group": "1_actions"
+        },
+        {
+          "command": "forest.restartShortcut",
+          "when": "viewItem == shortcut-terminal-running",
+          "group": "1_actions"
+        }
       ],
       "commandPalette": [
-        { "command": "forest.openShortcut", "when": "false" },
-        { "command": "forest.stopShortcut", "when": "false" },
-        { "command": "forest.restartShortcut", "when": "false" }
+        {
+          "command": "forest.openShortcut",
+          "when": "false"
+        },
+        {
+          "command": "forest.stopShortcut",
+          "when": "false"
+        },
+        {
+          "command": "forest.restartShortcut",
+          "when": "false"
+        }
       ]
     },
     "keybindings": []

@@ -4,16 +4,16 @@ VSCode extension for parallel feature development using git worktrees. One Linea
 
 ## Concepts
 
-| Term | Action |
-|------|--------|
-| **Plant** | Create a worktree from an existing Linear ticket |
-| **Seed** | Create a new Linear ticket + worktree in one step |
-| **Ship** | Push branch + create PR + move ticket to configured status |
-| **Fell** | Merge PR + delete worktree + move ticket to configured status |
-| **Water** | Rebase on latest + re-run setup (reinstall deps, re-copy env files) |
-| **Survey** | Quick-pick list of all active trees |
-| **Commit** | AI-generated commit message from staged diff |
-| **Init** | Bootstrapping wizard to create `.forest/config.json` |
+| Term       | Action                                                              |
+| ---------- | ------------------------------------------------------------------- |
+| **Plant**  | Create a worktree from an existing Linear ticket                    |
+| **Seed**   | Create a new Linear ticket + worktree in one step                   |
+| **Ship**   | Push branch + create PR + move ticket to configured status          |
+| **Fell**   | Merge PR + delete worktree + move ticket to configured status       |
+| **Water**  | Rebase on latest + re-run setup (reinstall deps, re-copy env files) |
+| **Survey** | Quick-pick list of all active trees                                 |
+| **Commit** | AI-generated commit message from staged diff                        |
+| **Init**   | Bootstrapping wizard to create `.forest/config.json`                |
 
 ## Prerequisites
 
@@ -23,7 +23,7 @@ VSCode extension for parallel feature development using git worktrees. One Linea
 
 ## Setup
 
-Run `Forest: Initialize Forest Config` from the command palette, or manually add `.forest/config.json` to your repo:
+Run `Forest: Init` from the command palette, or manually add `.forest/config.json` to your repo:
 
 ```json
 {
@@ -58,7 +58,7 @@ Run `Forest: Initialize Forest Config` from the command palette, or manually add
 }
 ```
 
-Per-developer overrides go in `.forest/local.json` (gitignored):
+Per-developer overrides go in `.forest/local.json` (should be gitignored):
 
 ```json
 {
@@ -155,19 +155,19 @@ Switch between trees from the sidebar. All processes keep running in background 
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `Forest: Seed` | Create new ticket + tree |
-| `Forest: Plant` | Tree from existing ticket |
-| `Forest: Switch Tree` | Open another tree's window |
-| `Forest: Ship` | Push + create PR |
-| `Forest: Fell` | Merge PR + cleanup |
-| `Forest: Water` | Rebase + refresh deps |
-| `Forest: Survey` | List all trees |
+| Command                       | Description                          |
+| ----------------------------- | ------------------------------------ |
+| `Forest: Seed`                | Create new ticket + tree             |
+| `Forest: Plant`               | Tree from existing ticket            |
+| `Forest: Switch Tree`         | Open another tree's window           |
+| `Forest: Ship`                | Push + create PR                     |
+| `Forest: Fell`                | Merge PR + cleanup                   |
+| `Forest: Water`               | Rebase + refresh deps                |
+| `Forest: Survey`              | List all trees                       |
 | `Forest: Commit — AI Message` | AI-generated commit from staged diff |
-| `Forest: Tree Summary — AI` | AI summary of current tree |
-| `Forest: Warm Template` | Rebuild node_modules template |
-| `Forest: Initialize Forest Config` | Bootstrapping wizard |
+| `Forest: Tree Summary — AI`   | AI summary of current tree           |
+| `Forest: Warm Template`       | Rebuild node_modules template        |
+| `Forest: Init`                | Bootstrapping wizard                 |
 
 ## Install locally
 
