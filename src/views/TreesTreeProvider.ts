@@ -66,9 +66,9 @@ export class TreesTreeProvider implements vscode.TreeDataProvider<TreeElement> {
     });
 
     const groups: TreeGroupItem[] = [];
-    if (inProgress.length) groups.push(new TreeGroupItem('inProgress', 'In Progress', inProgress, 'code'));
-    if (inReview.length) groups.push(new TreeGroupItem('inReview', 'In Review', inReview, 'git-pull-request'));
-    if (done.length) groups.push(new TreeGroupItem('done', 'Done', done, 'check'));
+    if (inProgress.length) groups.push(new TreeGroupItem('In Progress', inProgress, 'code'));
+    if (inReview.length) groups.push(new TreeGroupItem('In Review', inReview, 'git-pull-request'));
+    if (done.length) groups.push(new TreeGroupItem('Done', done, 'check'));
     return groups;
   }
 
