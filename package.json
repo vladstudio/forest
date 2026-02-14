@@ -6,7 +6,7 @@
   "publisher": "forest-dev",
   "repository": {
     "type": "git",
-    "url": "https://github.com/forest-dev/forest"
+    "url": "https://github.com/vladstudio/forest"
   },
   "engines": {
     "vscode": "^1.85.0"
