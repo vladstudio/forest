@@ -40,7 +40,7 @@ const DEFAULTS: Partial<ForestConfig> = {
 /** Migrate old `integrations` + `linearStatuses` → `linear` + `github`. Mutates in place. */
 function migrateConfig(config: any): void {
   if (config.integrations) {
-    const { linear: linearEnabled, github: githubEnabled, linearTeam, ...rest } = config.integrations;
+    const { linear: linearEnabled, github: githubEnabled, linearTeam } = config.integrations;
     if (!config.linear) config.linear = {};
     if (linearEnabled !== undefined) config.linear.enabled = linearEnabled;
     if (linearTeam !== undefined) config.linear.team = linearTeam;

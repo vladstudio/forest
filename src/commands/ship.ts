@@ -5,7 +5,6 @@ import * as gh from '../cli/gh';
 import * as linear from '../cli/linear';
 import { updateLinear } from './shared';
 
-
 export async function ship(ctx: ForestContext, treeArg?: import('../state').TreeState): Promise<void> {
   const tree = treeArg || ctx.currentTree;
   if (!tree) {
@@ -33,7 +32,7 @@ export async function ship(ctx: ForestContext, treeArg?: import('../state').Tree
       let prUrl: string | null = null;
       progress.report({ message: 'Creating PR...' });
       if (config.linear.enabled && await linear.isAvailable()) {
-        prUrl = await linear.createPR(tree.ticketId, config.baseBranch);
+        prUrl = await linear.createPR(tree.ticketId, config.baseBranch, tree.path);
         await updateLinear(ctx, tree.ticketId, config.linear.statuses.onShip);
       } else if (config.github.enabled && await gh.isAvailable()) {
         prUrl = await gh.createPR(tree.path, config.baseBranch, `${tree.ticketId}: ${tree.title}`);

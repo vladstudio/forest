@@ -10,8 +10,7 @@ import { slugify } from '../utils/slug';
 import { resolvePortVars } from '../utils/ports';
 import * as git from '../cli/git';
 import * as linear from '../cli/linear';
-import { execShell, execStream } from '../utils/exec';
-import { execFileSync } from 'child_process';
+import { exec as execUtil, execShell, execStream } from '../utils/exec';
 import { getRepoPath } from '../context';
 
 /** Run an async step, log to output channel, show error notification on failure. */
@@ -137,7 +136,7 @@ export async function createTree(opts: {
         generateWorkspaceFile(repoPath, treePath, ticketId, title);
         writeGitExclude(treePath);
 
-        const hadTemplate = copyModulesFromTemplate(repoPath, treePath);
+        const hadTemplate = await copyModulesFromTemplate(repoPath, treePath);
 
         if (fs.existsSync(path.join(treePath, '.envrc'))) {
           try { await execShell('direnv allow', { cwd: treePath, timeout: 10_000 }); } catch {}
@@ -146,7 +145,7 @@ export async function createTree(opts: {
         progress.report({ message: 'Running setup...' });
         await runSetupCommands(config, treePath);
 
-        if (!hadTemplate) saveTemplate(repoPath, treePath);
+        if (!hadTemplate) await saveTemplate(repoPath, treePath);
 
         progress.report({ message: 'Opening window...' });
         const wsFile = workspaceFilePath(repoPath, ticketId);
@@ -157,6 +156,8 @@ export async function createTree(opts: {
     );
   } catch (e) {
     await stateManager.removeTree(repoPath, ticketId);
+    await git.removeWorktree(repoPath, treePath).catch(() => {});
+    await git.deleteBranch(repoPath, branch).catch(() => {});
     throw e;
   }
 }
@@ -165,18 +166,18 @@ function templateDir(repoPath: string): string {
   return path.join(getTreesDir(repoPath), '.template');
 }
 
-export function copyModulesFromTemplate(repoPath: string, treePath: string): boolean {
+export async function copyModulesFromTemplate(repoPath: string, treePath: string): Promise<boolean> {
   const src = path.join(templateDir(repoPath), 'node_modules');
   const dst = path.join(treePath, 'node_modules');
   if (!fs.existsSync(src)) return false;
   try {
     const flag = os.platform() === 'darwin' ? '-Rc' : '-al';
-    execFileSync('cp', [flag, src, dst], { stdio: 'ignore' });
+    await execUtil('cp', [flag, src, dst]);
     return true;
   } catch { return false; }
 }
 
-export function saveTemplate(repoPath: string, treePath: string): void {
+export async function saveTemplate(repoPath: string, treePath: string): Promise<void> {
   const src = path.join(treePath, 'node_modules');
   if (!fs.existsSync(src)) return;
   const tplDir = templateDir(repoPath);
@@ -185,14 +186,14 @@ export function saveTemplate(repoPath: string, treePath: string): void {
   try {
     if (fs.existsSync(dst)) fs.rmSync(dst, { recursive: true });
     const flag = os.platform() === 'darwin' ? '-Rc' : '-al';
-    execFileSync('cp', [flag, src, dst], { stdio: 'ignore' });
+    await execUtil('cp', [flag, src, dst]);
   } catch {}
 }
 
 export async function warmTemplate(): Promise<void> {
   const curPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!curPath) return;
-  saveTemplate(getRepoPath(), curPath);
+  await saveTemplate(getRepoPath(), curPath);
   vscode.window.showInformationMessage('Forest: Template warmed from current tree.');
 }
 

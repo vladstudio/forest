@@ -125,6 +125,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // Auto-cleanup polling: check merged PRs every 5 minutes
   let autoCleanupRunning = false;
+  const dismissedPRs = new Set<string>();
   const autoCleanupInterval = setInterval(async () => {
     if (autoCleanupRunning) return;
     autoCleanupRunning = true;
@@ -133,13 +134,14 @@ export async function activate(context: vscode.ExtensionContext) {
       const s = await stateManager.load();
       const trees = stateManager.getTreesForRepo(s, getRepoPath());
       for (const tree of trees) {
-        if (!tree.prUrl) continue;
+        if (!tree.prUrl || dismissedPRs.has(tree.ticketId)) continue;
         if (await gh.prIsMerged(tree.repoPath, tree.branch)) {
           const action = await vscode.window.showInformationMessage(
             `${tree.ticketId} PR was merged. Clean up?`,
             'Cleanup', 'Dismiss',
           );
           if (action === 'Cleanup') await cleanupMerged(ctx, tree);
+          else dismissedPRs.add(tree.ticketId);
         }
       }
     } finally {

@@ -31,10 +31,7 @@ export async function update(ctx: ForestContext, treeArg?: import('../state').Tr
       progress.report({ message: 'Running setup...' });
       await runSetupCommands(config, tree.path, ctx.outputChannel);
 
-      vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: 'Tree updated. Dependencies refreshed.' },
-        () => new Promise(resolve => setTimeout(resolve, 2000)),
-      );
+      vscode.window.showInformationMessage('Tree updated. Dependencies refreshed.');
     },
   );
 }

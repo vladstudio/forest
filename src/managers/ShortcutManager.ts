@@ -127,7 +127,11 @@ export class ShortcutManager {
         env[k] = this.resolvePorts(v);
       }
     }
-    Object.assign(env, sc.env);
+    if (sc.env) {
+      for (const [k, v] of Object.entries(sc.env)) {
+        env[k] = this.resolvePorts(v);
+      }
+    }
     const terminal = vscode.window.createTerminal({
       name: sc.name,
       cwd: this.currentTree?.path,

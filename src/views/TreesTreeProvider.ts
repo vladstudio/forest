@@ -17,7 +17,7 @@ type TreeElement = TreeGroupItem | TreeItemView;
 export class TreesTreeProvider implements vscode.TreeDataProvider<TreeElement> {
   private _onDidChange = new vscode.EventEmitter<TreeElement | undefined>();
   readonly onDidChangeTreeData = this._onDidChange.event;
-  private healthCache = new Map<string, { health: TreeHealth; time: number }>();
+  private healthCache = new Map<string, { promise: Promise<TreeHealth>; time: number }>();
   private readonly HEALTH_TTL = 30_000;
 
   constructor(private stateManager: StateManager, private config: ForestConfig) {}
@@ -27,19 +27,23 @@ export class TreesTreeProvider implements vscode.TreeDataProvider<TreeElement> {
     this._onDidChange.fire(undefined);
   }
 
-  private async getHealth(tree: TreeState): Promise<TreeHealth> {
+  private getHealth(tree: TreeState): Promise<TreeHealth> {
     const cached = this.healthCache.get(tree.ticketId);
-    if (cached && Date.now() - cached.time < this.HEALTH_TTL) return cached.health;
+    if (cached && Date.now() - cached.time < this.HEALTH_TTL) return cached.promise;
 
+    const promise = this.fetchHealth(tree);
+    this.healthCache.set(tree.ticketId, { promise, time: Date.now() });
+    return promise;
+  }
+
+  private async fetchHealth(tree: TreeState): Promise<TreeHealth> {
     const [behind, ahead, pr] = await Promise.all([
       git.commitsBehind(tree.path, this.config.baseBranch),
       git.commitsAhead(tree.path, this.config.baseBranch),
       gh.prStatus(tree.path),
     ]);
     const age = ahead > 0 ? await git.lastCommitAge(tree.path) : null;
-    const health: TreeHealth = { behind, age, pr };
-    this.healthCache.set(tree.ticketId, { health, time: Date.now() });
-    return health;
+    return { behind, age, pr };
   }
 
   async getChildren(element?: TreeElement): Promise<TreeElement[]> {
