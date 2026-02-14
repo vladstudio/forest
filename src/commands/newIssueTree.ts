@@ -19,15 +19,19 @@ export async function newIssueTree(ctx: ForestContext): Promise<void> {
     ) as any;
 
     try {
-      ticketId = await linear.createIssue({ title, priority: priority?.value, team: config.linear.team });
+      ticketId = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: 'Creating Linear issue...', cancellable: false },
+        async () => {
+          const id = await linear.createIssue({ title, priority: priority?.value, team: config.linear.team });
+          const issue = await linear.getIssue(id);
+          if (issue) issueTitle = issue.title;
+          return id;
+        },
+      );
     } catch (e: any) {
       vscode.window.showErrorMessage(`Failed to create Linear issue: ${e.message}`);
       return;
     }
-
-    // Fetch full details
-    const issue = await linear.getIssue(ticketId);
-    if (issue) issueTitle = issue.title;
   } else {
     // Manual mode
     const id = await vscode.window.showInputBox({ prompt: 'Ticket ID', placeHolder: 'TEAM-1234' });

@@ -59,17 +59,19 @@ export async function activate(context: vscode.ExtensionContext) {
   const issuesProvider = new IssuesTreeProvider(config, stateManager);
   const treesProvider = new TreesTreeProvider(stateManager, config);
   const shortcutsProvider = new ShortcutsTreeProvider(config, shortcutManager);
+  const treesView = vscode.window.createTreeView('forest.trees', { treeDataProvider: treesProvider });
   context.subscriptions.push(
     vscode.window.registerTreeDataProvider('forest.issues', issuesProvider),
-    vscode.window.registerTreeDataProvider('forest.trees', treesProvider),
+    treesView,
     vscode.window.registerTreeDataProvider('forest.shortcuts', shortcutsProvider),
   );
 
-  // Update noTrees context
+  // Update noTrees context + sidebar badge
   const updateNoTrees = async () => {
     const s = await stateManager.load();
     const trees = stateManager.getTreesForRepo(s, getRepoPath());
     vscode.commands.executeCommand('setContext', 'forest.noTrees', trees.length === 0);
+    treesView.badge = trees.length ? { value: trees.length, tooltip: `${trees.length} trees` } : undefined;
   };
   updateNoTrees();
 
@@ -100,7 +102,7 @@ export async function activate(context: vscode.ExtensionContext) {
   reg('forest.list', () => list(ctx));
   reg('forest.commit', () => commit(ctx));
   reg('forest.treeSummary', () => treeSummary(ctx));
-  reg('forest.warmTemplate', () => warmTemplate(config));
+  reg('forest.warmTemplate', () => warmTemplate());
   reg('forest.refreshIssues', () => issuesProvider.refresh());
   reg('forest.refreshTrees', () => treesProvider.refresh());
   reg('forest.copyBranch', (arg?: TreeItemView) => {

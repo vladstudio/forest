@@ -32,7 +32,6 @@ Add `.forest/config.json` to your repo root (tip: ask Claude to generate one for
 ```json
 {
   "version": 1,
-  "treesDir": "~/.forest/trees/${repo}",
   "copy": [".env", ".env.local"],
   "setup": "bun install --frozen-lockfile",
   "shortcuts": [
@@ -82,8 +81,7 @@ Per-developer overrides go in `.forest/local.json` (should be gitignored):
 
 To set up Forest, ask Claude (or any AI) to read this README and generate `.forest/config.json`. The AI should inspect the repo and ask you:
 
-1. **Where to store trees?** → `treesDir` (default: `~/.forest/trees/${repo}`)
-2. **Setup command?** → detect from lockfile: `bun install`, `npm install`, `yarn`, `pnpm install`
+1. **Setup command?** → detect from lockfile: `bun install`, `npm install`, `yarn`, `pnpm install`
 3. **Files to copy into trees?** → check which of `.env`, `.env.local`, `.envrc` exist
 4. **Shortcuts?** → what terminals to open (dev server, claude, shell), any browser URLs
 5. **Ports?** → does the project use specific ports? set `baseRange` and `mapping` so each tree gets unique ports
@@ -94,7 +92,6 @@ To set up Forest, ask Claude (or any AI) to read this README and generate `.fore
 | Field             | Required | Default                          | Description                                                                                                                                                                 |
 | ----------------- | -------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `version`         | yes      | —                                | Always `1`                                                                                                                                                                  |
-| `treesDir`        | yes      | —                                | Where worktrees live. Supports `~` and `${repo}`                                                                                                                            |
 | `setup`           | no       | —                                | Command(s) to run after creating a tree                                                                                                                                     |
 | `copy`            | no       | `[]`                             | Files to copy from repo root into each tree                                                                                                                                 |
 | `shortcuts`       | no       | `[]`                             | Terminals, browsers, files to open per tree                                                                                                                                 |
@@ -183,7 +180,7 @@ On tree window open (if AI is configured), Forest auto-generates a 1-2 sentence 
 
 ### Claude Code Trust
 
-Claude Code asks for trust confirmation when opening a new workspace. Since each tree creates a new directory, you'd get this prompt for every tree. To avoid it, add your `treesDir` to Claude's trusted directories:
+Claude Code asks for trust confirmation when opening a new workspace. Since each tree creates a new directory, you'd get this prompt for every tree. To avoid it, add `~/.forest/trees` to Claude's trusted directories:
 
 In `~/.claude/settings.json`:
 ```json
@@ -192,7 +189,7 @@ In `~/.claude/settings.json`:
 }
 ```
 
-Replace the path with your actual `treesDir` (without the `${repo}` part).
+Replace `/Users/you` with your actual home directory.
 
 ### Configurable Linear Statuses
 

@@ -11,7 +11,6 @@ export type ShortcutConfig = TerminalShortcut | BrowserShortcut | FileShortcut;
 
 export interface ForestConfig {
   version: number;
-  treesDir: string;
   copy: string[];
   setup: string | string[];
   shortcuts: ShortcutConfig[];
@@ -100,17 +99,14 @@ export async function loadConfig(): Promise<ForestConfig | null> {
     }
   }
 
-  if (!merged.treesDir) {
-    vscode.window.showErrorMessage('Forest: "treesDir" is required in .forest/config.json');
-    return null;
-  }
-
-  // Resolve ~ in treesDir
-  merged.treesDir = merged.treesDir.replace(/^~/, os.homedir());
-  const repoName = path.basename(repoRoot);
-  merged.treesDir = merged.treesDir.replace('${repo}', repoName);
-
   return merged as ForestConfig;
+}
+
+/** Returns ~/.forest/trees/<repoName>, creating the directory if needed. */
+export function getTreesDir(repoPath: string): string {
+  const dir = path.join(os.homedir(), '.forest', 'trees', path.basename(repoPath));
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
 }
 
 function mergeConfig(base: any, local: any): any {

@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import type { ForestConfig } from '../config';
+import { type ForestConfig, getTreesDir } from '../config';
 import type { ForestContext } from '../context';
 import type { TreeState, StateManager } from '../state';
 import type { PortManager } from '../managers/PortManager';
@@ -107,7 +107,7 @@ export async function createTree(opts: {
   const portBase = await portManager.allocate(repoPath);
 
   // Worktree path
-  const treePath = path.join(config.treesDir, ticketId);
+  const treePath = path.join(getTreesDir(repoPath), ticketId);
 
   return await vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: `Creating tree for ${ticketId}...`, cancellable: false },
@@ -123,7 +123,7 @@ export async function createTree(opts: {
 
       generateWorkspaceFile(treePath, ticketId, title);
 
-      const hadTemplate = copyModulesFromTemplate(config, treePath);
+      const hadTemplate = copyModulesFromTemplate(repoPath, treePath);
 
       // Auto-allow direnv if .envrc exists
       if (fs.existsSync(path.join(treePath, '.envrc'))) {
@@ -133,7 +133,7 @@ export async function createTree(opts: {
       progress.report({ message: 'Running setup...' });
       await runSetupCommands(config, treePath);
 
-      if (!hadTemplate) saveTemplate(config, treePath);
+      if (!hadTemplate) saveTemplate(repoPath, treePath);
 
       // Save state
       const tree: TreeState = {
@@ -152,12 +152,12 @@ export async function createTree(opts: {
   );
 }
 
-function templateDir(config: ForestConfig): string {
-  return path.join(config.treesDir, '.template');
+function templateDir(repoPath: string): string {
+  return path.join(getTreesDir(repoPath), '.template');
 }
 
-export function copyModulesFromTemplate(config: ForestConfig, treePath: string): boolean {
-  const src = path.join(templateDir(config), 'node_modules');
+export function copyModulesFromTemplate(repoPath: string, treePath: string): boolean {
+  const src = path.join(templateDir(repoPath), 'node_modules');
   const dst = path.join(treePath, 'node_modules');
   if (!fs.existsSync(src)) return false;
   try {
@@ -167,10 +167,10 @@ export function copyModulesFromTemplate(config: ForestConfig, treePath: string):
   } catch { return false; }
 }
 
-export function saveTemplate(config: ForestConfig, treePath: string): void {
+export function saveTemplate(repoPath: string, treePath: string): void {
   const src = path.join(treePath, 'node_modules');
   if (!fs.existsSync(src)) return;
-  const tplDir = templateDir(config);
+  const tplDir = templateDir(repoPath);
   fs.mkdirSync(tplDir, { recursive: true });
   const dst = path.join(tplDir, 'node_modules');
   try {
@@ -180,10 +180,10 @@ export function saveTemplate(config: ForestConfig, treePath: string): void {
   } catch {}
 }
 
-export async function warmTemplate(config: ForestConfig): Promise<void> {
+export async function warmTemplate(): Promise<void> {
   const curPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!curPath) return;
-  saveTemplate(config, curPath);
+  saveTemplate(getRepoPath(), curPath);
   vscode.window.showInformationMessage('Forest: Template warmed from current tree.');
 }
 

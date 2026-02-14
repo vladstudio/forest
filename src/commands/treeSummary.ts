@@ -29,7 +29,7 @@ export async function treeSummary(ctx: ForestContext): Promise<void> {
   try {
     const summary = await generateText(
       config,
-      'Summarize this git tree status in exactly 1 short sentence. Be very concise.',
+      'Summarize this git tree status in exactly 1 short sentence, max 50 characters. Be extremely concise.',
       context,
     );
     ctx.statusBarManager.setSummary(summary);
