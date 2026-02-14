@@ -22,12 +22,13 @@ async function teardownTree(ctx: ForestContext, tree: TreeState): Promise<void> 
     const shouldClose = ctx.currentTree?.ticketId === tree.ticketId;
     await ctx.stateManager.removeTree(tree.repoPath, tree.ticketId);
     ctx.outputChannel.appendLine('[Forest] State updated');
-    // Git cleanup must run before closeWindow — closing kills the extension host.
-    // worktree remove --force works even with the directory still open.
-    await runStep(ctx, 'Remove worktree', () => git.removeWorktree(tree.repoPath, tree.path));
-    await runStep(ctx, 'Delete branch', () => git.deleteBranch(tree.repoPath, tree.branch));
     if (shouldClose) {
+      // Can't do git cleanup here — removing the worktree kills the extension host.
+      // The main window's state watcher handles it (extension.ts onDidChange).
       await vscode.commands.executeCommand('workbench.action.closeWindow');
+    } else {
+      await runStep(ctx, 'Remove worktree', () => git.removeWorktree(tree.repoPath, tree.path));
+      await runStep(ctx, 'Delete branch', () => git.deleteBranch(tree.repoPath, tree.branch));
     }
   } finally {
     teardownInProgress.delete(key);
