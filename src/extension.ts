@@ -85,7 +85,7 @@ export async function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(vscode.commands.registerCommand(id, fn));
 
   reg('forest.newIssueTree', () => newIssueTree(ctx));
-  reg('forest.newTree', (arg?: string | IssueItem) => newTree(ctx, arg instanceof IssueItem ? arg.issue.id : arg));
+  reg('forest.newTree', (arg?: string | IssueItem) => newTree(ctx, arg instanceof IssueItem ? { ticketId: arg.issue.id, title: arg.issue.title } : arg));
   reg('forest.newTreePicker', async () => {
     const pick = await vscode.window.showQuickPick([
       { label: '$(add) New Linear Issue + Tree', id: 'issue' },

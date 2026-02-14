@@ -4,21 +4,27 @@ import * as linear from '../cli/linear';
 import { createTree, updateLinear } from './shared';
 import { getRepoPath } from '../context';
 
-export async function newTree(ctx: ForestContext, ticketIdArg?: string): Promise<void> {
+export async function newTree(ctx: ForestContext, arg?: string | { ticketId: string; title: string }): Promise<void> {
   let ticketId: string;
   let title: string | undefined;
 
-  if (ticketIdArg) {
-    ticketId = ticketIdArg;
+  if (arg) {
+    if (typeof arg === 'string') {
+      ticketId = arg;
+    } else {
+      ticketId = arg.ticketId;
+      title = arg.title;
+    }
   } else if (ctx.config.linear.enabled && await linear.isAvailable()) {
     const issues = await linear.listMyIssues(ctx.config.linear.statuses.issueList, ctx.config.linear.team);
     if (!issues.length) { vscode.window.showInformationMessage('No issues found.'); return; }
     const pick = await vscode.window.showQuickPick(
-      issues.map(i => ({ label: `${i.id}  ${i.title}`, description: i.state, issueId: i.id })),
+      issues.map(i => ({ label: `${i.id}  ${i.title}`, description: i.state, issueId: i.id, issueTitle: i.title })),
       { placeHolder: 'Select an issue' },
     ) as any;
     if (!pick) return;
     ticketId = pick.issueId;
+    title = pick.issueTitle;
   } else {
     const input = await vscode.window.showInputBox({ prompt: 'Ticket ID', placeHolder: 'TEAM-1234' });
     if (!input) return;
@@ -38,7 +44,7 @@ export async function newTree(ctx: ForestContext, ticketIdArg?: string): Promise
     return;
   }
 
-  // Fetch title
+  // Fetch title if not already known
   if (!title && ctx.config.linear.enabled && await linear.isAvailable()) {
     const issue = await linear.getIssue(ticketId);
     title = issue?.title;
@@ -47,6 +53,16 @@ export async function newTree(ctx: ForestContext, ticketIdArg?: string): Promise
     title = await vscode.window.showInputBox({ prompt: 'Issue title' });
     if (!title) return;
   }
+
+  // Confirm before creating
+  const confirm = await vscode.window.showQuickPick(
+    [
+      { label: `$(add) Create "${title}"`, id: 'create' },
+      { label: '$(close) Cancel', id: 'cancel' },
+    ],
+    { placeHolder: `Create tree for ${ticketId}?` },
+  );
+  if (confirm?.id !== 'create') return;
 
   try {
     await createTree({ ticketId, title, config: ctx.config, stateManager: ctx.stateManager, portManager: ctx.portManager });
