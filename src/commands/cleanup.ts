@@ -6,10 +6,29 @@ import * as gh from '../cli/gh';
 import * as linear from '../cli/linear';
 import { getRepoPath } from '../context';
 
-export async function cleanup(ctx: ForestContext, ticketIdArg?: string): Promise<void> {
-  const tree = ticketIdArg
-    ? ctx.stateManager.getTree(await ctx.stateManager.load(), getRepoPath(), ticketIdArg)
+function resolveTree(ctx: ForestContext, ticketIdArg?: string): TreeState | undefined {
+  return ticketIdArg
+    ? ctx.stateManager.getTree(ctx.stateManager.loadSync(), getRepoPath(), ticketIdArg)
     : ctx.currentTree;
+}
+
+async function teardownTree(ctx: ForestContext, tree: TreeState): Promise<void> {
+  await git.removeWorktree(tree.repoPath, tree.path).catch(() => {});
+  await git.deleteBranch(tree.repoPath, tree.branch);
+  await ctx.stateManager.removeTree(getRepoPath(), tree.ticketId);
+  if (ctx.currentTree?.ticketId === tree.ticketId) {
+    vscode.commands.executeCommand('workbench.action.closeWindow');
+  }
+}
+
+async function updateLinear(ctx: ForestContext, ticketId: string, status: string): Promise<void> {
+  if (ctx.config.integrations.linear && await linear.isAvailable()) {
+    linear.updateIssueState(ticketId, status).catch(() => {});
+  }
+}
+
+export async function cleanup(ctx: ForestContext, ticketIdArg?: string): Promise<void> {
+  const tree = resolveTree(ctx, ticketIdArg);
 
   if (!tree) {
     vscode.window.showErrorMessage('No tree to clean up. Run from a tree window or select from sidebar.');
@@ -22,7 +41,6 @@ export async function cleanup(ctx: ForestContext, ticketIdArg?: string): Promise
   );
   if (confirm !== 'Cleanup') return;
 
-  // Check uncommitted changes
   if (await git.hasUncommittedChanges(tree.path)) {
     vscode.window.showErrorMessage('Tree has uncommitted changes. Commit or discard first.');
     return;
@@ -31,7 +49,6 @@ export async function cleanup(ctx: ForestContext, ticketIdArg?: string): Promise
   await vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: `Cleaning up ${tree.ticketId}...` },
     async (progress) => {
-      // Merge PR
       if (ctx.config.integrations.github && await gh.isAvailable()) {
         progress.report({ message: 'Merging PR...' });
         try {
@@ -42,32 +59,17 @@ export async function cleanup(ctx: ForestContext, ticketIdArg?: string): Promise
         }
       }
 
-      // Update Linear
-      if (ctx.config.integrations.linear && await linear.isAvailable()) {
-        progress.report({ message: 'Updating ticket...' });
-        linear.updateIssueState(tree.ticketId, ctx.config.linearStatuses.onCleanup).catch(() => {});
-      }
+      progress.report({ message: 'Updating ticket...' });
+      await updateLinear(ctx, tree.ticketId, ctx.config.linearStatuses.onCleanup);
 
-      // Remove worktree (from main repo, not worktree itself)
       progress.report({ message: 'Removing worktree...' });
-      await git.removeWorktree(tree.repoPath, tree.path);
-      await git.deleteBranch(tree.repoPath, tree.branch);
-
-      // Remove from state
-      await ctx.stateManager.removeTree(getRepoPath(), tree.ticketId);
-
-      // Close window if we're in the cleaned-up tree
-      if (ctx.currentTree?.ticketId === tree.ticketId) {
-        vscode.commands.executeCommand('workbench.action.closeWindow');
-      }
+      await teardownTree(ctx, tree);
     },
   );
 }
 
 export async function cancel(ctx: ForestContext, ticketIdArg?: string): Promise<void> {
-  const tree = ticketIdArg
-    ? ctx.stateManager.getTree(await ctx.stateManager.load(), getRepoPath(), ticketIdArg)
-    : ctx.currentTree;
+  const tree = resolveTree(ctx, ticketIdArg);
 
   if (!tree) {
     vscode.window.showErrorMessage('No tree to cancel. Run from a tree window or select from sidebar.');
@@ -83,33 +85,17 @@ export async function cancel(ctx: ForestContext, ticketIdArg?: string): Promise<
   await vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: `Canceling ${tree.ticketId}...` },
     async (progress) => {
-      if (ctx.config.integrations.linear && await linear.isAvailable()) {
-        progress.report({ message: 'Updating ticket...' });
-        linear.updateIssueState(tree.ticketId, ctx.config.linearStatuses.onCancel).catch(() => {});
-      }
+      progress.report({ message: 'Updating ticket...' });
+      await updateLinear(ctx, tree.ticketId, ctx.config.linearStatuses.onCancel);
 
       progress.report({ message: 'Removing worktree...' });
-      await git.removeWorktree(tree.repoPath, tree.path);
-      await git.deleteBranch(tree.repoPath, tree.branch);
-
-      await ctx.stateManager.removeTree(getRepoPath(), tree.ticketId);
-
-      if (ctx.currentTree?.ticketId === tree.ticketId) {
-        vscode.commands.executeCommand('workbench.action.closeWindow');
-      }
+      await teardownTree(ctx, tree);
     },
   );
 }
 
 /** Cleanup after an already-merged PR — skips merge and confirmation. */
 export async function cleanupMerged(ctx: ForestContext, tree: TreeState): Promise<void> {
-  if (ctx.config.integrations.linear && await linear.isAvailable()) {
-    linear.updateIssueState(tree.ticketId, ctx.config.linearStatuses.onCleanup).catch(() => {});
-  }
-  await git.removeWorktree(tree.repoPath, tree.path).catch(() => {});
-  await git.deleteBranch(tree.repoPath, tree.branch);
-  await ctx.stateManager.removeTree(getRepoPath(), tree.ticketId);
-  if (ctx.currentTree?.ticketId === tree.ticketId) {
-    vscode.commands.executeCommand('workbench.action.closeWindow');
-  }
+  await updateLinear(ctx, tree.ticketId, ctx.config.linearStatuses.onCleanup);
+  await teardownTree(ctx, tree);
 }
