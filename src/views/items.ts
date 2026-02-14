@@ -13,6 +13,15 @@ export class StatusGroupItem extends vscode.TreeItem {
   }
 }
 
+export class TreeGroupItem extends vscode.TreeItem {
+  contextValue = 'treeGroup';
+  constructor(public readonly groupKey: string, label: string, public readonly trees: TreeItemView[], icon: string) {
+    super(label, vscode.TreeItemCollapsibleState.Expanded);
+    this.description = `${trees.length}`;
+    this.iconPath = new vscode.ThemeIcon(icon);
+  }
+}
+
 export class IssueItem extends vscode.TreeItem {
   contextValue = 'issue';
   constructor(public readonly issue: LinearIssue) {

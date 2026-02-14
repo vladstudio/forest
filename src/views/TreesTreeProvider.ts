@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import type { ForestConfig } from '../config';
 import type { StateManager, TreeState } from '../state';
-import { TreeItemView } from './items';
+import { TreeItemView, TreeGroupItem } from './items';
 import { getRepoPath } from '../context';
 import * as git from '../cli/git';
 import * as gh from '../cli/gh';
@@ -12,8 +12,10 @@ export interface TreeHealth {
   pr: { state: string; reviewDecision: string | null } | null;
 }
 
-export class TreesTreeProvider implements vscode.TreeDataProvider<TreeItemView> {
-  private _onDidChange = new vscode.EventEmitter<TreeItemView | undefined>();
+type TreeElement = TreeGroupItem | TreeItemView;
+
+export class TreesTreeProvider implements vscode.TreeDataProvider<TreeElement> {
+  private _onDidChange = new vscode.EventEmitter<TreeElement | undefined>();
   readonly onDidChangeTreeData = this._onDidChange.event;
   private healthCache = new Map<string, { health: TreeHealth; time: number }>();
   private readonly HEALTH_TTL = 30_000;
@@ -36,7 +38,10 @@ export class TreesTreeProvider implements vscode.TreeDataProvider<TreeItemView> 
     return health;
   }
 
-  async getChildren(): Promise<TreeItemView[]> {
+  async getChildren(element?: TreeElement): Promise<TreeElement[]> {
+    if (element instanceof TreeItemView) return [];
+    if (element instanceof TreeGroupItem) return element.trees;
+
     const state = await this.stateManager.load();
     const trees = this.stateManager.getTreesForRepo(state, getRepoPath());
     const curPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -47,8 +52,25 @@ export class TreesTreeProvider implements vscode.TreeDataProvider<TreeItemView> 
     });
 
     const healthResults = await Promise.all(trees.map(t => this.getHealth(t).catch(() => null)));
-    return trees.map((t, i) => new TreeItemView(t, t.path === curPath, healthResults[i] ?? undefined));
+
+    const inProgress: TreeItemView[] = [];
+    const inReview: TreeItemView[] = [];
+    const done: TreeItemView[] = [];
+
+    trees.forEach((t, i) => {
+      const health = healthResults[i] ?? undefined;
+      const item = new TreeItemView(t, t.path === curPath, health);
+      if (!health?.pr) inProgress.push(item);
+      else if (health.pr.state === 'MERGED') done.push(item);
+      else inReview.push(item);
+    });
+
+    const groups: TreeGroupItem[] = [];
+    if (inProgress.length) groups.push(new TreeGroupItem('inProgress', 'In Progress', inProgress, 'code'));
+    if (inReview.length) groups.push(new TreeGroupItem('inReview', 'In Review', inReview, 'git-pull-request'));
+    if (done.length) groups.push(new TreeGroupItem('done', 'Done', done, 'check'));
+    return groups;
   }
 
-  getTreeItem(el: TreeItemView): vscode.TreeItem { return el; }
+  getTreeItem(el: TreeElement): vscode.TreeItem { return el; }
 }
