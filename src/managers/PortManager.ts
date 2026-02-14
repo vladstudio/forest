@@ -12,7 +12,7 @@ export class PortManager {
     for (let base = start; base + step - 1 <= end; base += step) {
       if (!usedBases.has(base)) return base;
     }
-    throw new Error(`No available ports in range [${start}, ${end}]. Fell some trees to free ports.`);
+    throw new Error(`No available ports in range [${start}, ${end}]. Clean up some trees to free ports.`);
   }
 
   private getMaxOffset(): number {

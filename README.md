@@ -4,26 +4,25 @@ VSCode extension for parallel feature development using git worktrees. One Linea
 
 ## Concepts
 
-| Term       | Action                                                              |
-| ---------- | ------------------------------------------------------------------- |
-| **Plant**  | Create a worktree from an existing Linear ticket                    |
-| **Seed**   | Create a new Linear ticket + worktree in one step                   |
-| **Ship**   | Push branch + create PR + move ticket to configured status          |
-| **Fell**   | Merge PR + delete worktree + move ticket to configured status       |
-| **Water**  | Rebase on latest + re-run setup (reinstall deps, re-copy env files) |
-| **Survey** | Quick-pick list of all active trees                                 |
-| **Commit** | AI-generated commit message from staged diff                        |
-| **Init**   | Bootstrapping wizard to create `.forest/config.json`                |
+| Term              | Action                                                              |
+| ----------------- | ------------------------------------------------------------------- |
+| **New Tree**      | Create a worktree from an existing Linear ticket                    |
+| **New Issue+Tree**| Create a new Linear ticket + worktree in one step                   |
+| **Ship**          | Push branch + create PR + move ticket to configured status          |
+| **Cleanup**       | Merge PR + delete worktree + move ticket to configured status       |
+| **Update**        | Rebase on latest + re-run setup (reinstall deps, re-copy env files) |
+| **List**          | Quick-pick list of all active trees                                 |
+| **Commit**        | AI-generated commit message from staged diff                        |
 
 ## Prerequisites
 
 - `git` (required)
-- `gh` CLI (for PR merge via `fell`)
+- `gh` CLI (for PR merge via `cleanup`)
 - [`linear`](https://github.com/schpet/linear-cli) CLI (optional — features degrade gracefully without it)
 
 ## Setup
 
-Run `Forest: Init` from the command palette, or manually add `.forest/config.json` to your repo:
+Add `.forest/config.json` to your repo root (tip: ask Claude to generate one for your project):
 
 ```json
 {
@@ -48,9 +47,9 @@ Run `Forest: Init` from the command palette, or manually add `.forest/config.jso
   "integrations": { "linear": true, "github": true, "linearTeam": "ENG" },
   "linearStatuses": {
     "issueList": ["Triage", "Backlog", "Todo"],
-    "onPlant": "In Progress",
+    "onNew": "In Progress",
     "onShip": "In Review",
-    "onFell": "Done"
+    "onCleanup": "Done"
   },
   "branchFormat": "${ticketId}-${slug}",
   "baseBranch": "origin/main",
@@ -70,6 +69,41 @@ Per-developer overrides go in `.forest/local.json` (should be gitignored):
 }
 ```
 
+## Generating Config with AI
+
+To set up Forest, ask Claude (or any AI) to read this README and generate `.forest/config.json`. The AI should inspect the repo and ask you:
+
+1. **Where to store trees?** → `treesDir` (default: `~/forest/${repo}`)
+2. **Setup command?** → detect from lockfile: `bun install`, `npm install`, `yarn`, `pnpm install`
+3. **Files to copy into trees?** → check which of `.env`, `.env.local`, `.envrc` exist
+4. **Shortcuts?** → what terminals to open (dev server, claude, shell), any browser URLs
+5. **Ports?** → does the project use specific ports? set `baseRange` and `mapping` so each tree gets unique ports
+6. **Linear integration?** → yes/no, and team name (e.g. `ENG`)
+
+### Config reference
+
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `version` | yes | — | Always `1` |
+| `treesDir` | yes | — | Where worktrees live. Supports `~` and `${repo}` |
+| `setup` | no | — | Command(s) to run after creating a tree |
+| `copy` | no | `[]` | Files to copy from repo root into each tree |
+| `shortcuts` | no | `[]` | Terminals, browsers, files to open per tree |
+| `ports.baseRange` | no | `[3000, 4000]` | Port range to allocate from |
+| `ports.mapping` | no | `{}` | Named ports as offsets: `{ "app": "+0", "api": "+1" }` |
+| `env` | no | `{}` | Extra env vars injected into tree. Supports `${ports.X}` |
+| `integrations` | no | `{ linear: true, github: true }` | Toggle integrations. `linearTeam` sets team name |
+| `linearStatuses` | no | see below | Linear states for issue list and lifecycle transitions |
+| `branchFormat` | no | `${ticketId}-${slug}` | Branch naming. Supports `${ticketId}`, `${slug}` |
+| `baseBranch` | no | `origin/main` | Branch to rebase on |
+| `maxTrees` | no | `10` | Max concurrent worktrees |
+
+**Shortcut types:** `terminal` (with optional `command`, `env`), `browser` (with `url`), `file` (with `path`). All support `openOnLaunch: N` (priority order, `false` to disable).
+
+**Variable expansion in shortcuts:** `${ticketId}`, `${branch}`, `${ports.X}`.
+
+**`local.json`** (gitignored) merges over `config.json` — use for per-dev AI keys and overrides.
+
 ## Features
 
 ### Tree Health Indicators
@@ -85,13 +119,13 @@ KAD-5678  Add dark mode    [review] · PR approved · 1d
 - **Age** — time since last commit
 - **PR status** — open, approved, changes requested
 
-### Auto-Fell on Merged PRs
+### Auto-Cleanup on Merged PRs
 
-Trees in `review` status with a PR are polled every 5 minutes. When a PR is merged, you get a notification: *"KAD-1234 PR was merged. Clean up?"* → click Fell to remove the worktree automatically.
+Trees in `review` status with a PR are polled every 5 minutes. When a PR is merged, you get a notification: *"KAD-1234 PR was merged. Clean up?"* → click Cleanup to remove the worktree automatically.
 
-### Water (Rebase + Refresh)
+### Update (Rebase + Refresh)
 
-`Water` now fetches and rebases your tree on the base branch before copying config files and running setup. If the rebase fails, it auto-aborts and shows an error.
+`Update` fetches and rebases your tree on the base branch before copying config files and running setup. If the rebase fails, it auto-aborts and shows an error.
 
 ### Shortcut Variable Expansion
 
@@ -128,14 +162,14 @@ On tree window open (if AI is configured), Forest auto-generates a 1-2 sentence 
 
 ### Configurable Linear Statuses
 
-Customize which Linear states to show in the issues sidebar and which states to set on plant/ship/fell:
+Customize which Linear states to show in the issues sidebar and which states to set on new/ship/cleanup:
 
 ```json
 "linearStatuses": {
   "issueList": ["Triage", "Backlog", "Todo"],
-  "onPlant": "In Progress",
+  "onNew": "In Progress",
   "onShip": "In Review",
-  "onFell": "Done"
+  "onCleanup": "Done"
 }
 ```
 
@@ -145,11 +179,11 @@ All commands are available from the Forest sidebar (tree icon in activity bar) o
 
 **Typical workflow:**
 
-1. **Plant** a tree from a Linear ticket (or **Seed** to create a new ticket)
+1. **New Tree** from a Linear ticket (or **New Issue + Tree** to create a new ticket)
 2. A new VSCode window opens with terminals running and ports allocated
 3. Code, test, iterate — each tree is fully isolated
 4. **Ship** when ready — pushes and creates a PR
-5. **Fell** after merge — cleans up worktree, branch, and ticket
+5. **Cleanup** after merge — removes worktree, branch, and ticket
 
 Switch between trees from the sidebar. All processes keep running in background windows.
 
@@ -157,17 +191,16 @@ Switch between trees from the sidebar. All processes keep running in background 
 
 | Command                       | Description                          |
 | ----------------------------- | ------------------------------------ |
-| `Forest: Seed`                | Create new ticket + tree             |
-| `Forest: Plant`               | Tree from existing ticket            |
+| `Forest: New Issue + Tree`    | Create new ticket + tree             |
+| `Forest: New Tree`            | Tree from existing ticket            |
 | `Forest: Switch Tree`         | Open another tree's window           |
 | `Forest: Ship`                | Push + create PR                     |
-| `Forest: Fell`                | Merge PR + cleanup                   |
-| `Forest: Water`               | Rebase + refresh deps                |
-| `Forest: Survey`              | List all trees                       |
+| `Forest: Cleanup`             | Merge PR + remove tree               |
+| `Forest: Update`              | Rebase + refresh deps                |
+| `Forest: List`                | List all trees                       |
 | `Forest: Commit — AI Message` | AI-generated commit from staged diff |
 | `Forest: Tree Summary — AI`   | AI summary of current tree           |
 | `Forest: Warm Template`       | Rebuild node_modules template        |
-| `Forest: Init`                | Bootstrapping wizard                 |
 
 ## Install locally
 

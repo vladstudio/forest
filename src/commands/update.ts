@@ -3,15 +3,15 @@ import type { ForestContext } from '../context';
 import * as git from '../cli/git';
 import { copyConfigFiles, writeForestEnv, runSetupCommands } from './shared';
 
-export async function water(ctx: ForestContext): Promise<void> {
+export async function update(ctx: ForestContext): Promise<void> {
   if (!ctx.currentTree) {
-    vscode.window.showErrorMessage('Water must be run from a tree window.');
+    vscode.window.showErrorMessage('Update must be run from a tree window.');
     return;
   }
   const tree = ctx.currentTree;
 
   await vscode.window.withProgress(
-    { location: vscode.ProgressLocation.Notification, title: `Watering ${tree.ticketId}...` },
+    { location: vscode.ProgressLocation.Notification, title: `Updating ${tree.ticketId}...` },
     async (progress) => {
       progress.report({ message: 'Rebasing on latest...' });
       try {
@@ -30,7 +30,7 @@ export async function water(ctx: ForestContext): Promise<void> {
       progress.report({ message: 'Running setup...' });
       await runSetupCommands(ctx.config, tree.path, ctx.outputChannel);
 
-      vscode.window.showInformationMessage('Tree watered. Dependencies refreshed.');
+      vscode.window.showInformationMessage('Tree updated. Dependencies refreshed.');
     },
   );
 }

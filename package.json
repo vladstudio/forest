@@ -19,8 +19,7 @@
   ],
   "main": "./dist/extension.js",
   "activationEvents": [
-    "workspaceContains:.forest/config.json",
-    "onCommand:forest.init"
+    "workspaceContains:.forest/config.json"
   ],
   "scripts": {
     "vscode:prepublish": "bun run package",
@@ -70,20 +69,20 @@
     "viewsWelcome": [
       {
         "view": "forest.trees",
-        "contents": "No trees planted yet.\n[Plant a Tree](command:forest.plant)\n[Seed a New Ticket](command:forest.seed)",
+        "contents": "No trees yet.\n[New Tree](command:forest.newTree)\n[New Issue + Tree](command:forest.newIssueTree)",
         "when": "forest.active && forest.noTrees"
       }
     ],
     "commands": [
       {
-        "command": "forest.seed",
-        "title": "Seed — New Ticket + Tree",
+        "command": "forest.newIssueTree",
+        "title": "New Issue + Tree",
         "category": "Forest",
         "icon": "$(add)"
       },
       {
-        "command": "forest.plant",
-        "title": "Plant — Tree from Existing Ticket",
+        "command": "forest.newTree",
+        "title": "New Tree",
         "category": "Forest",
         "icon": "$(git-branch)"
       },
@@ -100,20 +99,20 @@
         "icon": "$(rocket)"
       },
       {
-        "command": "forest.fell",
-        "title": "Fell — Merge + Cleanup",
+        "command": "forest.cleanup",
+        "title": "Cleanup — Merge + Remove",
         "category": "Forest",
         "icon": "$(check-all)"
       },
       {
-        "command": "forest.water",
-        "title": "Water — Refresh Dependencies",
+        "command": "forest.update",
+        "title": "Update — Rebase + Refresh",
         "category": "Forest",
         "icon": "$(refresh)"
       },
       {
-        "command": "forest.survey",
-        "title": "Survey — List All Trees",
+        "command": "forest.list",
+        "title": "List All Trees",
         "category": "Forest",
         "icon": "$(list-tree)"
       },
@@ -182,12 +181,6 @@
         "title": "Warm Template",
         "category": "Forest",
         "icon": "$(flame)"
-      },
-      {
-        "command": "forest.init",
-        "title": "Init",
-        "category": "Forest",
-        "icon": "$(gear)"
       }
     ],
     "menus": {
@@ -198,7 +191,7 @@
           "group": "navigation"
         },
         {
-          "command": "forest.seed",
+          "command": "forest.newIssueTree",
           "when": "view == forest.issues",
           "group": "navigation"
         },
@@ -208,14 +201,14 @@
           "group": "navigation"
         },
         {
-          "command": "forest.plant",
+          "command": "forest.newTree",
           "when": "view == forest.trees",
           "group": "navigation"
         }
       ],
       "view/item/context": [
         {
-          "command": "forest.plant",
+          "command": "forest.newTree",
           "when": "view == forest.issues && viewItem == issue",
           "group": "inline"
         },
@@ -245,12 +238,12 @@
           "group": "3_lifecycle"
         },
         {
-          "command": "forest.water",
+          "command": "forest.update",
           "when": "viewItem == tree",
           "group": "3_lifecycle"
         },
         {
-          "command": "forest.fell",
+          "command": "forest.cleanup",
           "when": "viewItem == tree",
           "group": "4_danger"
         },

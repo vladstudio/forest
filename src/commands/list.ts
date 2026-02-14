@@ -2,10 +2,10 @@ import * as vscode from 'vscode';
 import type { ForestContext } from '../context';
 import { getRepoPath } from '../context';
 
-export async function survey(ctx: ForestContext): Promise<void> {
+export async function list(ctx: ForestContext): Promise<void> {
   const state = await ctx.stateManager.load();
   const trees = ctx.stateManager.getTreesForRepo(state, getRepoPath());
-  if (!trees.length) { vscode.window.showInformationMessage('No trees planted.'); return; }
+  if (!trees.length) { vscode.window.showInformationMessage('No trees yet.'); return; }
 
   const curPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   const items = trees.map(t => ({
@@ -14,6 +14,6 @@ export async function survey(ctx: ForestContext): Promise<void> {
     id: t.ticketId,
   }));
 
-  const pick = await vscode.window.showQuickPick(items, { placeHolder: 'Survey all trees' }) as any;
+  const pick = await vscode.window.showQuickPick(items, { placeHolder: 'All trees' }) as any;
   if (pick) await vscode.commands.executeCommand('forest.switch', pick.id);
 }

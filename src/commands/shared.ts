@@ -53,7 +53,7 @@ export async function runSetupCommands(config: ForestConfig, treePath: string, c
   }
 }
 
-/** Shared tree creation logic for seed + plant. */
+/** Shared tree creation logic for newIssueTree + newTree. */
 export async function createTree(opts: {
   ticketId: string;
   title: string;
@@ -73,7 +73,7 @@ export async function createTree(opts: {
   // Check max trees
   const trees = stateManager.getTreesForRepo(state, repoPath);
   if (trees.length >= config.maxTrees) {
-    throw new Error(`Max trees (${config.maxTrees}) reached. Fell some trees first.`);
+    throw new Error(`Max trees (${config.maxTrees}) reached. Clean up some trees first.`);
   }
 
   // Generate branch
@@ -89,7 +89,7 @@ export async function createTree(opts: {
   const treePath = path.join(config.treesDir, ticketId);
 
   return await vscode.window.withProgress(
-    { location: vscode.ProgressLocation.Notification, title: `Planting ${ticketId}...`, cancellable: false },
+    { location: vscode.ProgressLocation.Notification, title: `Creating tree for ${ticketId}...`, cancellable: false },
     async (progress) => {
       progress.report({ message: 'Creating worktree...' });
       await git.createWorktree(repoPath, treePath, branch, config.baseBranch);

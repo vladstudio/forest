@@ -4,7 +4,7 @@ import * as linear from '../cli/linear';
 import { createTree } from './shared';
 import { getRepoPath } from '../context';
 
-export async function plant(ctx: ForestContext, ticketIdArg?: string): Promise<void> {
+export async function newTree(ctx: ForestContext, ticketIdArg?: string): Promise<void> {
   let ticketId: string;
   let title: string | undefined;
 
@@ -15,7 +15,7 @@ export async function plant(ctx: ForestContext, ticketIdArg?: string): Promise<v
     if (!issues.length) { vscode.window.showInformationMessage('No issues found.'); return; }
     const pick = await vscode.window.showQuickPick(
       issues.map(i => ({ label: `${i.id}  ${i.title}`, description: i.state, issueId: i.id })),
-      { placeHolder: 'Select an issue to plant' },
+      { placeHolder: 'Select an issue' },
     ) as any;
     if (!pick) return;
     ticketId = pick.issueId;
@@ -52,7 +52,7 @@ export async function plant(ctx: ForestContext, ticketIdArg?: string): Promise<v
     await createTree({ ticketId, title, config: ctx.config, stateManager: ctx.stateManager, portManager: ctx.portManager });
     // Update Linear state
     if (ctx.config.integrations.linear && await linear.isAvailable()) {
-      linear.updateIssueState(ticketId, ctx.config.linearStatuses.onPlant).catch(() => {});
+      linear.updateIssueState(ticketId, ctx.config.linearStatuses.onNew).catch(() => {});
     }
   } catch (e: any) {
     vscode.window.showErrorMessage(e.message);

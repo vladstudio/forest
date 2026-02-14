@@ -3,7 +3,7 @@ import type { ForestContext } from '../context';
 import * as linear from '../cli/linear';
 import { createTree } from './shared';
 
-export async function seed(ctx: ForestContext): Promise<void> {
+export async function newIssueTree(ctx: ForestContext): Promise<void> {
   const title = await vscode.window.showInputBox({ prompt: 'Issue title', placeHolder: 'Fix team invite email validation' });
   if (!title) return;
 

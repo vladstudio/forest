@@ -21,7 +21,7 @@ export interface ForestConfig {
   branchFormat: string;
   baseBranch: string;
   maxTrees: number;
-  linearStatuses: { issueList: string[]; onPlant: string; onShip: string; onFell: string };
+  linearStatuses: { issueList: string[]; onNew: string; onShip: string; onCleanup: string };
   ai?: { provider: 'gemini' | 'openai'; apiKey?: string; model?: string };
 }
 
@@ -34,7 +34,7 @@ const DEFAULTS: Partial<ForestConfig> = {
   branchFormat: '${ticketId}-${slug}',
   baseBranch: 'origin/main',
   maxTrees: 10,
-  linearStatuses: { issueList: ['Triage', 'Backlog', 'Todo'], onPlant: 'In Progress', onShip: 'In Review', onFell: 'Done' },
+  linearStatuses: { issueList: ['Triage', 'Backlog', 'Todo'], onNew: 'In Progress', onShip: 'In Review', onCleanup: 'Done' },
 };
 
 export async function loadConfig(): Promise<ForestConfig | null> {

@@ -9,24 +9,20 @@ import { StatusBarManager } from './managers/StatusBarManager';
 import { IssuesTreeProvider } from './views/IssuesTreeProvider';
 import { TreesTreeProvider } from './views/TreesTreeProvider';
 import { ShortcutsTreeProvider } from './views/ShortcutsTreeProvider';
-import { seed } from './commands/seed';
-import { plant } from './commands/plant';
+import { newIssueTree } from './commands/newIssueTree';
+import { newTree } from './commands/newTree';
 import { switchTree } from './commands/switch';
 import { ship } from './commands/ship';
-import { fell, fellMerged } from './commands/fell';
-import { water } from './commands/water';
-import { survey } from './commands/survey';
+import { cleanup, cleanupMerged } from './commands/cleanup';
+import { update } from './commands/update';
+import { list } from './commands/list';
 import { commit } from './commands/commit';
 import { treeSummary } from './commands/treeSummary';
-import { init } from './commands/init';
 import { warmTemplate } from './commands/shared';
 import * as linear from './cli/linear';
 import * as gh from './cli/gh';
 
 export async function activate(context: vscode.ExtensionContext) {
-  // Register init before config load — works without existing config
-  context.subscriptions.push(vscode.commands.registerCommand('forest.init', () => init()));
-
   const config = await loadConfig();
   if (!config) return;
 
@@ -74,13 +70,13 @@ export async function activate(context: vscode.ExtensionContext) {
   const reg = (id: string, fn: (...args: any[]) => any) =>
     context.subscriptions.push(vscode.commands.registerCommand(id, fn));
 
-  reg('forest.seed', () => seed(ctx));
-  reg('forest.plant', (ticketId?: string) => plant(ctx, ticketId));
+  reg('forest.newIssueTree', () => newIssueTree(ctx));
+  reg('forest.newTree', (ticketId?: string) => newTree(ctx, ticketId));
   reg('forest.switch', (ticketId?: string) => switchTree(ctx, ticketId));
   reg('forest.ship', () => ship(ctx));
-  reg('forest.fell', (ticketId?: string) => fell(ctx, ticketId));
-  reg('forest.water', () => water(ctx));
-  reg('forest.survey', () => survey(ctx));
+  reg('forest.cleanup', (ticketId?: string) => cleanup(ctx, ticketId));
+  reg('forest.update', () => update(ctx));
+  reg('forest.list', () => list(ctx));
   reg('forest.commit', () => commit(ctx));
   reg('forest.treeSummary', () => treeSummary(ctx));
   reg('forest.warmTemplate', () => warmTemplate(config));
@@ -112,7 +108,7 @@ export async function activate(context: vscode.ExtensionContext) {
   reg('forest.stopShortcut', (arg: any) => shortcutManager.stop(unwrap(arg)));
   reg('forest.restartShortcut', (arg: any) => shortcutManager.restart(unwrap(arg)));
 
-  // If this is a tree window, open launch shortcuts + auto-fell polling
+  // If this is a tree window, open launch shortcuts + auto-cleanup polling
   if (currentTree) {
     statusBarManager.show();
     shortcutManager.openOnLaunchShortcuts();
@@ -123,11 +119,11 @@ export async function activate(context: vscode.ExtensionContext) {
     }
   }
 
-  // Auto-fell polling: check merged PRs every 5 minutes
-  let autoFellRunning = false;
-  const autoFellInterval = setInterval(async () => {
-    if (autoFellRunning) return;
-    autoFellRunning = true;
+  // Auto-cleanup polling: check merged PRs every 5 minutes
+  let autoCleanupRunning = false;
+  const autoCleanupInterval = setInterval(async () => {
+    if (autoCleanupRunning) return;
+    autoCleanupRunning = true;
     try {
       if (!(await gh.isAvailable())) return;
       const s = await stateManager.load();
@@ -137,16 +133,16 @@ export async function activate(context: vscode.ExtensionContext) {
         if (await gh.prIsMerged(tree.repoPath, tree.branch)) {
           const action = await vscode.window.showInformationMessage(
             `${tree.ticketId} PR was merged. Clean up?`,
-            'Fell', 'Dismiss',
+            'Cleanup', 'Dismiss',
           );
-          if (action === 'Fell') await fellMerged(ctx, tree);
+          if (action === 'Cleanup') await cleanupMerged(ctx, tree);
         }
       }
     } finally {
-      autoFellRunning = false;
+      autoCleanupRunning = false;
     }
   }, 5 * 60 * 1000);
-  context.subscriptions.push({ dispose: () => clearInterval(autoFellInterval) });
+  context.subscriptions.push({ dispose: () => clearInterval(autoCleanupInterval) });
 
   // Watch state for changes from other windows
   stateManager.onDidChange((newState) => {
