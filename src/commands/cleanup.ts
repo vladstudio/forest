@@ -13,10 +13,11 @@ function resolveTree(ctx: ForestContext, ticketIdArg?: string): TreeState | unde
 }
 
 async function teardownTree(ctx: ForestContext, tree: TreeState): Promise<void> {
+  const shouldClose = ctx.currentTree?.ticketId === tree.ticketId;
   await git.removeWorktree(tree.repoPath, tree.path).catch(() => {});
   await git.deleteBranch(tree.repoPath, tree.branch);
   await ctx.stateManager.removeTree(getRepoPath(), tree.ticketId);
-  if (ctx.currentTree?.ticketId === tree.ticketId) {
+  if (shouldClose) {
     vscode.commands.executeCommand('workbench.action.closeWindow');
   }
 }

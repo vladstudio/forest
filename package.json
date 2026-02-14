@@ -82,14 +82,14 @@
       },
       {
         "view": "forest.trees",
-        "contents": "No trees yet.\n[New Tree](command:forest.newTree)\n[New Issue + Tree](command:forest.newIssueTree)",
+        "contents": "No trees yet.\n[New Tree](command:forest.newTree)\n[New Linear Issue + Tree](command:forest.newIssueTree)",
         "when": "forest.active && forest.noTrees"
       }
     ],
     "commands": [
       {
         "command": "forest.newIssueTree",
-        "title": "New Issue + Tree",
+        "title": "New Linear Issue + Tree",
         "category": "Forest",
         "icon": "$(add)"
       },
@@ -98,6 +98,12 @@
         "title": "New Tree",
         "category": "Forest",
         "icon": "$(git-branch)"
+      },
+      {
+        "command": "forest.newTreePicker",
+        "title": "New Tree…",
+        "category": "Forest",
+        "icon": "$(add)"
       },
       {
         "command": "forest.switch",
@@ -220,7 +226,7 @@
           "group": "navigation"
         },
         {
-          "command": "forest.newTree",
+          "command": "forest.newTreePicker",
           "when": "view == forest.trees",
           "group": "navigation"
         }

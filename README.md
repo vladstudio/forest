@@ -8,16 +8,16 @@ VSCode extension for parallel feature development using git worktrees. One Linea
 
 ## Concepts
 
-| Term              | Action                                                              |
-| ----------------- | ------------------------------------------------------------------- |
-| **New Tree**      | Create a worktree from an existing Linear ticket                    |
-| **New Issue+Tree**| Create a new Linear ticket + worktree in one step                   |
-| **Ship**          | Push branch + create PR + move ticket to configured status          |
-| **Cleanup**       | Merge PR + delete worktree + move ticket to configured status       |
-| **Cancel**        | Remove worktree + branch without merging + move ticket to canceled  |
-| **Update**        | Rebase on latest + re-run setup (reinstall deps, re-copy env files) |
-| **List**          | Quick-pick list of all active trees                                 |
-| **Commit**        | AI-generated commit message from staged diff                        |
+| Term                        | Action                                                              |
+| --------------------------- | ------------------------------------------------------------------- |
+| **New Tree**                | Create a worktree from an existing Linear ticket                    |
+| **New Linear Issue + Tree** | Create a new Linear ticket + worktree in one step                   |
+| **Ship**                    | Push branch + create PR + move ticket to configured status          |
+| **Cleanup**                 | Merge PR + delete worktree + move ticket to configured status       |
+| **Cancel**                  | Remove worktree + branch without merging + move ticket to canceled  |
+| **Update**                  | Rebase on latest + re-run setup (reinstall deps, re-copy env files) |
+| **List**                    | Quick-pick list of all active trees                                 |
+| **Commit**                  | AI-generated commit message from staged diff                        |
 
 ## Prerequisites
 
@@ -87,21 +87,21 @@ To set up Forest, ask Claude (or any AI) to read this README and generate `.fore
 
 ### Config reference
 
-| Field | Required | Default | Description |
-|-------|----------|---------|-------------|
-| `version` | yes | — | Always `1` |
-| `treesDir` | yes | — | Where worktrees live. Supports `~` and `${repo}` |
-| `setup` | no | — | Command(s) to run after creating a tree |
-| `copy` | no | `[]` | Files to copy from repo root into each tree |
-| `shortcuts` | no | `[]` | Terminals, browsers, files to open per tree |
-| `ports.baseRange` | no | `[3000, 4000]` | Port range to allocate from |
-| `ports.mapping` | no | `{}` | Named ports as offsets: `{ "app": "+0", "api": "+1" }` |
-| `env` | no | `{}` | Extra env vars injected into tree. Supports `${ports.X}` |
-| `integrations` | no | `{ linear: true, github: true }` | Toggle integrations. `linearTeam` is the team **key** (e.g. `KAD`), not the display name — run `linear team list` to find it |
-| `linearStatuses` | no | see below | Linear states for issue list and lifecycle transitions. **Must use lowercase** Linear CLI state names: `triage`, `backlog`, `unstarted`, `started`, `completed`, `canceled` |
-| `branchFormat` | no | `${ticketId}-${slug}` | Branch naming. Supports `${ticketId}`, `${slug}` |
-| `baseBranch` | no | `origin/main` | Branch to rebase on |
-| `maxTrees` | no | `10` | Max concurrent worktrees |
+| Field             | Required | Default                          | Description                                                                                                                                                                 |
+| ----------------- | -------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `version`         | yes      | —                                | Always `1`                                                                                                                                                                  |
+| `treesDir`        | yes      | —                                | Where worktrees live. Supports `~` and `${repo}`                                                                                                                            |
+| `setup`           | no       | —                                | Command(s) to run after creating a tree                                                                                                                                     |
+| `copy`            | no       | `[]`                             | Files to copy from repo root into each tree                                                                                                                                 |
+| `shortcuts`       | no       | `[]`                             | Terminals, browsers, files to open per tree                                                                                                                                 |
+| `ports.baseRange` | no       | `[3000, 4000]`                   | Port range to allocate from                                                                                                                                                 |
+| `ports.mapping`   | no       | `{}`                             | Named ports as offsets: `{ "app": "+0", "api": "+1" }`                                                                                                                      |
+| `env`             | no       | `{}`                             | Extra env vars injected into tree. Supports `${ports.X}`                                                                                                                    |
+| `integrations`    | no       | `{ linear: true, github: true }` | Toggle integrations. `linearTeam` is the team **key** (e.g. `KAD`), not the display name — run `linear team list` to find it                                                |
+| `linearStatuses`  | no       | see below                        | Linear states for issue list and lifecycle transitions. **Must use lowercase** Linear CLI state names: `triage`, `backlog`, `unstarted`, `started`, `completed`, `canceled` |
+| `branchFormat`    | no       | `${ticketId}-${slug}`            | Branch naming. Supports `${ticketId}`, `${slug}`                                                                                                                            |
+| `baseBranch`      | no       | `origin/main`                    | Branch to rebase on                                                                                                                                                         |
+| `maxTrees`        | no       | `10`                             | Max concurrent worktrees                                                                                                                                                    |
 
 **Shortcut types:** `terminal` (with optional `command`, `env`, `allowMultiple`), `browser` (with `url`), `file` (with `path`). All support `openOnLaunch: N` (priority order, `false` to disable). Terminal shortcuts with `allowMultiple: true` open a new instance on each click (no stop/restart buttons).
 
@@ -136,16 +136,16 @@ Trees in `review` status with a PR are polled every 5 minutes. When a PR is merg
 
 Shortcuts support these variables in commands, URLs, and file paths:
 
-| Variable | Description | Example value |
-|----------|-------------|---------------|
-| `${ticketId}` | Linear ticket ID | `KAD-123` |
-| `${branch}` | Full branch name | `KAD-123-fix-login` |
-| `${slug}` | Branch name without ticket prefix | `fix-login` |
-| `${repo}` | Repository name | `my-app` |
-| `${treePath}` | Absolute path to the worktree | `/Users/you/.forest/trees/my-app/KAD-123` |
-| `${prNumber}` | PR number (after ship) | `42` |
-| `${prUrl}` | PR URL (after ship) | `https://github.com/org/repo/pull/42` |
-| `${ports.X}` | Allocated port for named mapping | `14000` |
+| Variable      | Description                       | Example value                             |
+| ------------- | --------------------------------- | ----------------------------------------- |
+| `${ticketId}` | Linear ticket ID                  | `KAD-123`                                 |
+| `${branch}`   | Full branch name                  | `KAD-123-fix-login`                       |
+| `${slug}`     | Branch name without ticket prefix | `fix-login`                               |
+| `${repo}`     | Repository name                   | `my-app`                                  |
+| `${treePath}` | Absolute path to the worktree     | `/Users/you/.forest/trees/my-app/KAD-123` |
+| `${prNumber}` | PR number (after ship)            | `42`                                      |
+| `${prUrl}`    | PR URL (after ship)               | `https://github.com/org/repo/pull/42`     |
+| `${ports.X}`  | Allocated port for named mapping  | `14000`                                   |
 
 ```json
 { "name": "Linear", "type": "browser", "url": "https://linear.app/team/issue/${ticketId}" },
@@ -212,7 +212,7 @@ All commands are available from the Forest sidebar (tree icon in activity bar) o
 
 **Typical workflow:**
 
-1. **New Tree** from a Linear ticket (or **New Issue + Tree** to create a new ticket)
+1. **New Tree** from a Linear ticket (or **New Linear Issue + Tree** to create a new ticket)
 2. A new VSCode window opens with terminals running and ports allocated
 3. Code, test, iterate — each tree is fully isolated
 4. **Ship** when ready — pushes and creates a PR
@@ -223,19 +223,19 @@ Switch between trees from the sidebar. All processes keep running in background 
 
 ## Commands
 
-| Command                       | Description                          |
-| ----------------------------- | ------------------------------------ |
-| `Forest: New Issue + Tree`    | Create new ticket + tree             |
-| `Forest: New Tree`            | Tree from existing ticket            |
-| `Forest: Switch Tree`         | Open another tree's window           |
-| `Forest: Ship`                | Push + create PR                     |
-| `Forest: Cleanup`             | Merge PR + remove tree               |
-| `Forest: Cancel`              | Remove tree without merging          |
-| `Forest: Update`              | Rebase + refresh deps                |
-| `Forest: List`                | List all trees                       |
-| `Forest: Commit — AI Message` | AI-generated commit from staged diff |
-| `Forest: Tree Summary — AI`   | AI summary of current tree           |
-| `Forest: Warm Template`       | Rebuild node_modules template        |
+| Command                           | Description                          |
+| --------------------------------- | ------------------------------------ |
+| `Forest: New Linear Issue + Tree` | Create new ticket + tree             |
+| `Forest: New Tree`                | Tree from existing ticket            |
+| `Forest: Switch Tree`             | Open another tree's window           |
+| `Forest: Ship`                    | Push + create PR                     |
+| `Forest: Cleanup`                 | Merge PR + remove tree               |
+| `Forest: Cancel`                  | Remove tree without merging          |
+| `Forest: Update`                  | Rebase + refresh deps                |
+| `Forest: List`                    | List all trees                       |
+| `Forest: Commit — AI Message`     | AI-generated commit from staged diff |
+| `Forest: Tree Summary — AI`       | AI summary of current tree           |
+| `Forest: Warm Template`           | Rebuild node_modules template        |
 
 ## Install locally
 

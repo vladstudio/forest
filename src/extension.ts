@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { loadConfig } from './config';
-import { ShortcutItem } from './views/items';
+import { IssueItem, ShortcutItem, TreeItemView } from './views/items';
 import { StateManager, TreeState } from './state';
 import { ForestContext, getRepoPath } from './context';
 import { PortManager } from './managers/PortManager';
@@ -80,11 +80,19 @@ export async function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(vscode.commands.registerCommand(id, fn));
 
   reg('forest.newIssueTree', () => newIssueTree(ctx));
-  reg('forest.newTree', (ticketId?: string) => newTree(ctx, ticketId));
-  reg('forest.switch', (ticketId?: string) => switchTree(ctx, ticketId));
+  reg('forest.newTree', (arg?: string | IssueItem) => newTree(ctx, arg instanceof IssueItem ? arg.issue.id : arg));
+  reg('forest.newTreePicker', async () => {
+    const pick = await vscode.window.showQuickPick([
+      { label: '$(add) New Linear Issue + Tree', id: 'issue' },
+      { label: '$(git-branch) New Tree', id: 'tree' },
+    ], { placeHolder: 'Create a new tree' });
+    if (pick?.id === 'issue') newIssueTree(ctx);
+    else if (pick?.id === 'tree') newTree(ctx);
+  });
+  reg('forest.switch', (arg?: string | TreeItemView) => switchTree(ctx, arg instanceof TreeItemView ? arg.tree.ticketId : arg));
   reg('forest.ship', () => ship(ctx));
-  reg('forest.cleanup', (ticketId?: string) => cleanup(ctx, ticketId));
-  reg('forest.cancel', (ticketId?: string) => cancel(ctx, ticketId));
+  reg('forest.cleanup', (arg?: string | TreeItemView) => cleanup(ctx, arg instanceof TreeItemView ? arg.tree.ticketId : arg));
+  reg('forest.cancel', (arg?: string | TreeItemView) => cancel(ctx, arg instanceof TreeItemView ? arg.tree.ticketId : arg));
   reg('forest.update', () => update(ctx));
   reg('forest.list', () => list(ctx));
   reg('forest.commit', () => commit(ctx));

@@ -1,0 +1,54 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Build & Development
+
+```bash
+bun run compile        # Type-check + esbuild bundle
+bun run watch          # Concurrent tsc + esbuild watch mode
+bun run package        # Production build (minified, no sourcemaps)
+bun run check-types    # TypeScript type-check only (tsc --noEmit)
+```
+
+Press F5 in VS Code to launch the Extension Development Host for testing.
+
+Output: `dist/extension.js` (single bundle, `vscode` marked as external).
+
+## Architecture
+
+**Entry point**: `src/extension.ts` — loads config, creates managers/providers, registers commands, sets up state watching across windows.
+
+**Key flow**: Config → StateManager → Managers → TreeDataProviders → VS Code UI.
+
+### Config (`src/config.ts`)
+Three-tier merge: defaults → `.forest/config.json` (repo) → `.forest/local.json` (gitignored per-dev). Shortcuts merge by `name` field. Supports `${repo}`, `~`, `${ticketId}`, `${branch}`, `${ports.X}` variable expansion.
+
+### State (`src/state.ts`)
+Global state at `~/.forest/state.json`. Trees keyed as `repoPath:ticketId`. File-watch-based cross-window coordination with debounced events. Atomic writes via temp+rename. Write-locked to prevent races.
+
+### Context (`src/context.ts`)
+`ForestContext` is a dependency container passed to all commands — no globals. Contains config, all managers, providers, and current tree.
+
+### Commands (`src/commands/`)
+Thin wrappers (40-60 lines) around shared logic in `commands/shared.ts`. `createTree()` orchestrates: port allocation → worktree creation → file copy → setup → state save → open window.
+
+### Managers (`src/managers/`)
+- **ShortcutManager**: Terminal/browser/file lifecycle. Tracks terminals in `Map<string, vscode.Terminal[]>`. Emits change events for UI. Supports `allowMultiple` for multi-instance terminals.
+- **PortManager**: Allocates non-overlapping port ranges across trees.
+- **StatusBarManager**: Shows current tree info in status bar.
+
+### Views (`src/views/`)
+Standard `TreeDataProvider` pattern. `items.ts` defines all TreeItem subclasses with `contextValue` for context menus. Health metrics (commits behind, PR status, age) cached 30 seconds in `TreesTreeProvider`.
+
+### CLI Wrappers (`src/cli/`)
+`git.ts`, `linear.ts`, `gh.ts` — thin exec wrappers. Tool availability cached once per session. All calls wrapped in try/catch for graceful degradation when tools are missing.
+
+### Execution (`src/utils/exec.ts`)
+Three patterns: `exec()` (safe execFile), `execShell()` (user commands), `execStream()` (long-running with output channel streaming). All have timeouts and max buffer limits.
+
+## Conventions
+
+- Package.json `contributes.menus` uses `contextValue` from TreeItems for `when` clauses — keep these in sync when adding menu items.
+- Linear CLI states must be **lowercase** (`started`, not `Started`).
+- `linearTeam` is the team **key** (e.g. `KAD`), not the display name.
