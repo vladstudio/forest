@@ -32,7 +32,7 @@ Add `.forest/config.json` to your repo root (tip: ask Claude to generate one for
 ```json
 {
   "version": 1,
-  "treesDir": "~/forest/${repo}",
+  "treesDir": "~/.forest/trees/${repo}",
   "copy": [".env", ".env.local"],
   "setup": "bun install --frozen-lockfile",
   "shortcuts": [
@@ -78,7 +78,7 @@ Per-developer overrides go in `.forest/local.json` (should be gitignored):
 
 To set up Forest, ask Claude (or any AI) to read this README and generate `.forest/config.json`. The AI should inspect the repo and ask you:
 
-1. **Where to store trees?** → `treesDir` (default: `~/forest/${repo}`)
+1. **Where to store trees?** → `treesDir` (default: `~/.forest/trees/${repo}`)
 2. **Setup command?** → detect from lockfile: `bun install`, `npm install`, `yarn`, `pnpm install`
 3. **Files to copy into trees?** → check which of `.env`, `.env.local`, `.envrc` exist
 4. **Shortcuts?** → what terminals to open (dev server, claude, shell), any browser URLs
@@ -142,7 +142,7 @@ Shortcuts support these variables in commands, URLs, and file paths:
 | `${branch}` | Full branch name | `KAD-123-fix-login` |
 | `${slug}` | Branch name without ticket prefix | `fix-login` |
 | `${repo}` | Repository name | `my-app` |
-| `${treePath}` | Absolute path to the worktree | `/Users/you/forest/my-app/KAD-123` |
+| `${treePath}` | Absolute path to the worktree | `/Users/you/.forest/trees/my-app/KAD-123` |
 | `${prNumber}` | PR number (after ship) | `42` |
 | `${prUrl}` | PR URL (after ship) | `https://github.com/org/repo/pull/42` |
 | `${ports.X}` | Allocated port for named mapping | `14000` |
@@ -184,7 +184,7 @@ Claude Code asks for trust confirmation when opening a new workspace. Since each
 In `~/.claude/settings.json`:
 ```json
 {
-  "trustedDirectories": ["/Users/you/forest"]
+  "trustedDirectories": ["/Users/you/.forest/trees"]
 }
 ```
 
