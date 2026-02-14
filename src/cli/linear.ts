@@ -85,12 +85,12 @@ export async function updateIssueState(issueId: string, state: string): Promise<
   await exec('linear', ['issue', 'update', issueId, '-s', state], { timeout: 10_000 });
 }
 
-export async function createPR(issueId: string, baseBranch: string): Promise<string | null> {
+export async function createPR(issueId: string, baseBranch: string, cwd?: string): Promise<string | null> {
   try {
     const base = baseBranch.replace(/^origin\//, '');
     const { stdout } = await exec(
       'linear', ['issue', 'pr', issueId, '--base', base],
-      { timeout: 30_000 },
+      { cwd, timeout: 30_000 },
     );
     const urlMatch = stdout.match(/(https:\/\/github\.com\/[^\s]+)/);
     return urlMatch ? urlMatch[1] : null;
