@@ -20,7 +20,7 @@ export async function newTree(ctx: ForestContext, ticketIdArg?: string): Promise
     if (!pick) return;
     ticketId = pick.issueId;
   } else {
-    const input = await vscode.window.showInputBox({ prompt: 'Ticket ID', placeHolder: 'KAD-4788' });
+    const input = await vscode.window.showInputBox({ prompt: 'Ticket ID', placeHolder: 'TEAM-1234' });
     if (!input) return;
     ticketId = input;
   }

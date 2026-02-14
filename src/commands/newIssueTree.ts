@@ -30,7 +30,7 @@ export async function newIssueTree(ctx: ForestContext): Promise<void> {
     if (issue) issueTitle = issue.title;
   } else {
     // Manual mode
-    const id = await vscode.window.showInputBox({ prompt: 'Ticket ID', placeHolder: 'KAD-4788' });
+    const id = await vscode.window.showInputBox({ prompt: 'Ticket ID', placeHolder: 'TEAM-1234' });
     if (!id) return;
     ticketId = id;
   }

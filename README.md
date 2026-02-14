@@ -49,7 +49,7 @@ Add `.forest/config.json` to your repo root (tip: ask Claude to generate one for
     "APP_PORT": "${ports.app}",
     "API_PORT": "${ports.api}"
   },
-  "integrations": { "linear": true, "github": true, "linearTeam": "KAD" },
+  "integrations": { "linear": true, "github": true, "linearTeam": "ENG" },
   "linearStatuses": {
     "issueList": ["triage", "backlog", "unstarted"],
     "onNew": "started",
@@ -97,7 +97,7 @@ To set up Forest, ask Claude (or any AI) to read this README and generate `.fore
 | `ports.baseRange` | no       | `[3000, 4000]`                   | Port range to allocate from                                                                                                                                                 |
 | `ports.mapping`   | no       | `{}`                             | Named ports as offsets: `{ "app": "+0", "api": "+1" }`                                                                                                                      |
 | `env`             | no       | `{}`                             | Extra env vars injected into tree. Supports `${ports.X}`                                                                                                                    |
-| `integrations`    | no       | `{ linear: true, github: true }` | Toggle integrations. `linearTeam` is the team **key** (e.g. `KAD`), not the display name — run `linear team list` to find it                                                |
+| `integrations`    | no       | `{ linear: true, github: true }` | Toggle integrations. `linearTeam` is the team **key** (e.g. `ENG`), not the display name — run `linear team list` to find it                                                |
 | `linearStatuses`  | no       | see below                        | Linear states for issue list and lifecycle transitions. **Must use lowercase** Linear CLI state names: `triage`, `backlog`, `unstarted`, `started`, `completed`, `canceled` |
 | `branchFormat`    | no       | `${ticketId}-${slug}`            | Branch naming. Supports `${ticketId}`, `${slug}`                                                                                                                            |
 | `baseBranch`      | no       | `origin/main`                    | Branch to rebase on                                                                                                                                                         |
@@ -116,8 +116,8 @@ To set up Forest, ask Claude (or any AI) to read this README and generate `.fore
 The Trees sidebar shows live health info for each tree:
 
 ```
-KAD-1234  Fix login bug   [dev] · 3↓ · 2h
-KAD-5678  Add dark mode    [review] · PR approved · 1d
+ENG-1234  Fix login bug   [dev] · 3↓ · 2h
+ENG-5678  Add dark mode    [review] · PR approved · 1d
 ```
 
 - **N↓** — commits behind base branch
@@ -126,7 +126,7 @@ KAD-5678  Add dark mode    [review] · PR approved · 1d
 
 ### Auto-Cleanup on Merged PRs
 
-Trees in `review` status with a PR are polled every 5 minutes. When a PR is merged, you get a notification: *"KAD-1234 PR was merged. Clean up?"* → click Cleanup to remove the worktree automatically.
+Trees in `review` status with a PR are polled every 5 minutes. When a PR is merged, you get a notification: *"ENG-1234 PR was merged. Clean up?"* → click Cleanup to remove the worktree automatically.
 
 ### Update (Rebase + Refresh)
 
@@ -138,11 +138,11 @@ Shortcuts support these variables in commands, URLs, and file paths:
 
 | Variable      | Description                       | Example value                             |
 | ------------- | --------------------------------- | ----------------------------------------- |
-| `${ticketId}` | Linear ticket ID                  | `KAD-123`                                 |
-| `${branch}`   | Full branch name                  | `KAD-123-fix-login`                       |
+| `${ticketId}` | Linear ticket ID                  | `ENG-123`                                 |
+| `${branch}`   | Full branch name                  | `ENG-123-fix-login`                       |
 | `${slug}`     | Branch name without ticket prefix | `fix-login`                               |
 | `${repo}`     | Repository name                   | `my-app`                                  |
-| `${treePath}` | Absolute path to the worktree     | `/Users/you/.forest/trees/my-app/KAD-123` |
+| `${treePath}` | Absolute path to the worktree     | `/Users/you/.forest/trees/my-app/ENG-123` |
 | `${prNumber}` | PR number (after ship)            | `42`                                      |
 | `${prUrl}`    | PR URL (after ship)               | `https://github.com/org/repo/pull/42`     |
 | `${ports.X}`  | Allocated port for named mapping  | `14000`                                   |
@@ -194,7 +194,7 @@ Replace the path with your actual `treesDir` (without the `${repo}` part).
 
 Customize which Linear states to show in the issues sidebar and which states to set on new/ship/cleanup.
 
-**Important:** Use the lowercase state names from the Linear CLI, not the display names from the Linear UI. Run `linear issue list --help` to see valid values: `triage`, `backlog`, `unstarted`, `started`, `completed`, `canceled`. For `linearTeam`, use the team **key** (e.g. `KAD`), not the display name — find it with `linear team list`.
+**Important:** Use the lowercase state names from the Linear CLI, not the display names from the Linear UI. Run `linear issue list --help` to see valid values: `triage`, `backlog`, `unstarted`, `started`, `completed`, `canceled`. For `linearTeam`, use the team **key** (e.g. `ENG`), not the display name — find it with `linear team list`.
 
 ```json
 "linearStatuses": {

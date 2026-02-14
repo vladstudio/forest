@@ -51,4 +51,4 @@ Three patterns: `exec()` (safe execFile), `execShell()` (user commands), `execSt
 
 - Package.json `contributes.menus` uses `contextValue` from TreeItems for `when` clauses — keep these in sync when adding menu items.
 - Linear CLI states must be **lowercase** (`started`, not `Started`).
-- `linearTeam` is the team **key** (e.g. `KAD`), not the display name.
+- `linearTeam` is the team **key** (e.g. `ENG`), not the display name.
