@@ -90,7 +90,7 @@
       },
       {
         "view": "forest.trees",
-        "contents": "No trees yet.\n[New Tree](command:forest.newTree)\n[New Linear Issue + Tree](command:forest.newIssueTree)",
+        "contents": "No trees yet.\nClick an issue above to create a tree.\n[New Linear Issue + Tree](command:forest.newIssueTree)",
         "when": "forest.active && forest.noTrees"
       }
     ],

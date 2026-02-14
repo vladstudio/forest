@@ -58,10 +58,16 @@ export async function newTree(ctx: ForestContext, arg?: string | { ticketId: str
   const confirm = await vscode.window.showQuickPick(
     [
       { label: `$(add) Create "${title}"`, id: 'create' },
+      { label: '$(link-external) Open in browser', id: 'open' },
       { label: '$(close) Cancel', id: 'cancel' },
     ],
     { placeHolder: `Create tree for ${ticketId}?` },
   );
+  if (confirm?.id === 'open') {
+    const url = await linear.getIssueUrl(ticketId);
+    if (url) vscode.env.openExternal(vscode.Uri.parse(url));
+    return;
+  }
   if (confirm?.id !== 'create') return;
 
   try {

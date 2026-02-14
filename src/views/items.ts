@@ -28,7 +28,7 @@ export class IssueItem extends vscode.TreeItem {
     super(`${issue.id}  ${issue.title}`, vscode.TreeItemCollapsibleState.None);
     this.tooltip = `${issue.id}: ${issue.title}\nState: ${issue.state}`;
     this.iconPath = new vscode.ThemeIcon('circle-outline');
-    this.command = { command: 'forest.newTree', title: 'New Tree', arguments: [issue.id] };
+    this.command = { command: 'forest.newTree', title: 'New Tree', arguments: [{ ticketId: issue.id, title: issue.title }] };
   }
 }
 
