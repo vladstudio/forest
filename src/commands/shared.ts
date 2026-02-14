@@ -6,7 +6,6 @@ import type { ForestConfig } from '../config';
 import type { TreeState, StateManager } from '../state';
 import type { PortManager } from '../managers/PortManager';
 import { slugify } from '../utils/slug';
-import { ticketToColor, darken } from '../utils/colors';
 import { resolvePortVars } from '../utils/ports';
 import * as git from '../cli/git';
 import { execShell, execStream } from '../utils/exec';
@@ -100,7 +99,7 @@ export async function createTree(opts: {
       progress.report({ message: 'Configuring ports...' });
       writeForestEnv(config, treePath, portBase);
 
-      generateWorkspaceFile(treePath, ticketId, title, config);
+      generateWorkspaceFile(treePath, ticketId, title);
 
       const hadTemplate = copyModulesFromTemplate(config, treePath);
 
@@ -117,7 +116,7 @@ export async function createTree(opts: {
       // Save state
       const tree: TreeState = {
         ticketId, title, branch, path: treePath, repoPath,
-        portBase, status: 'dev', createdAt: new Date().toISOString(),
+        portBase, createdAt: new Date().toISOString(),
       };
       await stateManager.addTree(repoPath, tree);
 
@@ -166,21 +165,12 @@ export async function warmTemplate(config: ForestConfig): Promise<void> {
   vscode.window.showInformationMessage('Forest: Template warmed from current tree.');
 }
 
-function generateWorkspaceFile(treePath: string, ticketId: string, title: string, config: ForestConfig): void {
-  const color = ticketToColor(ticketId);
+function generateWorkspaceFile(treePath: string, ticketId: string, title: string): void {
   const workspace = {
     folders: [{ path: '.' }],
     settings: {
       'window.title': `${ticketId}: ${title} — \${activeEditorShort}`,
       'terminal.integrated.enablePersistentSessions': false,
-      'workbench.colorCustomizations': {
-        'titleBar.activeBackground': color,
-        'titleBar.activeForeground': '#ffffff',
-        'titleBar.inactiveBackground': darken(color, 0.3),
-        'titleBar.inactiveForeground': '#cccccc',
-        'statusBar.background': color,
-        'statusBar.foreground': '#ffffff',
-      },
     },
   };
   fs.writeFileSync(path.join(treePath, `${ticketId}.code-workspace`), JSON.stringify(workspace, null, 2));

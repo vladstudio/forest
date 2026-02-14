@@ -10,7 +10,6 @@ export interface TreeState {
   path: string;
   repoPath: string;
   portBase: number;
-  status: 'dev' | 'testing' | 'review' | 'done';
   createdAt: string;
   prUrl?: string;
 }

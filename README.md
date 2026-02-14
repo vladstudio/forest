@@ -120,8 +120,8 @@ To set up Forest, ask Claude (or any AI) to read this README and generate `.fore
 The Trees sidebar shows live health info for each tree:
 
 ```
-ENG-1234  Fix login bug   [dev] · 3↓ · 2h
-ENG-5678  Add dark mode    [review] · PR approved · 1d
+ENG-1234  Fix login bug   3↓ · 2h
+ENG-5678  Add dark mode   PR approved · 1d
 ```
 
 - **N↓** — commits behind base branch
@@ -130,7 +130,7 @@ ENG-5678  Add dark mode    [review] · PR approved · 1d
 
 ### Auto-Cleanup on Merged PRs
 
-Trees in `review` status with a PR are polled every 5 minutes. When a PR is merged, you get a notification: *"ENG-1234 PR was merged. Clean up?"* → click Cleanup to remove the worktree automatically.
+Trees with a PR are polled every 5 minutes. When a PR is merged, you get a notification: *"ENG-1234 PR was merged. Clean up?"* → click Cleanup to remove the worktree automatically.
 
 ### Update (Rebase + Refresh)
 

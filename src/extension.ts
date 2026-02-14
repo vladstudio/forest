@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { loadConfig } from './config';
 import { IssueItem, ShortcutItem, TreeItemView } from './views/items';
-import { StateManager, TreeState } from './state';
+import { StateManager } from './state';
 import { ForestContext, getRepoPath } from './context';
 import { PortManager } from './managers/PortManager';
 import { ShortcutManager } from './managers/ShortcutManager';
@@ -19,7 +19,6 @@ import { list } from './commands/list';
 import { commit } from './commands/commit';
 import { treeSummary } from './commands/treeSummary';
 import { warmTemplate } from './commands/shared';
-import * as linear from './cli/linear';
 import * as gh from './cli/gh';
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -108,27 +107,6 @@ export async function activate(context: vscode.ExtensionContext) {
     const tree = arg instanceof TreeItemView ? arg.tree : ctx.currentTree;
     if (tree) vscode.env.clipboard.writeText(tree.branch);
   });
-  reg('forest.openInLinear', async (arg?: string | TreeItemView | IssueItem) => {
-    const id = arg instanceof TreeItemView ? arg.tree.ticketId
-      : arg instanceof IssueItem ? arg.issue.id
-      : arg || ctx.currentTree?.ticketId;
-    if (!id) return;
-    const url = await linear.getIssueUrl(id);
-    if (url) vscode.env.openExternal(vscode.Uri.parse(url));
-  });
-  reg('forest.setStatus', async (arg?: TreeItemView) => {
-    const tree = arg instanceof TreeItemView ? arg.tree : ctx.currentTree;
-    if (!tree) return;
-    const pick = await vscode.window.showQuickPick(
-      ['dev', 'testing', 'review', 'done'].map(s => ({ label: s })),
-      { placeHolder: 'Set tree status' },
-    );
-    if (pick) {
-      await stateManager.updateTree(getRepoPath(), tree.ticketId, {
-        status: pick.label as TreeState['status'],
-      });
-    }
-  });
   const unwrap = (arg: any) => arg instanceof ShortcutItem ? arg.shortcut : arg;
   reg('forest.openShortcut', (arg: any) => shortcutManager.open(unwrap(arg)));
   reg('forest.stopShortcut', (arg: any) => shortcutManager.stop(unwrap(arg)));
@@ -156,7 +134,7 @@ export async function activate(context: vscode.ExtensionContext) {
       const s = await stateManager.load();
       const trees = stateManager.getTreesForRepo(s, getRepoPath());
       for (const tree of trees) {
-        if (tree.status !== 'review' || !tree.prUrl) continue;
+        if (!tree.prUrl) continue;
         if (await gh.prIsMerged(tree.repoPath, tree.branch)) {
           const action = await vscode.window.showInformationMessage(
             `${tree.ticketId} PR was merged. Clean up?`,

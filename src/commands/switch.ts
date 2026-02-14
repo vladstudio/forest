@@ -13,7 +13,7 @@ export async function switchTree(ctx: ForestContext, ticketIdArg?: string): Prom
     const trees = ctx.stateManager.getTreesForRepo(state, getRepoPath());
     if (!trees.length) { vscode.window.showInformationMessage('No trees to switch to.'); return; }
     const pick = await vscode.window.showQuickPick(
-      trees.map(t => ({ label: `${t.ticketId}  ${t.title}`, description: `[${t.status}]`, id: t.ticketId })),
+      trees.map(t => ({ label: `${t.ticketId}  ${t.title}`, id: t.ticketId })),
       { placeHolder: 'Select a tree' },
     ) as any;
     if (!pick) return;

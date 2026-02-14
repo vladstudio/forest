@@ -10,7 +10,7 @@ export async function list(ctx: ForestContext): Promise<void> {
   const curPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   const items = trees.map(t => ({
     label: `${t.path === curPath ? '$(star-full) ' : ''}${t.ticketId}  ${t.title}`,
-    description: `[${t.status}] :${t.portBase}`,
+    description: `:${t.portBase}`,
     id: t.ticketId,
   }));
 

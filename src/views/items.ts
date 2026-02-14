@@ -76,7 +76,7 @@ export class TreeItemView extends vscode.TreeItem {
   constructor(public readonly tree: TreeState, isCurrent: boolean, health?: TreeHealth) {
     super(`${tree.ticketId}  ${tree.title}`, vscode.TreeItemCollapsibleState.None);
 
-    const parts: string[] = [`[${tree.status}]`];
+    const parts: string[] = [];
     if (health) {
       if (health.pr) {
         const rd = health.pr.reviewDecision;
@@ -88,20 +88,12 @@ export class TreeItemView extends vscode.TreeItem {
     }
     this.description = parts.join(' \u00b7 ');
 
-    const statusColor: Record<string, string> = {
-      dev: 'charts.blue',
-      testing: 'charts.yellow',
-      review: 'charts.orange',
-      done: 'charts.green',
-    };
-    const color = statusColor[tree.status] ? new vscode.ThemeColor(statusColor[tree.status]) : undefined;
     this.iconPath = isCurrent
-      ? new vscode.ThemeIcon('arrow-right', color ?? new vscode.ThemeColor('charts.green'))
-      : new vscode.ThemeIcon('git-branch', color);
+      ? new vscode.ThemeIcon('arrow-right', new vscode.ThemeColor('charts.green'))
+      : new vscode.ThemeIcon('git-branch');
     this.tooltip = [
       `${tree.ticketId}: ${tree.title}`,
       `Branch: ${tree.branch}`,
-      `Status: ${tree.status}`,
       `Ports: ${tree.portBase}`,
       tree.prUrl ? `PR: ${tree.prUrl}` : 'PR: none',
     ].join('\n');

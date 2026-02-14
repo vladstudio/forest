@@ -80,7 +80,13 @@
     "viewsWelcome": [
       {
         "view": "forest.setup",
-        "contents": "Forest is not configured for this workspace.\n\nAsk your AI agent:\n\n`Set up Forest (https://github.com/vladstudio/forest) for this project. Create .forest/config.json with the required configuration.`\n\n[Copy to Clipboard](command:forest.copySetupPrompt)"
+        "contents": "$(folder) Forest needs an open folder to operate.\n\n[Open Folder](command:vscode.openFolder)",
+        "when": "workspaceFolderCount == 0"
+      },
+      {
+        "view": "forest.setup",
+        "contents": "$(gear) Forest is not configured for this workspace.\n\nAsk your AI agent:\n\n`Set up Forest (https://github.com/vladstudio/forest) for this project. Create .forest/config.json with the required configuration.`\n\n[Copy to Clipboard](command:forest.copySetupPrompt)",
+        "when": "workspaceFolderCount != 0"
       },
       {
         "view": "forest.trees",
@@ -149,22 +155,10 @@
         "icon": "$(list-tree)"
       },
       {
-        "command": "forest.openInLinear",
-        "title": "Open in Linear",
-        "category": "Forest",
-        "icon": "$(link-external)"
-      },
-      {
         "command": "forest.copyBranch",
         "title": "Copy Branch Name",
         "category": "Forest",
         "icon": "$(copy)"
-      },
-      {
-        "command": "forest.setStatus",
-        "title": "Set Tree Status",
-        "category": "Forest",
-        "icon": "$(tag)"
       },
       {
         "command": "forest.refreshIssues",
@@ -245,19 +239,9 @@
           "group": "inline"
         },
         {
-          "command": "forest.openInLinear",
-          "when": "viewItem == tree || viewItem == issue",
-          "group": "1_navigation"
-        },
-        {
           "command": "forest.copyBranch",
           "when": "viewItem == tree",
           "group": "1_navigation"
-        },
-        {
-          "command": "forest.setStatus",
-          "when": "viewItem == tree",
-          "group": "2_status"
         },
         {
           "command": "forest.ship",

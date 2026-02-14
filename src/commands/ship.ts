@@ -36,9 +36,9 @@ export async function ship(ctx: ForestContext, treeArg?: import('../state').Tree
       }
 
       // Update state
-      await ctx.stateManager.updateTree(getRepoPath(), tree.ticketId, {
-        status: 'review', ...(prUrl ? { prUrl } : {}),
-      });
+      if (prUrl) {
+        await ctx.stateManager.updateTree(getRepoPath(), tree.ticketId, { prUrl });
+      }
 
       const action = prUrl
         ? await vscode.window.showInformationMessage(`Shipped! PR: ${prUrl}`, 'Open PR')
