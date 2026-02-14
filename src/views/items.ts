@@ -4,11 +4,19 @@ import type { TreeState } from '../state';
 import type { ShortcutConfig } from '../config';
 import type { TreeHealth } from './TreesTreeProvider';
 
+export class StatusGroupItem extends vscode.TreeItem {
+  contextValue = 'statusGroup';
+  constructor(public readonly status: string, count: number) {
+    super(status, vscode.TreeItemCollapsibleState.Expanded);
+    this.description = `${count}`;
+    this.iconPath = new vscode.ThemeIcon('circle-outline');
+  }
+}
+
 export class IssueItem extends vscode.TreeItem {
   contextValue = 'issue';
   constructor(public readonly issue: LinearIssue) {
     super(`${issue.id}  ${issue.title}`, vscode.TreeItemCollapsibleState.None);
-    this.description = `[${issue.state}]`;
     this.tooltip = `${issue.id}: ${issue.title}\nState: ${issue.state}`;
     this.iconPath = new vscode.ThemeIcon('circle-outline');
     this.command = { command: 'forest.newTree', title: 'New Tree', arguments: [issue.id] };
