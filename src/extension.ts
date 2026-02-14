@@ -19,6 +19,7 @@ import { list } from './commands/list';
 import { commit } from './commands/commit';
 import { treeSummary } from './commands/treeSummary';
 import { warmTemplate } from './commands/shared';
+import * as git from './cli/git';
 import * as gh from './cli/gh';
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -152,6 +153,7 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push({ dispose: () => clearInterval(autoCleanupInterval) });
 
   // Watch state for changes from other windows
+  let previousTrees = stateManager.getTreesForRepo(stateManager.loadSync(), getRepoPath());
   stateManager.onDidChange((newState) => {
     if (ctx.currentTree) {
       const updated = stateManager.getTree(newState, getRepoPath(), ctx.currentTree.ticketId);
@@ -160,6 +162,19 @@ export async function activate(context: vscode.ExtensionContext) {
         statusBarManager.update(updated);
         shortcutManager.updateTree(updated);
       }
+    }
+    // Clean up git artifacts for trees removed by other windows (e.g. tree window
+    // closes before git cleanup can run). Only runs in the main window.
+    if (!currentTree) {
+      const currentTrees = stateManager.getTreesForRepo(newState, getRepoPath());
+      const currentIds = new Set(currentTrees.map(t => t.ticketId));
+      for (const prev of previousTrees) {
+        if (!currentIds.has(prev.ticketId)) {
+          git.removeWorktree(prev.repoPath, prev.path).catch(() => {});
+          git.deleteBranch(prev.repoPath, prev.branch).catch(() => {});
+        }
+      }
+      previousTrees = currentTrees;
     }
     issuesProvider.refresh();
     treesProvider.refresh();
