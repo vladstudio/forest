@@ -10,6 +10,7 @@ VSCode extension for parallel feature development using git worktrees. One Linea
 | **New Issue+Tree**| Create a new Linear ticket + worktree in one step                   |
 | **Ship**          | Push branch + create PR + move ticket to configured status          |
 | **Cleanup**       | Merge PR + delete worktree + move ticket to configured status       |
+| **Cancel**        | Remove worktree + branch without merging + move ticket to canceled  |
 | **Update**        | Rebase on latest + re-run setup (reinstall deps, re-copy env files) |
 | **List**          | Quick-pick list of all active trees                                 |
 | **Commit**        | AI-generated commit message from staged diff                        |
@@ -184,7 +185,8 @@ Customize which Linear states to show in the issues sidebar and which states to 
   "issueList": ["triage", "backlog", "unstarted"],
   "onNew": "started",
   "onShip": "started",
-  "onCleanup": "completed"
+  "onCleanup": "completed",
+  "onCancel": "canceled"
 }
 ```
 
@@ -199,6 +201,7 @@ All commands are available from the Forest sidebar (tree icon in activity bar) o
 3. Code, test, iterate — each tree is fully isolated
 4. **Ship** when ready — pushes and creates a PR
 5. **Cleanup** after merge — removes worktree, branch, and ticket
+6. **Cancel** to discard a tree without merging
 
 Switch between trees from the sidebar. All processes keep running in background windows.
 
@@ -211,6 +214,7 @@ Switch between trees from the sidebar. All processes keep running in background 
 | `Forest: Switch Tree`         | Open another tree's window           |
 | `Forest: Ship`                | Push + create PR                     |
 | `Forest: Cleanup`             | Merge PR + remove tree               |
+| `Forest: Cancel`              | Remove tree without merging          |
 | `Forest: Update`              | Rebase + refresh deps                |
 | `Forest: List`                | List all trees                       |
 | `Forest: Commit — AI Message` | AI-generated commit from staged diff |

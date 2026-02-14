@@ -13,7 +13,7 @@ import { newIssueTree } from './commands/newIssueTree';
 import { newTree } from './commands/newTree';
 import { switchTree } from './commands/switch';
 import { ship } from './commands/ship';
-import { cleanup, cleanupMerged } from './commands/cleanup';
+import { cleanup, cancel, cleanupMerged } from './commands/cleanup';
 import { update } from './commands/update';
 import { list } from './commands/list';
 import { commit } from './commands/commit';
@@ -84,6 +84,7 @@ export async function activate(context: vscode.ExtensionContext) {
   reg('forest.switch', (ticketId?: string) => switchTree(ctx, ticketId));
   reg('forest.ship', () => ship(ctx));
   reg('forest.cleanup', (ticketId?: string) => cleanup(ctx, ticketId));
+  reg('forest.cancel', (ticketId?: string) => cancel(ctx, ticketId));
   reg('forest.update', () => update(ctx));
   reg('forest.list', () => list(ctx));
   reg('forest.commit', () => commit(ctx));

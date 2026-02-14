@@ -118,6 +118,12 @@
         "icon": "$(check-all)"
       },
       {
+        "command": "forest.cancel",
+        "title": "Cancel — Remove Without Merging",
+        "category": "Forest",
+        "icon": "$(trash)"
+      },
+      {
         "command": "forest.update",
         "title": "Update — Rebase + Refresh",
         "category": "Forest",
@@ -257,6 +263,11 @@
         },
         {
           "command": "forest.cleanup",
+          "when": "viewItem == tree",
+          "group": "4_danger"
+        },
+        {
+          "command": "forest.cancel",
           "when": "viewItem == tree",
           "group": "4_danger"
         },

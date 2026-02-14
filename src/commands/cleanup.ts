@@ -64,6 +64,43 @@ export async function cleanup(ctx: ForestContext, ticketIdArg?: string): Promise
   );
 }
 
+export async function cancel(ctx: ForestContext, ticketIdArg?: string): Promise<void> {
+  const tree = ticketIdArg
+    ? ctx.stateManager.getTree(await ctx.stateManager.load(), getRepoPath(), ticketIdArg)
+    : ctx.currentTree;
+
+  if (!tree) {
+    vscode.window.showErrorMessage('No tree to cancel. Run from a tree window or select from sidebar.');
+    return;
+  }
+
+  const confirm = await vscode.window.showWarningMessage(
+    `Cancel ${tree.ticketId}: ${tree.title}?\n\nThis will remove the worktree and branch without merging.`,
+    { modal: true }, 'Cancel Tree',
+  );
+  if (confirm !== 'Cancel Tree') return;
+
+  await vscode.window.withProgress(
+    { location: vscode.ProgressLocation.Notification, title: `Canceling ${tree.ticketId}...` },
+    async (progress) => {
+      if (ctx.config.integrations.linear && await linear.isAvailable()) {
+        progress.report({ message: 'Updating ticket...' });
+        linear.updateIssueState(tree.ticketId, ctx.config.linearStatuses.onCancel).catch(() => {});
+      }
+
+      progress.report({ message: 'Removing worktree...' });
+      await git.removeWorktree(tree.repoPath, tree.path);
+      await git.deleteBranch(tree.repoPath, tree.branch);
+
+      await ctx.stateManager.removeTree(getRepoPath(), tree.ticketId);
+
+      if (ctx.currentTree?.ticketId === tree.ticketId) {
+        vscode.commands.executeCommand('workbench.action.closeWindow');
+      }
+    },
+  );
+}
+
 /** Cleanup after an already-merged PR — skips merge and confirmation. */
 export async function cleanupMerged(ctx: ForestContext, tree: TreeState): Promise<void> {
   if (ctx.config.integrations.linear && await linear.isAvailable()) {
