@@ -4,6 +4,7 @@ import * as path from 'path';
 import type { ForestContext } from '../context';
 import { getRepoPath } from '../context';
 import { execShell } from '../utils/exec';
+import { workspaceFilePath } from './shared';
 
 export async function switchTree(ctx: ForestContext, ticketIdArg?: string): Promise<void> {
   let ticketId = ticketIdArg;
@@ -29,6 +30,6 @@ export async function switchTree(ctx: ForestContext, ticketIdArg?: string): Prom
     try { await execShell('direnv allow', { cwd: tree.path, timeout: 10_000 }); } catch {}
   }
 
-  const wsFile = path.join(tree.path, `${tree.ticketId}.code-workspace`);
+  const wsFile = workspaceFilePath(getRepoPath(), tree.ticketId);
   await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(wsFile), { forceNewWindow: true });
 }

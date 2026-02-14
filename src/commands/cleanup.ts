@@ -1,10 +1,11 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
 import type { ForestContext } from '../context';
 import type { TreeState } from '../state';
 import * as git from '../cli/git';
 import * as gh from '../cli/gh';
 import { getRepoPath } from '../context';
-import { runStep, updateLinear } from './shared';
+import { runStep, updateLinear, workspaceFilePath } from './shared';
 
 function resolveTree(ctx: ForestContext, ticketIdArg?: string): TreeState | undefined {
   return ticketIdArg
@@ -21,6 +22,7 @@ async function teardownTree(ctx: ForestContext, tree: TreeState): Promise<void> 
   try {
     const shouldClose = ctx.currentTree?.ticketId === tree.ticketId;
     await ctx.stateManager.removeTree(tree.repoPath, tree.ticketId);
+    try { fs.unlinkSync(workspaceFilePath(tree.repoPath, tree.ticketId)); } catch {}
     ctx.outputChannel.appendLine('[Forest] State updated');
     if (shouldClose) {
       // Can't do git cleanup here — removing the worktree kills the extension host.

@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
 import { loadConfig } from './config';
 import { ShortcutItem, TreeItemView } from './views/items';
 import { StateManager } from './state';
@@ -17,7 +18,7 @@ import { cleanup, cancel, cleanupMerged } from './commands/cleanup';
 import { update } from './commands/update';
 import { list } from './commands/list';
 import { commit } from './commands/commit';
-import { warmTemplate } from './commands/shared';
+import { warmTemplate, workspaceFilePath } from './commands/shared';
 import * as git from './cli/git';
 import * as gh from './cli/gh';
 
@@ -166,6 +167,7 @@ export async function activate(context: vscode.ExtensionContext) {
       // Skip self — teardownTree handles our own window
       if (prev.ticketId === currentTree?.ticketId) continue;
       if (!currentIds.has(prev.ticketId)) {
+        try { fs.unlinkSync(workspaceFilePath(prev.repoPath, prev.ticketId)); } catch {}
         git.removeWorktree(prev.repoPath, prev.path)
           .then(() => {
             outputChannel.appendLine(`[Forest] Cleaned worktree: ${prev.ticketId}`);

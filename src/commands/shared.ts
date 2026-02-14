@@ -134,7 +134,8 @@ export async function createTree(opts: {
         progress.report({ message: 'Configuring ports...' });
         writeForestEnv(config, treePath, portBase);
 
-        generateWorkspaceFile(treePath, ticketId, title);
+        generateWorkspaceFile(repoPath, treePath, ticketId, title);
+        writeGitExclude(treePath);
 
         const hadTemplate = copyModulesFromTemplate(repoPath, treePath);
 
@@ -148,7 +149,7 @@ export async function createTree(opts: {
         if (!hadTemplate) saveTemplate(repoPath, treePath);
 
         progress.report({ message: 'Opening window...' });
-        const wsFile = path.join(treePath, `${ticketId}.code-workspace`);
+        const wsFile = workspaceFilePath(repoPath, ticketId);
         await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(wsFile), { forceNewWindow: true });
 
         return tree;
@@ -195,13 +196,32 @@ export async function warmTemplate(): Promise<void> {
   vscode.window.showInformationMessage('Forest: Template warmed from current tree.');
 }
 
-function generateWorkspaceFile(treePath: string, ticketId: string, title: string): void {
+export function workspaceFilePath(repoPath: string, ticketId: string): string {
+  const dir = path.join(os.homedir(), '.forest', 'workspaces');
+  fs.mkdirSync(dir, { recursive: true });
+  return path.join(dir, `${ticketId}.code-workspace`);
+}
+
+function writeGitExclude(treePath: string): void {
+  const excludePath = path.join(treePath, '.git', 'info', 'exclude');
+  const marker = '# Forest-generated';
+  const entries = `\n${marker}\n.forest.env\n`;
+  try {
+    const existing = fs.existsSync(excludePath) ? fs.readFileSync(excludePath, 'utf8') : '';
+    if (!existing.includes(marker)) {
+      fs.mkdirSync(path.dirname(excludePath), { recursive: true });
+      fs.appendFileSync(excludePath, entries);
+    }
+  } catch {}
+}
+
+function generateWorkspaceFile(repoPath: string, treePath: string, ticketId: string, title: string): void {
   const workspace = {
-    folders: [{ path: '.' }],
+    folders: [{ path: treePath }],
     settings: {
       'window.title': `${ticketId}: ${title}\${separator}\${activeEditorShort}`,
       'terminal.integrated.enablePersistentSessions': false,
     },
   };
-  fs.writeFileSync(path.join(treePath, `${ticketId}.code-workspace`), JSON.stringify(workspace, null, 2));
+  fs.writeFileSync(workspaceFilePath(repoPath, ticketId), JSON.stringify(workspace, null, 2));
 }
