@@ -4,13 +4,14 @@ import * as linear from '../cli/linear';
 import { createTree } from './shared';
 
 export async function newIssueTree(ctx: ForestContext): Promise<void> {
+  const config = ctx.config;
   const title = await vscode.window.showInputBox({ prompt: 'Issue title', placeHolder: 'Fix team invite email validation' });
   if (!title) return;
 
   let ticketId: string;
   let issueTitle = title;
 
-  if (ctx.config.integrations.linear && await linear.isAvailable()) {
+  if (config.integrations.linear && await linear.isAvailable()) {
     // Pick priority
     const priority = await vscode.window.showQuickPick(
       [{ label: 'Urgent', value: 1 }, { label: 'High', value: 2 }, { label: 'Normal', value: 3 }, { label: 'Low', value: 4 }],
@@ -18,7 +19,7 @@ export async function newIssueTree(ctx: ForestContext): Promise<void> {
     ) as any;
 
     try {
-      ticketId = await linear.createIssue({ title, priority: priority?.value, team: ctx.config.integrations.linearTeam });
+      ticketId = await linear.createIssue({ title, priority: priority?.value, team: config.integrations.linearTeam });
     } catch (e: any) {
       vscode.window.showErrorMessage(`Failed to create Linear issue: ${e.message}`);
       return;
@@ -35,7 +36,7 @@ export async function newIssueTree(ctx: ForestContext): Promise<void> {
   }
 
   try {
-    await createTree({ ticketId, title: issueTitle, config: ctx.config, stateManager: ctx.stateManager, portManager: ctx.portManager });
+    await createTree({ ticketId, title: issueTitle, config, stateManager: ctx.stateManager, portManager: ctx.portManager });
   } catch (e: any) {
     vscode.window.showErrorMessage(e.message);
   }

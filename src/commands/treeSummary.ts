@@ -9,9 +9,11 @@ export async function treeSummary(ctx: ForestContext): Promise<void> {
   if (!ctx.currentTree) return;
   const tree = ctx.currentTree;
 
+  const config = ctx.config;
+
   const [log, behind, prInfo, statusResult] = await Promise.all([
     exec('git', ['log', '--oneline', '-3'], { cwd: tree.path }).then(r => r.stdout).catch(() => ''),
-    git.commitsBehind(tree.path, ctx.config.baseBranch),
+    git.commitsBehind(tree.path, config.baseBranch),
     gh.prStatus(tree.path).catch(() => null),
     exec('git', ['status', '--porcelain'], { cwd: tree.path }).then(r => r.stdout.split('\n').filter(Boolean).length).catch(() => 0),
   ]);
@@ -26,7 +28,7 @@ export async function treeSummary(ctx: ForestContext): Promise<void> {
 
   try {
     const summary = await generateText(
-      ctx.config,
+      config,
       'Summarize this git tree status in exactly 1 short sentence. Be very concise.',
       context,
     );

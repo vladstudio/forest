@@ -8,8 +8,10 @@ export async function commit(ctx: ForestContext): Promise<void> {
     vscode.window.showErrorMessage('Commit must be run from a tree window.');
     return;
   }
+  const tree = ctx.currentTree;
+  const config = ctx.config;
 
-  const { stdout: diff } = await exec('git', ['diff', '--cached'], { cwd: ctx.currentTree.path });
+  const { stdout: diff } = await exec('git', ['diff', '--cached'], { cwd: tree.path });
   if (!diff.trim()) {
     vscode.window.showWarningMessage('No staged changes. Stage files with git add first.');
     return;
@@ -18,7 +20,7 @@ export async function commit(ctx: ForestContext): Promise<void> {
   let message: string;
   try {
     message = await generateText(
-      ctx.config,
+      config,
       'Generate a concise git commit message (1 line, no quotes) for this diff:',
       diff.slice(0, 8000),
     );
@@ -35,7 +37,7 @@ export async function commit(ctx: ForestContext): Promise<void> {
   if (!edited) return;
 
   try {
-    await exec('git', ['commit', '-m', edited], { cwd: ctx.currentTree.path });
+    await exec('git', ['commit', '-m', edited], { cwd: tree.path });
     vscode.window.showInformationMessage('Committed.');
   } catch (e: any) {
     vscode.window.showErrorMessage(`Commit failed: ${e.message}`);

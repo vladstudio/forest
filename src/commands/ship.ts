@@ -4,12 +4,13 @@ import * as git from '../cli/git';
 import * as linear from '../cli/linear';
 import { getRepoPath } from '../context';
 
-export async function ship(ctx: ForestContext): Promise<void> {
-  if (!ctx.currentTree) {
+export async function ship(ctx: ForestContext, treeArg?: import('../state').TreeState): Promise<void> {
+  const tree = treeArg || ctx.currentTree;
+  if (!tree) {
     vscode.window.showErrorMessage('Ship must be run from a tree window.');
     return;
   }
-  const tree = ctx.currentTree;
+  const config = ctx.config;
 
   // Check uncommitted changes
   if (await git.hasUncommittedChanges(tree.path)) {
@@ -28,10 +29,10 @@ export async function ship(ctx: ForestContext): Promise<void> {
 
       // Create PR + update Linear
       let prUrl: string | null = null;
-      if (ctx.config.integrations.linear && await linear.isAvailable()) {
+      if (config.integrations.linear && await linear.isAvailable()) {
         progress.report({ message: 'Creating PR...' });
-        prUrl = await linear.createPR(tree.ticketId, ctx.config.baseBranch);
-        linear.updateIssueState(tree.ticketId, ctx.config.linearStatuses.onShip).catch(() => {});
+        prUrl = await linear.createPR(tree.ticketId, config.baseBranch);
+        linear.updateIssueState(tree.ticketId, config.linearStatuses.onShip).catch(() => {});
       }
 
       // Update state

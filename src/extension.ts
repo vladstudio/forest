@@ -90,33 +90,37 @@ export async function activate(context: vscode.ExtensionContext) {
     else if (pick?.id === 'tree') newTree(ctx);
   });
   reg('forest.switch', (arg?: string | TreeItemView) => switchTree(ctx, arg instanceof TreeItemView ? arg.tree.ticketId : arg));
-  reg('forest.ship', () => ship(ctx));
+  reg('forest.ship', (arg?: TreeItemView) => ship(ctx, arg instanceof TreeItemView ? arg.tree : undefined));
   reg('forest.cleanup', (arg?: string | TreeItemView) => cleanup(ctx, arg instanceof TreeItemView ? arg.tree.ticketId : arg));
   reg('forest.cancel', (arg?: string | TreeItemView) => cancel(ctx, arg instanceof TreeItemView ? arg.tree.ticketId : arg));
-  reg('forest.update', () => update(ctx));
+  reg('forest.update', (arg?: TreeItemView) => update(ctx, arg instanceof TreeItemView ? arg.tree : undefined));
   reg('forest.list', () => list(ctx));
   reg('forest.commit', () => commit(ctx));
   reg('forest.treeSummary', () => treeSummary(ctx));
   reg('forest.warmTemplate', () => warmTemplate(config));
   reg('forest.refreshIssues', () => issuesProvider.refresh());
   reg('forest.refreshTrees', () => treesProvider.refresh());
-  reg('forest.copyBranch', () => {
-    if (currentTree) vscode.env.clipboard.writeText(currentTree.branch);
+  reg('forest.copyBranch', (arg?: TreeItemView) => {
+    const tree = arg instanceof TreeItemView ? arg.tree : ctx.currentTree;
+    if (tree) vscode.env.clipboard.writeText(tree.branch);
   });
-  reg('forest.openInLinear', async (ticketId?: string) => {
-    const id = ticketId || currentTree?.ticketId;
+  reg('forest.openInLinear', async (arg?: string | TreeItemView | IssueItem) => {
+    const id = arg instanceof TreeItemView ? arg.tree.ticketId
+      : arg instanceof IssueItem ? arg.issue.id
+      : arg || ctx.currentTree?.ticketId;
     if (!id) return;
     const url = await linear.getIssueUrl(id);
     if (url) vscode.env.openExternal(vscode.Uri.parse(url));
   });
-  reg('forest.setStatus', async () => {
-    if (!currentTree) return;
+  reg('forest.setStatus', async (arg?: TreeItemView) => {
+    const tree = arg instanceof TreeItemView ? arg.tree : ctx.currentTree;
+    if (!tree) return;
     const pick = await vscode.window.showQuickPick(
       ['dev', 'testing', 'review', 'done'].map(s => ({ label: s })),
       { placeHolder: 'Set tree status' },
     );
     if (pick) {
-      await stateManager.updateTree(getRepoPath(), currentTree.ticketId, {
+      await stateManager.updateTree(getRepoPath(), tree.ticketId, {
         status: pick.label as TreeState['status'],
       });
     }
