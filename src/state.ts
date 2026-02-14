@@ -40,7 +40,12 @@ export class StateManager {
   private startWatching(): void {
     let lastContent = '';
     try { lastContent = fs.readFileSync(this.statePath, 'utf8'); } catch {}
-    this.watcher = fs.watch(this.statePath, () => {
+    // Watch the directory, not the file — fs.watch on macOS loses track of
+    // the inode after atomic rename (tmp + rename), missing subsequent changes.
+    const dir = path.dirname(this.statePath);
+    const basename = path.basename(this.statePath);
+    this.watcher = fs.watch(dir, (_event, filename) => {
+      if (filename !== basename) return;
       try {
         const content = fs.readFileSync(this.statePath, 'utf8');
         if (content !== lastContent) {
