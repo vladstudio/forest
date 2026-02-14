@@ -26,7 +26,9 @@ export class StatusBarManager {
       this.summaryItem.hide();
       return;
     }
-    this.summaryItem.text = `$(info) ${text}`;
+    const maxLen = 80;
+    const display = text.length > maxLen ? text.slice(0, maxLen) + '…' : text;
+    this.summaryItem.text = `$(info) ${display}`;
     this.summaryItem.tooltip = text;
     this.summaryItem.command = 'forest.treeSummary';
     this.summaryItem.show();
