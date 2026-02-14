@@ -22,8 +22,7 @@ VSCode extension for parallel feature development using git worktrees. One Linea
 ## Prerequisites
 
 - `git` (required)
-- `gh` CLI (for PR merge via `cleanup`)
-- [`linear`](https://github.com/schpet/linear-cli) CLI (optional — features degrade gracefully without it)
+- `gh` CLI (for PR creation and merge)
 
 ## Setup
 
@@ -54,7 +53,7 @@ Add `.forest/config.json` to your repo root (tip: ask Claude to generate one for
     "statuses": {
       "issueList": ["triage", "backlog", "unstarted"],
       "onNew": "started",
-      "onShip": "started",
+      "onShip": "in review",
       "onCleanup": "completed"
     }
   },
@@ -69,10 +68,8 @@ Per-developer overrides go in `.forest/local.json` (should be gitignored):
 
 ```json
 {
-  "ai": {
-    "provider": "gemini",
-    "apiKey": "YOUR_KEY",
-    "model": "gemini-2.0-flash-lite"
+  "linear": {
+    "apiKey": "lin_api_YOUR_KEY"
   }
 }
 ```
@@ -184,12 +181,6 @@ If a `.envrc` file exists in the tree, Forest automatically runs `direnv allow` 
 
 Rebuild the template manually: `Forest: Warm Template` from the command palette.
 
-### AI Commit Messages
-
-Configure an AI provider in `.forest/local.json`, then run `Forest: Commit — AI Message`. It reads your staged diff, generates a commit message, lets you edit it, and commits.
-
-Supported providers: `gemini` (default model: `gemini-2.0-flash-lite`) and `openai` (default: `gpt-4o-mini`).
-
 ### Claude Code Trust
 
 Claude Code asks for trust confirmation when opening a new workspace. Since each tree creates a new directory, you'd get this prompt for every tree. To avoid it, add `~/.forest/trees` to Claude's trusted directories:
@@ -207,7 +198,7 @@ Replace `/Users/you` with your actual home directory.
 
 Customize which Linear states to show in the issues sidebar and which states to set on new/ship/cleanup.
 
-**Important:** Use the lowercase state names from the Linear CLI, not the display names from the Linear UI. Run `linear issue list --help` to see valid values: `triage`, `backlog`, `unstarted`, `started`, `completed`, `canceled`. For `linearTeam`, use the team **key** (e.g. `ENG`), not the display name — find it with `linear team list`.
+Status names in `issueList` use Linear's built-in types: `triage`, `backlog`, `unstarted`, `started`, `completed`, `canceled`. Status names in `onShip`, `onNew`, etc. can be custom workflow state names (e.g. `"in review"`) — Forest resolves them via the Linear API. Use the team **key** (e.g. `ENG`), not the display name.
 
 ```json
 "linear": {
@@ -216,7 +207,7 @@ Customize which Linear states to show in the issues sidebar and which states to 
   "statuses": {
     "issueList": ["triage", "backlog", "unstarted"],
     "onNew": "started",
-    "onShip": "started",
+    "onShip": "in review",
     "onCleanup": "completed",
     "onCancel": "canceled"
   }

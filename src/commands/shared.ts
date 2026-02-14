@@ -28,7 +28,7 @@ export async function runStep(ctx: ForestContext, label: string, fn: () => Promi
 }
 
 export async function updateLinear(ctx: ForestContext, ticketId: string, status: string): Promise<void> {
-  if (ctx.config.linear.enabled && await linear.isAvailable()) {
+  if (ctx.config.linear.enabled && linear.isAvailable()) {
     await runStep(ctx, `Linear ${ticketId} → ${status}`, () => linear.updateIssueState(ticketId, status));
   }
 }

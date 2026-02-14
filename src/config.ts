@@ -17,12 +17,11 @@ export interface ForestConfig {
   shortcuts: ShortcutConfig[];
   ports: { baseRange: [number, number]; mapping: Record<string, string> };
   env: Record<string, string>;
-  linear: { enabled: boolean; team?: string; statuses: { issueList: string[]; onNew: string; onShip: string; onCleanup: string; onCancel: string } };
+  linear: { enabled: boolean; apiKey?: string; team?: string; statuses: { issueList: string[]; onNew: string; onShip: string; onCleanup: string; onCancel: string } };
   github: { enabled: boolean };
   branchFormat: string;
   baseBranch: string;
   maxTrees: number;
-  ai?: { provider: 'gemini' | 'openai'; apiKey?: string; model?: string };
 }
 
 const DEFAULTS: Partial<ForestConfig> = {
@@ -30,7 +29,7 @@ const DEFAULTS: Partial<ForestConfig> = {
   shortcuts: [],
   env: {},
   ports: { baseRange: [3000, 4000], mapping: {} },
-  linear: { enabled: true, statuses: { issueList: ['triage', 'backlog', 'unstarted'], onNew: 'started', onShip: 'started', onCleanup: 'completed', onCancel: 'canceled' } },
+  linear: { enabled: true, statuses: { issueList: ['triage', 'backlog', 'unstarted'], onNew: 'started', onShip: 'in review', onCleanup: 'completed', onCancel: 'canceled' } },
   github: { enabled: true },
   branchFormat: '${ticketId}-${slug}',
   baseBranch: 'origin/main',

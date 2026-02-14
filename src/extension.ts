@@ -17,10 +17,10 @@ import { ship } from './commands/ship';
 import { cleanup, cancel, cleanupMerged } from './commands/cleanup';
 import { update } from './commands/update';
 import { list } from './commands/list';
-import { commit } from './commands/commit';
 import { warmTemplate, workspaceFilePath } from './commands/shared';
 import * as git from './cli/git';
 import * as gh from './cli/gh';
+import * as linear from './cli/linear';
 
 export async function activate(context: vscode.ExtensionContext) {
   const config = await loadConfig();
@@ -42,6 +42,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   vscode.commands.executeCommand('setContext', 'forest.active', true);
   vscode.commands.executeCommand('setContext', 'forest.linearEnabled', config.linear.enabled);
+  linear.configure(config.linear.apiKey);
 
   const stateManager = new StateManager();
   await stateManager.initialize();
@@ -102,13 +103,16 @@ export async function activate(context: vscode.ExtensionContext) {
   reg('forest.cancel', (arg?: string | TreeItemView) => cancel(ctx, arg instanceof TreeItemView ? arg.tree.ticketId : arg));
   reg('forest.update', (arg?: TreeItemView) => andRefresh(() => update(ctx, arg instanceof TreeItemView ? arg.tree : undefined))());
   reg('forest.list', () => list(ctx));
-  reg('forest.commit', () => commit(ctx));
   reg('forest.warmTemplate', () => warmTemplate());
   reg('forest.refreshIssues', () => issuesProvider.refresh());
   reg('forest.refreshTrees', () => treesProvider.refresh());
   reg('forest.copyBranch', (arg?: TreeItemView) => {
     const tree = arg instanceof TreeItemView ? arg.tree : ctx.currentTree;
     if (tree) vscode.env.clipboard.writeText(tree.branch);
+  });
+  reg('forest.openPR', (arg?: TreeItemView) => {
+    const tree = arg instanceof TreeItemView ? arg.tree : ctx.currentTree;
+    if (tree?.prUrl) vscode.env.openExternal(vscode.Uri.parse(tree.prUrl));
   });
   const unwrap = (arg: any) => arg instanceof ShortcutItem ? arg.shortcut : arg;
   reg('forest.openShortcut', (arg: any) => shortcutManager.open(unwrap(arg)));

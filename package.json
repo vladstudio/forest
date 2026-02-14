@@ -191,10 +191,10 @@
         "icon": "$(debug-restart)"
       },
       {
-        "command": "forest.commit",
-        "title": "Commit — AI Message",
+        "command": "forest.openPR",
+        "title": "Open PR",
         "category": "Forest",
-        "icon": "$(git-commit)"
+        "icon": "$(link-external)"
       },
       {
         "command": "forest.warmTemplate",
@@ -234,6 +234,11 @@
         },
         {
           "command": "forest.copyBranch",
+          "when": "viewItem == tree",
+          "group": "1_navigation"
+        },
+        {
+          "command": "forest.openPR",
           "when": "viewItem == tree",
           "group": "1_navigation"
         },

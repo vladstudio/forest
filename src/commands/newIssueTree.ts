@@ -11,7 +11,7 @@ export async function newIssueTree(ctx: ForestContext): Promise<void> {
   let ticketId: string;
   let issueTitle = title;
 
-  if (config.linear.enabled && await linear.isAvailable()) {
+  if (config.linear.enabled && linear.isAvailable()) {
     // Pick priority
     const priority = await vscode.window.showQuickPick(
       [{ label: 'Urgent', value: 1 }, { label: 'High', value: 2 }, { label: 'Normal', value: 3 }, { label: 'Low', value: 4 }],
