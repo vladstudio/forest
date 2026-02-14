@@ -122,6 +122,7 @@ export async function activate(context: vscode.ExtensionContext) {
   if (currentTree) {
     statusBarManager.show();
     shortcutManager.openOnLaunchShortcuts();
+    vscode.commands.executeCommand('forest.trees.focus');
 
     // Auto-run tree summary if AI configured
     if (config.ai?.apiKey) {
