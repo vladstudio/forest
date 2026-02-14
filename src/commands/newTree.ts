@@ -52,7 +52,7 @@ export async function newTree(ctx: ForestContext, ticketIdArg?: string): Promise
     await createTree({ ticketId, title, config: ctx.config, stateManager: ctx.stateManager, portManager: ctx.portManager });
     // Update Linear state
     if (ctx.config.linear.enabled && await linear.isAvailable()) {
-      linear.updateIssueState(ticketId, ctx.config.linear.statuses.onNew).catch(() => {});
+      await linear.updateIssueState(ticketId, ctx.config.linear.statuses.onNew).catch(() => {});
     }
   } catch (e: any) {
     vscode.window.showErrorMessage(e.message);

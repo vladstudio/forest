@@ -158,7 +158,7 @@ export class ShortcutManager {
 
     const timeout = 120_000;
     const start = Date.now();
-    vscode.window.withProgress(
+    await vscode.window.withProgress(
       { location: vscode.ProgressLocation.Notification, title: `Waiting for port ${port}…`, cancellable: true },
       (_progress, token) => new Promise<void>(resolve => {
         const check = async (): Promise<void> => {

@@ -14,17 +14,19 @@ function resolveTree(ctx: ForestContext, ticketIdArg?: string): TreeState | unde
 
 async function teardownTree(ctx: ForestContext, tree: TreeState): Promise<void> {
   const shouldClose = ctx.currentTree?.ticketId === tree.ticketId;
-  await git.removeWorktree(tree.repoPath, tree.path).catch(() => {});
+  // Delete branch and state BEFORE removing worktree — worktree removal
+  // destabilizes the VS Code window and can interrupt remaining operations.
   await git.deleteBranch(tree.repoPath, tree.branch);
-  await ctx.stateManager.removeTree(getRepoPath(), tree.ticketId);
+  await ctx.stateManager.removeTree(tree.repoPath, tree.ticketId);
+  await git.removeWorktree(tree.repoPath, tree.path).catch(() => {});
   if (shouldClose) {
-    vscode.commands.executeCommand('workbench.action.closeWindow');
+    await vscode.commands.executeCommand('workbench.action.closeWindow');
   }
 }
 
 async function updateLinear(config: import('../config').ForestConfig, ticketId: string, status: string): Promise<void> {
   if (config.linear.enabled && await linear.isAvailable()) {
-    linear.updateIssueState(ticketId, status).catch(() => {});
+    await linear.updateIssueState(ticketId, status).catch(() => {});
   }
 }
 

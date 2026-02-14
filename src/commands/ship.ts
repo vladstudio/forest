@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import type { ForestContext } from '../context';
 import * as git from '../cli/git';
 import * as linear from '../cli/linear';
-import { getRepoPath } from '../context';
+
 
 export async function ship(ctx: ForestContext, treeArg?: import('../state').TreeState): Promise<void> {
   const tree = treeArg || ctx.currentTree;
@@ -32,12 +32,12 @@ export async function ship(ctx: ForestContext, treeArg?: import('../state').Tree
       if (config.linear.enabled && await linear.isAvailable()) {
         progress.report({ message: 'Creating PR...' });
         prUrl = await linear.createPR(tree.ticketId, config.baseBranch);
-        linear.updateIssueState(tree.ticketId, config.linear.statuses.onShip).catch(() => {});
+        await linear.updateIssueState(tree.ticketId, config.linear.statuses.onShip).catch(() => {});
       }
 
       // Update state
       if (prUrl) {
-        await ctx.stateManager.updateTree(getRepoPath(), tree.ticketId, { prUrl });
+        await ctx.stateManager.updateTree(tree.repoPath, tree.ticketId, { prUrl });
       }
 
       const action = prUrl
