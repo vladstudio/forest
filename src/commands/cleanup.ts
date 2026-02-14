@@ -12,21 +12,30 @@ function resolveTree(ctx: ForestContext, ticketIdArg?: string): TreeState | unde
     : ctx.currentTree;
 }
 
+const teardownInProgress = new Set<string>();
+
 async function teardownTree(ctx: ForestContext, tree: TreeState): Promise<void> {
-  const shouldClose = ctx.currentTree?.ticketId === tree.ticketId;
-  // Remove state first — if we're in the tree window, removing the worktree
-  // deletes the workspace directory, which causes VS Code to kill the extension
-  // host before subsequent steps (state cleanup, branch deletion) can run.
-  await ctx.stateManager.removeTree(tree.repoPath, tree.ticketId);
-  ctx.outputChannel.appendLine('[Forest] State updated');
-  // Close window before removing worktree so the directory isn't held open.
-  if (shouldClose) {
-    await vscode.commands.executeCommand('workbench.action.closeWindow');
+  const key = `${tree.repoPath}:${tree.ticketId}`;
+  if (teardownInProgress.has(key)) return;
+  teardownInProgress.add(key);
+  try {
+    const shouldClose = ctx.currentTree?.ticketId === tree.ticketId;
+    // Remove state first — if we're in the tree window, removing the worktree
+    // deletes the workspace directory, which causes VS Code to kill the extension
+    // host before subsequent steps (state cleanup, branch deletion) can run.
+    await ctx.stateManager.removeTree(tree.repoPath, tree.ticketId);
+    ctx.outputChannel.appendLine('[Forest] State updated');
+    // Close window before removing worktree so the directory isn't held open.
+    if (shouldClose) {
+      await vscode.commands.executeCommand('workbench.action.closeWindow');
+    }
+    // Git cleanup — runs only if extension host survives (i.e. invoked from main window).
+    // Remove worktree first so the branch is no longer checked out.
+    await runStep(ctx, 'Remove worktree', () => git.removeWorktree(tree.repoPath, tree.path));
+    await runStep(ctx, 'Delete branch', () => git.deleteBranch(tree.repoPath, tree.branch));
+  } finally {
+    teardownInProgress.delete(key);
   }
-  // Git cleanup — runs only if extension host survives (i.e. invoked from main window).
-  // Remove worktree first so the branch is no longer checked out.
-  await runStep(ctx, 'Remove worktree', () => git.removeWorktree(tree.repoPath, tree.path));
-  await runStep(ctx, 'Delete branch', () => git.deleteBranch(tree.repoPath, tree.branch));
 }
 
 export async function cleanup(ctx: ForestContext, ticketIdArg?: string): Promise<void> {

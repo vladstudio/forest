@@ -22,7 +22,10 @@ export class TreesTreeProvider implements vscode.TreeDataProvider<TreeElement> {
 
   constructor(private stateManager: StateManager, private config: ForestConfig) {}
 
-  refresh(): void { this._onDidChange.fire(undefined); }
+  refresh(): void {
+    this.healthCache.clear();
+    this._onDidChange.fire(undefined);
+  }
 
   private async getHealth(tree: TreeState): Promise<TreeHealth> {
     const cached = this.healthCache.get(tree.ticketId);

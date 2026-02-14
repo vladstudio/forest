@@ -135,17 +135,18 @@ export async function createTree(opts: {
 
       if (!hadTemplate) saveTemplate(repoPath, treePath);
 
-      // Save state
+      // Open new window BEFORE saving state — if openFolder fails, we don't
+      // leave an orphaned tree in state. State is saved after so other windows
+      // pick it up via the file watcher.
+      progress.report({ message: 'Opening window...' });
+      const wsFile = path.join(treePath, `${ticketId}.code-workspace`);
+      await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(wsFile), { forceNewWindow: true });
+
       const tree: TreeState = {
         ticketId, title, branch, path: treePath, repoPath,
         portBase, createdAt: new Date().toISOString(),
       };
       await stateManager.addTree(repoPath, tree);
-
-      // Open new window
-      progress.report({ message: 'Opening window...' });
-      const wsFile = path.join(treePath, `${ticketId}.code-workspace`);
-      await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(wsFile), { forceNewWindow: true });
 
       return tree;
     },
