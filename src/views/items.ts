@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import type { LinearIssue } from '../cli/linear';
 import type { TreeState } from '../state';
 import type { ShortcutConfig } from '../config';
+import type { TreeHealth } from './TreesTreeProvider';
 
 export class IssueItem extends vscode.TreeItem {
   contextValue = 'issue';
@@ -40,11 +41,34 @@ export class ShortcutItem extends vscode.TreeItem {
   }
 }
 
+function abbreviateAge(age: string): string {
+  return age
+    .replace(/ seconds? ago/, 's')
+    .replace(/ minutes? ago/, 'm')
+    .replace(/ hours? ago/, 'h')
+    .replace(/ days? ago/, 'd')
+    .replace(/ weeks? ago/, 'w')
+    .replace(/ months? ago/, 'mo')
+    .replace(/ years? ago/, 'y');
+}
+
 export class TreeItemView extends vscode.TreeItem {
   contextValue = 'tree';
-  constructor(public readonly tree: TreeState, isCurrent: boolean) {
+  constructor(public readonly tree: TreeState, isCurrent: boolean, health?: TreeHealth) {
     super(`${tree.ticketId}  ${tree.title}`, vscode.TreeItemCollapsibleState.None);
-    this.description = `[${tree.status}]`;
+
+    const parts: string[] = [`[${tree.status}]`];
+    if (health) {
+      if (health.pr) {
+        const rd = health.pr.reviewDecision;
+        const prLabel = rd === 'APPROVED' ? 'PR approved' : rd === 'CHANGES_REQUESTED' ? 'PR changes' : `PR ${health.pr.state.toLowerCase()}`;
+        parts.push(prLabel);
+      }
+      if (health.behind > 0) parts.push(`${health.behind}\u2193`);
+      if (health.age !== 'unknown') parts.push(abbreviateAge(health.age));
+    }
+    this.description = parts.join(' \u00b7 ');
+
     this.iconPath = isCurrent
       ? new vscode.ThemeIcon('arrow-right', new vscode.ThemeColor('charts.green'))
       : new vscode.ThemeIcon('git-branch');

@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import type { ForestContext } from '../context';
+import * as git from '../cli/git';
 import { copyConfigFiles, writeForestEnv, runSetupCommands } from './shared';
 
 export async function water(ctx: ForestContext): Promise<void> {
@@ -12,6 +13,14 @@ export async function water(ctx: ForestContext): Promise<void> {
   await vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: `Watering ${tree.ticketId}...` },
     async (progress) => {
+      progress.report({ message: 'Rebasing on latest...' });
+      try {
+        await git.rebase(tree.path, ctx.config.baseBranch);
+      } catch (e: any) {
+        vscode.window.showErrorMessage(`Rebase failed: ${e.message}. Resolve conflicts manually.`);
+        return;
+      }
+
       progress.report({ message: 'Copying files...' });
       copyConfigFiles(ctx.config, tree.repoPath, tree.path);
 
@@ -19,7 +28,7 @@ export async function water(ctx: ForestContext): Promise<void> {
       writeForestEnv(ctx.config, tree.path, tree.portBase);
 
       progress.report({ message: 'Running setup...' });
-      await runSetupCommands(ctx.config, tree.path);
+      await runSetupCommands(ctx.config, tree.path, ctx.outputChannel);
 
       vscode.window.showInformationMessage('Tree watered. Dependencies refreshed.');
     },

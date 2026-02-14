@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import type { ForestConfig, ShortcutConfig } from '../config';
 import type { TreeState } from '../state';
+import type { StateManager } from '../state';
 import { isPortOpen, resolvePortVars } from '../utils/ports';
 
 export class ShortcutManager {
@@ -13,7 +14,7 @@ export class ShortcutManager {
   private _onDidChange = new vscode.EventEmitter<void>();
   readonly onDidChange = this._onDidChange.event;
 
-  constructor(private config: ForestConfig, private currentTree: TreeState | undefined) {
+  constructor(private config: ForestConfig, private currentTree: TreeState | undefined, private stateManager?: StateManager) {
     this.disposables.push(
       vscode.window.onDidCloseTerminal(t => this.handleTerminalClose(t)),
       this._onDidChange,
@@ -52,7 +53,7 @@ export class ShortcutManager {
     this.stop(sc);
   }
 
-  openOnLaunchShortcuts(): void {
+  async openOnLaunchShortcuts(): Promise<void> {
     if (!this.currentTree) return;
     // Adopt existing terminals
     const existing = new Map(vscode.window.terminals.map(t => [t.name, t]));
@@ -63,6 +64,9 @@ export class ShortcutManager {
       if (t) this.terminals.set(sc.name, t);
     }
 
+    // Check port conflicts before launching terminals
+    await this.checkPortConflicts();
+
     for (const sc of this.config.shortcuts) {
       if (!sc.openOnLaunch) continue;
       if (sc.type === 'terminal') {
@@ -72,6 +76,40 @@ export class ShortcutManager {
       }
     }
     this._onDidChange.fire();
+  }
+
+  private getAllPorts(): { name: string; port: number }[] {
+    if (!this.currentTree) return [];
+    const result: { name: string; port: number }[] = [];
+    for (const [name, offset] of Object.entries(this.config.ports.mapping)) {
+      const off = parseInt(offset.replace('+', '')) || 0;
+      result.push({ name, port: this.currentTree.portBase + off });
+    }
+    return result;
+  }
+
+  private findPortOwner(port: number): TreeState | undefined {
+    if (!this.stateManager) return undefined;
+    const state = this.stateManager.loadSync();
+    for (const tree of Object.values(state.trees)) {
+      if (tree === this.currentTree || tree.ticketId === this.currentTree?.ticketId) continue;
+      for (const offset of Object.values(this.config.ports.mapping)) {
+        const off = parseInt(offset.replace('+', '')) || 0;
+        if (tree.portBase + off === port) return tree;
+      }
+    }
+    return undefined;
+  }
+
+  private async checkPortConflicts(): Promise<void> {
+    const ports = this.getAllPorts();
+    for (const { name, port } of ports) {
+      if (await isPortOpen(port)) {
+        const owner = this.findPortOwner(port);
+        const ownerMsg = owner ? ` (possibly used by ${owner.ticketId})` : '';
+        vscode.window.showWarningMessage(`Port ${port} (${name}) is already in use${ownerMsg}.`);
+      }
+    }
   }
 
   private openTerminal(sc: ShortcutConfig & { type: 'terminal' }): void {
@@ -90,13 +128,13 @@ export class ShortcutManager {
       cwd: this.currentTree?.path,
       env,
     });
-    if (sc.command) terminal.sendText(sc.command);
+    if (sc.command) terminal.sendText(this.resolveVars(sc.command));
     this.terminals.set(sc.name, terminal);
     this._onDidChange.fire();
   }
 
   private async openBrowser(sc: ShortcutConfig & { type: 'browser' }, viewColumn?: vscode.ViewColumn): Promise<void> {
-    const url = this.resolvePorts(sc.url);
+    const url = this.resolvePorts(this.resolveVars(sc.url));
     const port = this.extractPort(url);
     const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)/.test(url);
 
@@ -137,7 +175,8 @@ export class ShortcutManager {
   private async openFile(sc: ShortcutConfig & { type: 'file' }): Promise<void> {
     const base = this.currentTree?.path ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!base) return;
-    const filePath = path.isAbsolute(sc.path) ? sc.path : path.join(base, sc.path);
+    const resolved = this.resolveVars(sc.path);
+    const filePath = path.isAbsolute(resolved) ? resolved : path.join(base, resolved);
     await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath));
   }
 
@@ -153,6 +192,13 @@ export class ShortcutManager {
       }
       break;
     }
+  }
+
+  private resolveVars(value: string): string {
+    if (!this.currentTree) return value;
+    return value
+      .replace(/\$\{ticketId\}/g, this.currentTree.ticketId)
+      .replace(/\$\{branch\}/g, this.currentTree.branch);
   }
 
   private resolvePorts(value: string): string {

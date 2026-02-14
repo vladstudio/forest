@@ -8,7 +8,7 @@
   "categories": ["Other"],
   "keywords": ["git", "worktree", "linear", "workflow", "monorepo"],
   "main": "./dist/extension.js",
-  "activationEvents": ["workspaceContains:.forest/config.json"],
+  "activationEvents": ["workspaceContains:.forest/config.json", "onCommand:forest.init"],
   "scripts": {
     "vscode:prepublish": "bun run package",
     "compile": "bun run check-types && node esbuild.js",
@@ -60,7 +60,11 @@
       { "command": "forest.refreshTrees", "title": "Refresh Trees", "category": "Forest", "icon": "$(refresh)" },
       { "command": "forest.openShortcut", "title": "Open Shortcut", "category": "Forest", "icon": "$(play)" },
       { "command": "forest.stopShortcut", "title": "Stop Terminal", "category": "Forest", "icon": "$(debug-stop)" },
-      { "command": "forest.restartShortcut", "title": "Restart Terminal", "category": "Forest", "icon": "$(debug-restart)" }
+      { "command": "forest.restartShortcut", "title": "Restart Terminal", "category": "Forest", "icon": "$(debug-restart)" },
+      { "command": "forest.commit", "title": "Commit — AI Message", "category": "Forest", "icon": "$(git-commit)" },
+      { "command": "forest.treeSummary", "title": "Tree Summary — AI", "category": "Forest", "icon": "$(info)" },
+      { "command": "forest.warmTemplate", "title": "Warm Template", "category": "Forest", "icon": "$(flame)" },
+      { "command": "forest.init", "title": "Initialize Forest Config", "category": "Forest", "icon": "$(gear)" }
     ],
     "menus": {
       "view/title": [
@@ -81,7 +85,7 @@
         { "command": "forest.stopShortcut", "when": "viewItem == shortcut-terminal-running", "group": "inline" },
         { "command": "forest.stopShortcut", "when": "viewItem == shortcut-terminal-running", "group": "1_actions" },
         { "command": "forest.restartShortcut", "when": "viewItem == shortcut-terminal-running", "group": "1_actions" }
-      ]
+      ],
       "commandPalette": [
         { "command": "forest.openShortcut", "when": "false" },
         { "command": "forest.stopShortcut", "when": "false" },

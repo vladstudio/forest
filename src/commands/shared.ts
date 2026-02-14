@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
 import type { ForestConfig } from '../config';
 import type { TreeState, StateManager } from '../state';
 import type { PortManager } from '../managers/PortManager';
@@ -8,7 +9,7 @@ import { slugify } from '../utils/slug';
 import { ticketToColor, darken } from '../utils/colors';
 import { resolvePortVars } from '../utils/ports';
 import * as git from '../cli/git';
-import { execShell } from '../utils/exec';
+import { execShell, execStream } from '../utils/exec';
 import { getRepoPath } from '../context';
 
 export function copyConfigFiles(config: ForestConfig, repoPath: string, treePath: string): void {
@@ -30,11 +31,22 @@ export function writeForestEnv(config: ForestConfig, treePath: string, portBase:
   fs.writeFileSync(path.join(treePath, '.forest.env'), envLines.join('\n'));
 }
 
-export async function runSetupCommands(config: ForestConfig, treePath: string): Promise<void> {
+export async function runSetupCommands(config: ForestConfig, treePath: string, channel?: vscode.OutputChannel): Promise<void> {
   const cmds = Array.isArray(config.setup) ? config.setup : config.setup ? [config.setup] : [];
   for (const cmd of cmds) {
     try {
-      await execShell(cmd, { cwd: treePath, timeout: 120_000 });
+      if (channel) {
+        channel.appendLine(`$ ${cmd}`);
+        channel.show(true);
+        await execStream(cmd, {
+          cwd: treePath,
+          timeout: 120_000,
+          onData: (chunk) => channel.append(chunk),
+        });
+        channel.appendLine('');
+      } else {
+        await execShell(cmd, { cwd: treePath, timeout: 120_000 });
+      }
     } catch (e: any) {
       vscode.window.showWarningMessage(`Setup command failed: ${e.message}`);
     }
@@ -90,8 +102,12 @@ export async function createTree(opts: {
 
       generateWorkspaceFile(treePath, ticketId, title, config);
 
+      const hadTemplate = copyModulesFromTemplate(config, treePath);
+
       progress.report({ message: 'Running setup...' });
       await runSetupCommands(config, treePath);
+
+      if (!hadTemplate) saveTemplate(config, treePath);
 
       // Save state
       const tree: TreeState = {
@@ -108,6 +124,41 @@ export async function createTree(opts: {
       return tree;
     },
   );
+}
+
+function templateDir(config: ForestConfig): string {
+  return path.join(config.treesDir, '.template');
+}
+
+export function copyModulesFromTemplate(config: ForestConfig, treePath: string): boolean {
+  const src = path.join(templateDir(config), 'node_modules');
+  const dst = path.join(treePath, 'node_modules');
+  if (!fs.existsSync(src)) return false;
+  try {
+    const flag = os.platform() === 'darwin' ? '-Rc' : '-al';
+    require('child_process').execSync(`cp ${flag} ${src} ${dst}`, { stdio: 'ignore' });
+    return true;
+  } catch { return false; }
+}
+
+export function saveTemplate(config: ForestConfig, treePath: string): void {
+  const src = path.join(treePath, 'node_modules');
+  if (!fs.existsSync(src)) return;
+  const tplDir = templateDir(config);
+  fs.mkdirSync(tplDir, { recursive: true });
+  const dst = path.join(tplDir, 'node_modules');
+  try {
+    if (fs.existsSync(dst)) fs.rmSync(dst, { recursive: true });
+    const flag = os.platform() === 'darwin' ? '-Rc' : '-al';
+    require('child_process').execSync(`cp ${flag} ${src} ${dst}`, { stdio: 'ignore' });
+  } catch {}
+}
+
+export async function warmTemplate(config: ForestConfig): Promise<void> {
+  const curPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  if (!curPath) return;
+  saveTemplate(config, curPath);
+  vscode.window.showInformationMessage('Forest: Template warmed from current tree.');
 }
 
 function generateWorkspaceFile(treePath: string, ticketId: string, title: string, config: ForestConfig): void {

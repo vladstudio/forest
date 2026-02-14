@@ -20,7 +20,31 @@ export async function pushBranch(worktreePath: string, branch: string): Promise<
   await exec('git', ['push', '-u', 'origin', branch], { cwd: worktreePath });
 }
 
+export async function rebase(worktreePath: string, baseRef: string): Promise<void> {
+  await exec('git', ['fetch', 'origin'], { cwd: worktreePath });
+  try {
+    await exec('git', ['rebase', baseRef], { cwd: worktreePath, timeout: 60_000 });
+  } catch (e) {
+    await exec('git', ['rebase', '--abort'], { cwd: worktreePath }).catch(() => {});
+    throw e;
+  }
+}
+
 export async function hasUncommittedChanges(worktreePath: string): Promise<boolean> {
   const { stdout } = await exec('git', ['status', '--porcelain'], { cwd: worktreePath });
   return stdout.length > 0;
+}
+
+export async function commitsBehind(worktreePath: string, baseRef: string): Promise<number> {
+  try {
+    const { stdout } = await exec('git', ['rev-list', '--count', `HEAD..${baseRef}`], { cwd: worktreePath, timeout: 10_000 });
+    return parseInt(stdout) || 0;
+  } catch { return 0; }
+}
+
+export async function lastCommitAge(worktreePath: string): Promise<string> {
+  try {
+    const { stdout } = await exec('git', ['log', '-1', '--format=%cr'], { cwd: worktreePath, timeout: 5_000 });
+    return stdout || 'unknown';
+  } catch { return 'unknown'; }
 }

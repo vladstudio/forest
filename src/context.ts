@@ -17,6 +17,7 @@ export interface ForestContext {
   statusBarManager: StatusBarManager;
   issuesProvider: IssuesTreeProvider;
   treesProvider: TreesTreeProvider;
+  outputChannel: vscode.OutputChannel;
   currentTree: TreeState | undefined;
 }
 

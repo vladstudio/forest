@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import type { ForestContext } from '../context';
+import type { TreeState } from '../state';
 import * as git from '../cli/git';
 import * as gh from '../cli/gh';
 import * as linear from '../cli/linear';
@@ -44,7 +45,7 @@ export async function fell(ctx: ForestContext, ticketIdArg?: string): Promise<vo
       // Update Linear
       if (ctx.config.integrations.linear && await linear.isAvailable()) {
         progress.report({ message: 'Updating ticket...' });
-        linear.updateIssueState(tree.ticketId, 'Done').catch(() => {});
+        linear.updateIssueState(tree.ticketId, ctx.config.linearStatuses.onFell).catch(() => {});
       }
 
       // Remove worktree (from main repo, not worktree itself)
@@ -61,4 +62,17 @@ export async function fell(ctx: ForestContext, ticketIdArg?: string): Promise<vo
       }
     },
   );
+}
+
+/** Cleanup after an already-merged PR — skips merge and confirmation. */
+export async function fellMerged(ctx: ForestContext, tree: TreeState): Promise<void> {
+  if (ctx.config.integrations.linear && await linear.isAvailable()) {
+    linear.updateIssueState(tree.ticketId, ctx.config.linearStatuses.onFell).catch(() => {});
+  }
+  await git.removeWorktree(tree.repoPath, tree.path).catch(() => {});
+  await git.deleteBranch(tree.repoPath, tree.branch);
+  await ctx.stateManager.removeTree(getRepoPath(), tree.ticketId);
+  if (ctx.currentTree?.ticketId === tree.ticketId) {
+    vscode.commands.executeCommand('workbench.action.closeWindow');
+  }
 }

@@ -20,7 +20,7 @@ export async function isAvailable(): Promise<boolean> {
  * Parses table output since `linear issue list` has no --json flag.
  */
 export async function listMyIssues(
-  states: string[] = ['unstarted', 'started'],
+  states: string[],
   team?: string,
 ): Promise<LinearIssue[]> {
   try {

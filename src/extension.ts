@@ -13,12 +13,20 @@ import { seed } from './commands/seed';
 import { plant } from './commands/plant';
 import { switchTree } from './commands/switch';
 import { ship } from './commands/ship';
-import { fell } from './commands/fell';
+import { fell, fellMerged } from './commands/fell';
 import { water } from './commands/water';
 import { survey } from './commands/survey';
+import { commit } from './commands/commit';
+import { treeSummary } from './commands/treeSummary';
+import { init } from './commands/init';
+import { warmTemplate } from './commands/shared';
 import * as linear from './cli/linear';
+import * as gh from './cli/gh';
 
 export async function activate(context: vscode.ExtensionContext) {
+  // Register init before config load — works without existing config
+  context.subscriptions.push(vscode.commands.registerCommand('forest.init', () => init()));
+
   const config = await loadConfig();
   if (!config) return;
 
@@ -35,11 +43,12 @@ export async function activate(context: vscode.ExtensionContext) {
 
   vscode.commands.executeCommand('setContext', 'forest.isTree', !!currentTree);
 
+  const outputChannel = vscode.window.createOutputChannel('Forest');
   const portManager = new PortManager(config, stateManager);
-  const shortcutManager = new ShortcutManager(config, currentTree);
+  const shortcutManager = new ShortcutManager(config, currentTree, stateManager);
   const statusBarManager = new StatusBarManager(currentTree);
   const issuesProvider = new IssuesTreeProvider(config, stateManager);
-  const treesProvider = new TreesTreeProvider(stateManager);
+  const treesProvider = new TreesTreeProvider(stateManager, config);
   const shortcutsProvider = new ShortcutsTreeProvider(config, shortcutManager);
 
   context.subscriptions.push(
@@ -58,7 +67,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   const ctx: ForestContext = {
     config, stateManager, portManager, shortcutManager,
-    statusBarManager, issuesProvider, treesProvider, currentTree,
+    statusBarManager, issuesProvider, treesProvider, outputChannel, currentTree,
   };
 
   // Register commands
@@ -72,6 +81,9 @@ export async function activate(context: vscode.ExtensionContext) {
   reg('forest.fell', (ticketId?: string) => fell(ctx, ticketId));
   reg('forest.water', () => water(ctx));
   reg('forest.survey', () => survey(ctx));
+  reg('forest.commit', () => commit(ctx));
+  reg('forest.treeSummary', () => treeSummary(ctx));
+  reg('forest.warmTemplate', () => warmTemplate(config));
   reg('forest.refreshIssues', () => issuesProvider.refresh());
   reg('forest.refreshTrees', () => treesProvider.refresh());
   reg('forest.copyBranch', () => {
@@ -100,11 +112,34 @@ export async function activate(context: vscode.ExtensionContext) {
   reg('forest.stopShortcut', (arg: any) => shortcutManager.stop(unwrap(arg)));
   reg('forest.restartShortcut', (arg: any) => shortcutManager.restart(unwrap(arg)));
 
-  // If this is a tree window, open launch shortcuts
+  // If this is a tree window, open launch shortcuts + auto-fell polling
   if (currentTree) {
     statusBarManager.show();
     shortcutManager.openOnLaunchShortcuts();
+
+    // Auto-run tree summary if AI configured
+    if (config.ai?.apiKey) {
+      treeSummary(ctx);
+    }
   }
+
+  // Auto-fell polling: check merged PRs every 5 minutes
+  const autoFellInterval = setInterval(async () => {
+    if (!(await gh.isAvailable())) return;
+    const s = await stateManager.load();
+    const trees = stateManager.getTreesForRepo(s, getRepoPath());
+    for (const tree of trees) {
+      if (tree.status !== 'review' || !tree.prUrl) continue;
+      if (await gh.prIsMerged(tree.repoPath, tree.branch)) {
+        const action = await vscode.window.showInformationMessage(
+          `${tree.ticketId} PR was merged. Clean up?`,
+          'Fell', 'Dismiss',
+        );
+        if (action === 'Fell') await fellMerged(ctx, tree);
+      }
+    }
+  }, 5 * 60 * 1000);
+  context.subscriptions.push({ dispose: () => clearInterval(autoFellInterval) });
 
   // Watch state for changes from other windows
   stateManager.onDidChange((newState) => {
@@ -121,7 +156,7 @@ export async function activate(context: vscode.ExtensionContext) {
     updateNoTrees();
   });
 
-  context.subscriptions.push(shortcutManager, statusBarManager, stateManager);
+  context.subscriptions.push(outputChannel, shortcutManager, statusBarManager, stateManager);
 }
 
 export function deactivate() {}

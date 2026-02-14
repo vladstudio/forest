@@ -31,7 +31,7 @@ export async function ship(ctx: ForestContext): Promise<void> {
       if (ctx.config.integrations.linear && await linear.isAvailable()) {
         progress.report({ message: 'Creating PR...' });
         prUrl = await linear.createPR(tree.ticketId, ctx.config.baseBranch);
-        linear.updateIssueState(tree.ticketId, 'In Review').catch(() => {});
+        linear.updateIssueState(tree.ticketId, ctx.config.linearStatuses.onShip).catch(() => {});
       }
 
       // Update state
