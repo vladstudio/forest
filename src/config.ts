@@ -126,7 +126,7 @@ function mergeConfig(base: any, local: any): any {
       }
       result[key] = baseArr;
     } else if (typeof local[key] === 'object' && !Array.isArray(local[key]) && local[key] !== null) {
-      result[key] = { ...(base[key] || {}), ...local[key] };
+      result[key] = mergeConfig(base[key] || {}, local[key]);
     } else {
       result[key] = local[key];
     }

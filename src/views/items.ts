@@ -84,7 +84,7 @@ export class TreeItemView extends vscode.TreeItem {
         parts.push(prLabel);
       }
       if (health.behind > 0) parts.push(`${health.behind}\u2193`);
-      if (health.age !== 'unknown') parts.push(abbreviateAge(health.age));
+      if (health.age) parts.push(abbreviateAge(health.age));
     }
     this.description = parts.join(' \u00b7 ');
 

@@ -8,7 +8,7 @@ import * as gh from '../cli/gh';
 
 export interface TreeHealth {
   behind: number;
-  age: string;
+  age: string | null;
   pr: { state: string; reviewDecision: string | null } | null;
 }
 
@@ -28,11 +28,12 @@ export class TreesTreeProvider implements vscode.TreeDataProvider<TreeElement> {
     const cached = this.healthCache.get(tree.ticketId);
     if (cached && Date.now() - cached.time < this.HEALTH_TTL) return cached.health;
 
-    const [behind, age, pr] = await Promise.all([
+    const [behind, ahead, pr] = await Promise.all([
       git.commitsBehind(tree.path, this.config.baseBranch),
-      git.lastCommitAge(tree.path),
+      git.commitsAhead(tree.path, this.config.baseBranch),
       gh.prStatus(tree.path),
     ]);
+    const age = ahead > 0 ? await git.lastCommitAge(tree.path) : null;
     const health: TreeHealth = { behind, age, pr };
     this.healthCache.set(tree.ticketId, { health, time: Date.now() });
     return health;

@@ -12,7 +12,7 @@ export async function removeWorktree(repoPath: string, worktreePath: string): Pr
 }
 
 export async function deleteBranch(repoPath: string, branch: string): Promise<void> {
-  await exec('git', ['branch', '-D', branch], { cwd: repoPath }).catch(() => {});
+  await exec('git', ['branch', '-D', branch], { cwd: repoPath });
   await exec('git', ['push', 'origin', '--delete', branch], { cwd: repoPath }).catch(() => {});
 }
 
@@ -38,6 +38,13 @@ export async function hasUncommittedChanges(worktreePath: string): Promise<boole
 export async function commitsBehind(worktreePath: string, baseRef: string): Promise<number> {
   try {
     const { stdout } = await exec('git', ['rev-list', '--count', `HEAD..${baseRef}`], { cwd: worktreePath, timeout: 10_000 });
+    return parseInt(stdout) || 0;
+  } catch { return 0; }
+}
+
+export async function commitsAhead(worktreePath: string, baseRef: string): Promise<number> {
+  try {
+    const { stdout } = await exec('git', ['rev-list', '--count', `${baseRef}..HEAD`], { cwd: worktreePath, timeout: 10_000 });
     return parseInt(stdout) || 0;
   } catch { return 0; }
 }

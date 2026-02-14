@@ -3,8 +3,8 @@ import type { ForestContext } from '../context';
 import type { TreeState } from '../state';
 import * as git from '../cli/git';
 import * as gh from '../cli/gh';
-import * as linear from '../cli/linear';
 import { getRepoPath } from '../context';
+import { runStep, updateLinear } from './shared';
 
 function resolveTree(ctx: ForestContext, ticketIdArg?: string): TreeState | undefined {
   return ticketIdArg
@@ -14,19 +14,14 @@ function resolveTree(ctx: ForestContext, ticketIdArg?: string): TreeState | unde
 
 async function teardownTree(ctx: ForestContext, tree: TreeState): Promise<void> {
   const shouldClose = ctx.currentTree?.ticketId === tree.ticketId;
-  // Delete branch and state BEFORE removing worktree — worktree removal
-  // destabilizes the VS Code window and can interrupt remaining operations.
-  await git.deleteBranch(tree.repoPath, tree.branch);
+  // Remove worktree first so the branch is no longer checked out —
+  // git refuses to delete a branch that's checked out in a worktree.
+  await runStep(ctx, 'Remove worktree', () => git.removeWorktree(tree.repoPath, tree.path));
+  await runStep(ctx, 'Delete branch', () => git.deleteBranch(tree.repoPath, tree.branch));
   await ctx.stateManager.removeTree(tree.repoPath, tree.ticketId);
-  await git.removeWorktree(tree.repoPath, tree.path).catch(() => {});
+  ctx.outputChannel.appendLine('[Forest] State updated');
   if (shouldClose) {
     await vscode.commands.executeCommand('workbench.action.closeWindow');
-  }
-}
-
-async function updateLinear(config: import('../config').ForestConfig, ticketId: string, status: string): Promise<void> {
-  if (config.linear.enabled && await linear.isAvailable()) {
-    await linear.updateIssueState(ticketId, status).catch(() => {});
   }
 }
 
@@ -55,16 +50,11 @@ export async function cleanup(ctx: ForestContext, ticketIdArg?: string): Promise
     async (progress) => {
       if (config.github.enabled && await gh.isAvailable()) {
         progress.report({ message: 'Merging PR...' });
-        try {
-          await gh.mergePR(tree.path);
-        } catch (e: any) {
-          vscode.window.showErrorMessage(`PR merge failed: ${e.message}`);
-          return;
-        }
+        if (!await runStep(ctx, 'Merge PR', () => gh.mergePR(tree.path))) return;
       }
 
       progress.report({ message: 'Updating ticket...' });
-      await updateLinear(config, tree.ticketId, config.linear.statuses.onCleanup);
+      await updateLinear(ctx, tree.ticketId, config.linear.statuses.onCleanup);
 
       progress.report({ message: 'Removing worktree...' });
       await teardownTree(ctx, tree);
@@ -79,7 +69,6 @@ export async function cancel(ctx: ForestContext, ticketIdArg?: string): Promise<
     vscode.window.showErrorMessage('No tree to cancel. Run from a tree window or select from sidebar.');
     return;
   }
-  const config = ctx.config;
 
   const confirm = await vscode.window.showWarningMessage(
     `Cancel ${tree.ticketId}: ${tree.title}?\n\nThis will remove the worktree and branch without merging.`,
@@ -91,7 +80,7 @@ export async function cancel(ctx: ForestContext, ticketIdArg?: string): Promise<
     { location: vscode.ProgressLocation.Notification, title: `Canceling ${tree.ticketId}...` },
     async (progress) => {
       progress.report({ message: 'Updating ticket...' });
-      await updateLinear(config, tree.ticketId, config.linear.statuses.onCancel);
+      await updateLinear(ctx, tree.ticketId, ctx.config.linear.statuses.onCancel);
 
       progress.report({ message: 'Removing worktree...' });
       await teardownTree(ctx, tree);
@@ -101,6 +90,6 @@ export async function cancel(ctx: ForestContext, ticketIdArg?: string): Promise<
 
 /** Cleanup after an already-merged PR — skips merge and confirmation. */
 export async function cleanupMerged(ctx: ForestContext, tree: TreeState): Promise<void> {
-  await updateLinear(ctx.config, tree.ticketId, ctx.config.linear.statuses.onCleanup);
+  await updateLinear(ctx, tree.ticketId, ctx.config.linear.statuses.onCleanup);
   await teardownTree(ctx, tree);
 }

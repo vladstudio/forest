@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import type { ForestContext } from '../context';
 import * as linear from '../cli/linear';
-import { createTree } from './shared';
+import { createTree, updateLinear } from './shared';
 import { getRepoPath } from '../context';
 
 export async function newTree(ctx: ForestContext, ticketIdArg?: string): Promise<void> {
@@ -50,10 +50,7 @@ export async function newTree(ctx: ForestContext, ticketIdArg?: string): Promise
 
   try {
     await createTree({ ticketId, title, config: ctx.config, stateManager: ctx.stateManager, portManager: ctx.portManager });
-    // Update Linear state
-    if (ctx.config.linear.enabled && await linear.isAvailable()) {
-      await linear.updateIssueState(ticketId, ctx.config.linear.statuses.onNew).catch(() => {});
-    }
+    await updateLinear(ctx, ticketId, ctx.config.linear.statuses.onNew);
   } catch (e: any) {
     vscode.window.showErrorMessage(e.message);
   }

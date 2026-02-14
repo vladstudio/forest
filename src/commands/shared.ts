@@ -3,13 +3,35 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import type { ForestConfig } from '../config';
+import type { ForestContext } from '../context';
 import type { TreeState, StateManager } from '../state';
 import type { PortManager } from '../managers/PortManager';
 import { slugify } from '../utils/slug';
 import { resolvePortVars } from '../utils/ports';
 import * as git from '../cli/git';
+import * as linear from '../cli/linear';
 import { execShell, execStream } from '../utils/exec';
 import { getRepoPath } from '../context';
+
+/** Run an async step, log to output channel, show error notification on failure. */
+export async function runStep(ctx: ForestContext, label: string, fn: () => Promise<void>): Promise<boolean> {
+  try {
+    await fn();
+    ctx.outputChannel.appendLine(`[Forest] ${label}: done`);
+    return true;
+  } catch (e: any) {
+    ctx.outputChannel.appendLine(`[Forest] ${label}: FAILED — ${e.message}`);
+    ctx.outputChannel.show(true);
+    vscode.window.showErrorMessage(`${label}: ${e.message}`);
+    return false;
+  }
+}
+
+export async function updateLinear(ctx: ForestContext, ticketId: string, status: string): Promise<void> {
+  if (ctx.config.linear.enabled && await linear.isAvailable()) {
+    await runStep(ctx, `Linear ${ticketId} → ${status}`, () => linear.updateIssueState(ticketId, status));
+  }
+}
 
 export function copyConfigFiles(config: ForestConfig, repoPath: string, treePath: string): void {
   for (const file of config.copy) {
