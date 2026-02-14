@@ -4,6 +4,10 @@
   "description": "Manage parallel feature development with git worktrees",
   "version": "0.1.0",
   "publisher": "forest-dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/forest-dev/forest"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
