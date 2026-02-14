@@ -49,13 +49,17 @@ Add `.forest/config.json` to your repo root (tip: ask Claude to generate one for
     "APP_PORT": "${ports.app}",
     "API_PORT": "${ports.api}"
   },
-  "integrations": { "linear": true, "github": true, "linearTeam": "ENG" },
-  "linearStatuses": {
-    "issueList": ["triage", "backlog", "unstarted"],
-    "onNew": "started",
-    "onShip": "started",
-    "onCleanup": "completed"
+  "linear": {
+    "enabled": true,
+    "team": "ENG",
+    "statuses": {
+      "issueList": ["triage", "backlog", "unstarted"],
+      "onNew": "started",
+      "onShip": "started",
+      "onCleanup": "completed"
+    }
   },
+  "github": { "enabled": true },
   "branchFormat": "${ticketId}-${slug}",
   "baseBranch": "origin/main",
   "maxTrees": 10
@@ -97,8 +101,8 @@ To set up Forest, ask Claude (or any AI) to read this README and generate `.fore
 | `ports.baseRange` | no       | `[3000, 4000]`                   | Port range to allocate from                                                                                                                                                 |
 | `ports.mapping`   | no       | `{}`                             | Named ports as offsets: `{ "app": "+0", "api": "+1" }`                                                                                                                      |
 | `env`             | no       | `{}`                             | Extra env vars injected into tree. Supports `${ports.X}`                                                                                                                    |
-| `integrations`    | no       | `{ linear: true, github: true }` | Toggle integrations. `linearTeam` is the team **key** (e.g. `ENG`), not the display name — run `linear team list` to find it                                                |
-| `linearStatuses`  | no       | see below                        | Linear states for issue list and lifecycle transitions. **Must use lowercase** Linear CLI state names: `triage`, `backlog`, `unstarted`, `started`, `completed`, `canceled` |
+| `linear`          | no       | `{ enabled: true }`             | Linear integration. `team` is the team **key** (e.g. `ENG`), not the display name — run `linear team list` to find it. `statuses` controls issue list and lifecycle transitions (**must use lowercase** Linear CLI state names: `triage`, `backlog`, `unstarted`, `started`, `completed`, `canceled`) |
+| `github`          | no       | `{ enabled: true }`             | GitHub integration toggle                                                                                                                                                   |
 | `branchFormat`    | no       | `${ticketId}-${slug}`            | Branch naming. Supports `${ticketId}`, `${slug}`                                                                                                                            |
 | `baseBranch`      | no       | `origin/main`                    | Branch to rebase on                                                                                                                                                         |
 | `maxTrees`        | no       | `10`                             | Max concurrent worktrees                                                                                                                                                    |
@@ -197,12 +201,16 @@ Customize which Linear states to show in the issues sidebar and which states to 
 **Important:** Use the lowercase state names from the Linear CLI, not the display names from the Linear UI. Run `linear issue list --help` to see valid values: `triage`, `backlog`, `unstarted`, `started`, `completed`, `canceled`. For `linearTeam`, use the team **key** (e.g. `ENG`), not the display name — find it with `linear team list`.
 
 ```json
-"linearStatuses": {
-  "issueList": ["triage", "backlog", "unstarted"],
-  "onNew": "started",
-  "onShip": "started",
-  "onCleanup": "completed",
-  "onCancel": "canceled"
+"linear": {
+  "enabled": true,
+  "team": "ENG",
+  "statuses": {
+    "issueList": ["triage", "backlog", "unstarted"],
+    "onNew": "started",
+    "onShip": "started",
+    "onCleanup": "completed",
+    "onCancel": "canceled"
+  }
 }
 ```
 

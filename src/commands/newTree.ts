@@ -10,8 +10,8 @@ export async function newTree(ctx: ForestContext, ticketIdArg?: string): Promise
 
   if (ticketIdArg) {
     ticketId = ticketIdArg;
-  } else if (ctx.config.integrations.linear && await linear.isAvailable()) {
-    const issues = await linear.listMyIssues(ctx.config.linearStatuses.issueList, ctx.config.integrations.linearTeam);
+  } else if (ctx.config.linear.enabled && await linear.isAvailable()) {
+    const issues = await linear.listMyIssues(ctx.config.linear.statuses.issueList, ctx.config.linear.team);
     if (!issues.length) { vscode.window.showInformationMessage('No issues found.'); return; }
     const pick = await vscode.window.showQuickPick(
       issues.map(i => ({ label: `${i.id}  ${i.title}`, description: i.state, issueId: i.id })),
@@ -39,7 +39,7 @@ export async function newTree(ctx: ForestContext, ticketIdArg?: string): Promise
   }
 
   // Fetch title
-  if (!title && ctx.config.integrations.linear && await linear.isAvailable()) {
+  if (!title && ctx.config.linear.enabled && await linear.isAvailable()) {
     const issue = await linear.getIssue(ticketId);
     title = issue?.title;
   }
@@ -51,8 +51,8 @@ export async function newTree(ctx: ForestContext, ticketIdArg?: string): Promise
   try {
     await createTree({ ticketId, title, config: ctx.config, stateManager: ctx.stateManager, portManager: ctx.portManager });
     // Update Linear state
-    if (ctx.config.integrations.linear && await linear.isAvailable()) {
-      linear.updateIssueState(ticketId, ctx.config.linearStatuses.onNew).catch(() => {});
+    if (ctx.config.linear.enabled && await linear.isAvailable()) {
+      linear.updateIssueState(ticketId, ctx.config.linear.statuses.onNew).catch(() => {});
     }
   } catch (e: any) {
     vscode.window.showErrorMessage(e.message);

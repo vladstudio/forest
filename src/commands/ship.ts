@@ -29,10 +29,10 @@ export async function ship(ctx: ForestContext, treeArg?: import('../state').Tree
 
       // Create PR + update Linear
       let prUrl: string | null = null;
-      if (config.integrations.linear && await linear.isAvailable()) {
+      if (config.linear.enabled && await linear.isAvailable()) {
         progress.report({ message: 'Creating PR...' });
         prUrl = await linear.createPR(tree.ticketId, config.baseBranch);
-        linear.updateIssueState(tree.ticketId, config.linearStatuses.onShip).catch(() => {});
+        linear.updateIssueState(tree.ticketId, config.linear.statuses.onShip).catch(() => {});
       }
 
       // Update state

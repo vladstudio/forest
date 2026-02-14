@@ -37,7 +37,7 @@ export async function activate(context: vscode.ExtensionContext) {
   }
 
   vscode.commands.executeCommand('setContext', 'forest.active', true);
-  vscode.commands.executeCommand('setContext', 'forest.linearEnabled', config.integrations.linear);
+  vscode.commands.executeCommand('setContext', 'forest.linearEnabled', config.linear.enabled);
 
   const stateManager = new StateManager();
   await stateManager.initialize();

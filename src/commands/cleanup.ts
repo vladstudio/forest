@@ -23,7 +23,7 @@ async function teardownTree(ctx: ForestContext, tree: TreeState): Promise<void> 
 }
 
 async function updateLinear(config: import('../config').ForestConfig, ticketId: string, status: string): Promise<void> {
-  if (config.integrations.linear && await linear.isAvailable()) {
+  if (config.linear.enabled && await linear.isAvailable()) {
     linear.updateIssueState(ticketId, status).catch(() => {});
   }
 }
@@ -51,7 +51,7 @@ export async function cleanup(ctx: ForestContext, ticketIdArg?: string): Promise
   await vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: `Cleaning up ${tree.ticketId}...` },
     async (progress) => {
-      if (config.integrations.github && await gh.isAvailable()) {
+      if (config.github.enabled && await gh.isAvailable()) {
         progress.report({ message: 'Merging PR...' });
         try {
           await gh.mergePR(tree.path);
@@ -62,7 +62,7 @@ export async function cleanup(ctx: ForestContext, ticketIdArg?: string): Promise
       }
 
       progress.report({ message: 'Updating ticket...' });
-      await updateLinear(config, tree.ticketId, config.linearStatuses.onCleanup);
+      await updateLinear(config, tree.ticketId, config.linear.statuses.onCleanup);
 
       progress.report({ message: 'Removing worktree...' });
       await teardownTree(ctx, tree);
@@ -89,7 +89,7 @@ export async function cancel(ctx: ForestContext, ticketIdArg?: string): Promise<
     { location: vscode.ProgressLocation.Notification, title: `Canceling ${tree.ticketId}...` },
     async (progress) => {
       progress.report({ message: 'Updating ticket...' });
-      await updateLinear(config, tree.ticketId, config.linearStatuses.onCancel);
+      await updateLinear(config, tree.ticketId, config.linear.statuses.onCancel);
 
       progress.report({ message: 'Removing worktree...' });
       await teardownTree(ctx, tree);
@@ -99,6 +99,6 @@ export async function cancel(ctx: ForestContext, ticketIdArg?: string): Promise<
 
 /** Cleanup after an already-merged PR — skips merge and confirmation. */
 export async function cleanupMerged(ctx: ForestContext, tree: TreeState): Promise<void> {
-  await updateLinear(ctx.config, tree.ticketId, ctx.config.linearStatuses.onCleanup);
+  await updateLinear(ctx.config, tree.ticketId, ctx.config.linear.statuses.onCleanup);
   await teardownTree(ctx, tree);
 }

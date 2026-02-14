@@ -17,11 +17,11 @@ export interface ForestConfig {
   shortcuts: ShortcutConfig[];
   ports: { baseRange: [number, number]; mapping: Record<string, string> };
   env: Record<string, string>;
-  integrations: { linear: boolean; github: boolean; linearTeam?: string };
+  linear: { enabled: boolean; team?: string; statuses: { issueList: string[]; onNew: string; onShip: string; onCleanup: string; onCancel: string } };
+  github: { enabled: boolean };
   branchFormat: string;
   baseBranch: string;
   maxTrees: number;
-  linearStatuses: { issueList: string[]; onNew: string; onShip: string; onCleanup: string; onCancel: string };
   ai?: { provider: 'gemini' | 'openai'; apiKey?: string; model?: string };
 }
 
@@ -43,12 +43,30 @@ const DEFAULTS: Partial<ForestConfig> = {
   shortcuts: [],
   env: {},
   ports: { baseRange: [3000, 4000], mapping: {} },
-  integrations: { linear: true, github: true },
+  linear: { enabled: true, statuses: { issueList: ['triage', 'backlog', 'unstarted'], onNew: 'started', onShip: 'started', onCleanup: 'completed', onCancel: 'canceled' } },
+  github: { enabled: true },
   branchFormat: '${ticketId}-${slug}',
   baseBranch: 'origin/main',
   maxTrees: 10,
-  linearStatuses: { issueList: ['triage', 'backlog', 'unstarted'], onNew: 'started', onShip: 'started', onCleanup: 'completed', onCancel: 'canceled' },
 };
+
+/** Migrate old `integrations` + `linearStatuses` → `linear` + `github`. Mutates in place. */
+function migrateConfig(config: any): void {
+  if (config.integrations) {
+    const { linear: linearEnabled, github: githubEnabled, linearTeam, ...rest } = config.integrations;
+    if (!config.linear) config.linear = {};
+    if (linearEnabled !== undefined) config.linear.enabled = linearEnabled;
+    if (linearTeam !== undefined) config.linear.team = linearTeam;
+    if (!config.github) config.github = {};
+    if (githubEnabled !== undefined) config.github.enabled = githubEnabled;
+    delete config.integrations;
+  }
+  if (config.linearStatuses) {
+    if (!config.linear) config.linear = {};
+    config.linear.statuses = config.linearStatuses;
+    delete config.linearStatuses;
+  }
+}
 
 export async function loadConfig(): Promise<ForestConfig | null> {
   const ws = vscode.workspace.workspaceFolders?.[0];
@@ -66,12 +84,16 @@ export async function loadConfig(): Promise<ForestConfig | null> {
     return null;
   }
 
+  // Migrate v1 config shape
+  migrateConfig(config);
+
   // Merge: defaults → config → local
   let merged: any = mergeConfig(DEFAULTS, config);
   const localPath = path.join(repoRoot, '.forest', 'local.json');
   if (fs.existsSync(localPath)) {
     try {
       const local = JSON.parse(fs.readFileSync(localPath, 'utf8'));
+      migrateConfig(local);
       merged = mergeConfig(merged, local);
     } catch {
       vscode.window.showWarningMessage('Forest: local.json has syntax errors, ignoring overrides.');
