@@ -21,18 +21,22 @@ export interface ForestContext {
   currentTree: TreeState | undefined;
 }
 
-/** Get the main repo path — whether we're in the main repo or a worktree. */
-export function getRepoPath(): string {
-  const wsPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  if (!wsPath) throw new Error('Forest: no workspace folder open');
+/** Resolve main repo root from any path (worktree or main). */
+export function resolveMainRepo(wsPath: string): string {
   const gitPath = path.join(wsPath, '.git');
   try {
     if (fs.statSync(gitPath).isFile()) {
-      // Worktree: .git is a file containing "gitdir: <path>"
       const content = fs.readFileSync(gitPath, 'utf8').trim();
       const gitdir = content.replace('gitdir: ', '');
       return path.resolve(gitdir, '..', '..', '..');
     }
   } catch {}
   return wsPath;
+}
+
+/** Get the main repo path for the current workspace. */
+export function getRepoPath(): string {
+  const wsPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  if (!wsPath) throw new Error('Forest: no workspace folder open');
+  return resolveMainRepo(wsPath);
 }

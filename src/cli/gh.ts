@@ -32,6 +32,12 @@ export async function prIsMerged(repoPath: string, branch: string): Promise<bool
   } catch { return false; }
 }
 
+export async function createPR(worktreePath: string, baseBranch: string, title: string): Promise<string | null> {
+  const base = baseBranch.replace(/^origin\//, '');
+  const { stdout } = await exec('gh', ['pr', 'create', '--base', base, '--title', title, '--fill', '--json', 'url', '--jq', '.url'], { cwd: worktreePath, timeout: 30_000 });
+  return stdout || null;
+}
+
 export async function getPRUrl(worktreePath: string): Promise<string | null> {
   try {
     const { stdout } = await exec('gh', ['pr', 'view', '--json', 'url', '--jq', '.url'], { cwd: worktreePath, timeout: 10_000 });

@@ -95,10 +95,11 @@ export async function activate(context: vscode.ExtensionContext) {
     else if (pick?.id === 'tree') newTree(ctx);
   });
   reg('forest.switch', (arg?: string | TreeItemView) => switchTree(ctx, arg instanceof TreeItemView ? arg.tree.ticketId : arg));
-  reg('forest.ship', (arg?: TreeItemView) => ship(ctx, arg instanceof TreeItemView ? arg.tree : undefined));
+  const andRefresh = <T>(fn: () => Promise<T>) => async () => { await fn(); treesProvider.refresh(); };
+  reg('forest.ship', (arg?: TreeItemView) => andRefresh(() => ship(ctx, arg instanceof TreeItemView ? arg.tree : undefined))());
   reg('forest.cleanup', (arg?: string | TreeItemView) => cleanup(ctx, arg instanceof TreeItemView ? arg.tree.ticketId : arg));
   reg('forest.cancel', (arg?: string | TreeItemView) => cancel(ctx, arg instanceof TreeItemView ? arg.tree.ticketId : arg));
-  reg('forest.update', (arg?: TreeItemView) => update(ctx, arg instanceof TreeItemView ? arg.tree : undefined));
+  reg('forest.update', (arg?: TreeItemView) => andRefresh(() => update(ctx, arg instanceof TreeItemView ? arg.tree : undefined))());
   reg('forest.list', () => list(ctx));
   reg('forest.commit', () => commit(ctx));
   reg('forest.warmTemplate', () => warmTemplate());
@@ -157,19 +158,23 @@ export async function activate(context: vscode.ExtensionContext) {
         shortcutManager.updateTree(updated);
       }
     }
-    // Clean up git artifacts for trees removed by other windows (e.g. tree window
-    // closes before git cleanup can run). Only runs in the main window.
-    if (!currentTree) {
-      const currentTrees = stateManager.getTreesForRepo(newState, getRepoPath());
-      const currentIds = new Set(currentTrees.map(t => t.ticketId));
-      for (const prev of previousTrees) {
-        if (!currentIds.has(prev.ticketId)) {
-          git.removeWorktree(prev.repoPath, prev.path).catch(() => {});
-          git.deleteBranch(prev.repoPath, prev.branch).catch(() => {});
-        }
+    // Clean up git artifacts for trees removed by other windows.
+    // All windows participate — operations are idempotent, races are harmless.
+    const currentTrees = stateManager.getTreesForRepo(newState, getRepoPath());
+    const currentIds = new Set(currentTrees.map(t => t.ticketId));
+    for (const prev of previousTrees) {
+      // Skip self — teardownTree handles our own window
+      if (prev.ticketId === currentTree?.ticketId) continue;
+      if (!currentIds.has(prev.ticketId)) {
+        git.removeWorktree(prev.repoPath, prev.path)
+          .then(() => outputChannel.appendLine(`[Forest] Cleaned worktree: ${prev.ticketId}`))
+          .catch(e => outputChannel.appendLine(`[Forest] Worktree cleanup failed (${prev.ticketId}): ${e.message}`));
+        git.deleteBranch(prev.repoPath, prev.branch)
+          .then(() => outputChannel.appendLine(`[Forest] Deleted branch: ${prev.branch}`))
+          .catch(e => outputChannel.appendLine(`[Forest] Branch cleanup failed (${prev.branch}): ${e.message}`));
       }
-      previousTrees = currentTrees;
     }
+    previousTrees = currentTrees;
     issuesProvider.refresh();
     treesProvider.refresh();
     updateNoTrees();

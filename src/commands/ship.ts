@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import type { ForestContext } from '../context';
 import * as git from '../cli/git';
+import * as gh from '../cli/gh';
 import * as linear from '../cli/linear';
 import { updateLinear } from './shared';
 
@@ -28,12 +29,14 @@ export async function ship(ctx: ForestContext, treeArg?: import('../state').Tree
       progress.report({ message: 'Pushing branch...' });
       await git.pushBranch(tree.path, tree.branch);
 
-      // Create PR + update Linear
+      // Create PR
       let prUrl: string | null = null;
+      progress.report({ message: 'Creating PR...' });
       if (config.linear.enabled && await linear.isAvailable()) {
-        progress.report({ message: 'Creating PR...' });
         prUrl = await linear.createPR(tree.ticketId, config.baseBranch);
         await updateLinear(ctx, tree.ticketId, config.linear.statuses.onShip);
+      } else if (config.github.enabled && await gh.isAvailable()) {
+        prUrl = await gh.createPR(tree.path, config.baseBranch, `${tree.ticketId}: ${tree.title}`);
       }
 
       // Update state

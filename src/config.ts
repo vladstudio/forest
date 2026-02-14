@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { resolveMainRepo } from './context';
 
 interface ShortcutBase { name: string; openOnLaunch?: number | false; allowMultiple?: boolean; }
 interface TerminalShortcut extends ShortcutBase { type: 'terminal'; command?: string; env?: Record<string, string>; }
@@ -22,19 +23,6 @@ export interface ForestConfig {
   baseBranch: string;
   maxTrees: number;
   ai?: { provider: 'gemini' | 'openai'; apiKey?: string; model?: string };
-}
-
-/** Resolve the main repo root, even when opened inside a worktree. */
-function getMainRepoPath(wsPath: string): string {
-  const gitPath = path.join(wsPath, '.git');
-  try {
-    if (fs.statSync(gitPath).isFile()) {
-      const content = fs.readFileSync(gitPath, 'utf8').trim();
-      const gitdir = content.replace('gitdir: ', '');
-      return path.resolve(gitdir, '..', '..', '..');
-    }
-  } catch {}
-  return wsPath;
 }
 
 const DEFAULTS: Partial<ForestConfig> = {
@@ -71,7 +59,7 @@ export async function loadConfig(): Promise<ForestConfig | null> {
   const ws = vscode.workspace.workspaceFolders?.[0];
   if (!ws) return null;
 
-  const repoRoot = getMainRepoPath(ws.uri.fsPath);
+  const repoRoot = resolveMainRepo(ws.uri.fsPath);
   const configPath = path.join(repoRoot, '.forest', 'config.json');
   if (!fs.existsSync(configPath)) return null;
 
@@ -102,11 +90,9 @@ export async function loadConfig(): Promise<ForestConfig | null> {
   return merged as ForestConfig;
 }
 
-/** Returns ~/.forest/trees/<repoName>, creating the directory if needed. */
+/** Returns ~/.forest/trees/<repoName>. */
 export function getTreesDir(repoPath: string): string {
-  const dir = path.join(os.homedir(), '.forest', 'trees', path.basename(repoPath));
-  fs.mkdirSync(dir, { recursive: true });
-  return dir;
+  return path.join(os.homedir(), '.forest', 'trees', path.basename(repoPath));
 }
 
 function mergeConfig(base: any, local: any): any {

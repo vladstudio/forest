@@ -11,6 +11,7 @@ import { resolvePortVars } from '../utils/ports';
 import * as git from '../cli/git';
 import * as linear from '../cli/linear';
 import { execShell, execStream } from '../utils/exec';
+import { execFileSync } from 'child_process';
 import { getRepoPath } from '../context';
 
 /** Run an async step, log to output channel, show error notification on failure. */
@@ -107,50 +108,56 @@ export async function createTree(opts: {
   const portBase = await portManager.allocate(repoPath);
 
   // Worktree path
-  const treePath = path.join(getTreesDir(repoPath), ticketId);
+  const treesDir = getTreesDir(repoPath);
+  fs.mkdirSync(treesDir, { recursive: true });
+  const treePath = path.join(treesDir, ticketId);
 
-  return await vscode.window.withProgress(
-    { location: vscode.ProgressLocation.Notification, title: `Creating tree for ${ticketId}...`, cancellable: false },
-    async (progress) => {
-      progress.report({ message: 'Creating worktree...' });
-      await git.createWorktree(repoPath, treePath, branch, config.baseBranch);
+  const tree: TreeState = {
+    ticketId, title, branch, path: treePath, repoPath,
+    portBase, createdAt: new Date().toISOString(),
+  };
 
-      progress.report({ message: 'Copying files...' });
-      copyConfigFiles(config, repoPath, treePath);
+  // Save state early to reserve port and prevent duplicates across windows.
+  // The state watcher cleanup handles removal if any step below fails.
+  await stateManager.addTree(repoPath, tree);
 
-      progress.report({ message: 'Configuring ports...' });
-      writeForestEnv(config, treePath, portBase);
+  try {
+    return await vscode.window.withProgress(
+      { location: vscode.ProgressLocation.Notification, title: `Creating tree for ${ticketId}...`, cancellable: false },
+      async (progress) => {
+        progress.report({ message: 'Creating worktree...' });
+        await git.createWorktree(repoPath, treePath, branch, config.baseBranch);
 
-      generateWorkspaceFile(treePath, ticketId, title);
+        progress.report({ message: 'Copying files...' });
+        copyConfigFiles(config, repoPath, treePath);
 
-      const hadTemplate = copyModulesFromTemplate(repoPath, treePath);
+        progress.report({ message: 'Configuring ports...' });
+        writeForestEnv(config, treePath, portBase);
 
-      // Auto-allow direnv if .envrc exists
-      if (fs.existsSync(path.join(treePath, '.envrc'))) {
-        try { await execShell('direnv allow', { cwd: treePath, timeout: 10_000 }); } catch {}
-      }
+        generateWorkspaceFile(treePath, ticketId, title);
 
-      progress.report({ message: 'Running setup...' });
-      await runSetupCommands(config, treePath);
+        const hadTemplate = copyModulesFromTemplate(repoPath, treePath);
 
-      if (!hadTemplate) saveTemplate(repoPath, treePath);
+        if (fs.existsSync(path.join(treePath, '.envrc'))) {
+          try { await execShell('direnv allow', { cwd: treePath, timeout: 10_000 }); } catch {}
+        }
 
-      // Open new window BEFORE saving state — if openFolder fails, we don't
-      // leave an orphaned tree in state. State is saved after so other windows
-      // pick it up via the file watcher.
-      progress.report({ message: 'Opening window...' });
-      const wsFile = path.join(treePath, `${ticketId}.code-workspace`);
-      await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(wsFile), { forceNewWindow: true });
+        progress.report({ message: 'Running setup...' });
+        await runSetupCommands(config, treePath);
 
-      const tree: TreeState = {
-        ticketId, title, branch, path: treePath, repoPath,
-        portBase, createdAt: new Date().toISOString(),
-      };
-      await stateManager.addTree(repoPath, tree);
+        if (!hadTemplate) saveTemplate(repoPath, treePath);
 
-      return tree;
-    },
-  );
+        progress.report({ message: 'Opening window...' });
+        const wsFile = path.join(treePath, `${ticketId}.code-workspace`);
+        await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(wsFile), { forceNewWindow: true });
+
+        return tree;
+      },
+    );
+  } catch (e) {
+    await stateManager.removeTree(repoPath, ticketId);
+    throw e;
+  }
 }
 
 function templateDir(repoPath: string): string {
@@ -163,7 +170,7 @@ export function copyModulesFromTemplate(repoPath: string, treePath: string): boo
   if (!fs.existsSync(src)) return false;
   try {
     const flag = os.platform() === 'darwin' ? '-Rc' : '-al';
-    require('child_process').execFileSync('cp', [flag, src, dst], { stdio: 'ignore' });
+    execFileSync('cp', [flag, src, dst], { stdio: 'ignore' });
     return true;
   } catch { return false; }
 }
@@ -177,7 +184,7 @@ export function saveTemplate(repoPath: string, treePath: string): void {
   try {
     if (fs.existsSync(dst)) fs.rmSync(dst, { recursive: true });
     const flag = os.platform() === 'darwin' ? '-Rc' : '-al';
-    require('child_process').execFileSync('cp', [flag, src, dst], { stdio: 'ignore' });
+    execFileSync('cp', [flag, src, dst], { stdio: 'ignore' });
   } catch {}
 }
 
