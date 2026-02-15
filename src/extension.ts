@@ -62,6 +62,22 @@ export async function activate(context: vscode.ExtensionContext) {
   const stateManager = new StateManager();
   await stateManager.initialize();
 
+  // Prune orphaned trees (folder deleted from disk but state/branch still exist)
+  const repoPath = getRepoPath();
+  const outputChannel = vscode.window.createOutputChannel('Forest');
+  const preState = stateManager.loadSync();
+  for (const tree of stateManager.getTreesForRepo(preState, repoPath)) {
+    if (!fs.existsSync(tree.path)) {
+      outputChannel.appendLine(`[Forest] Pruning orphan: ${tree.ticketId} (${tree.path} missing)`);
+      stateManager.removeTree(tree.repoPath, tree.ticketId).catch(() => {});
+      try { fs.unlinkSync(workspaceFilePath(tree.repoPath, tree.ticketId)); } catch {}
+      git.removeWorktree(tree.repoPath, tree.path).catch(() => {});
+      git.deleteBranch(tree.repoPath, tree.branch)
+        .then(() => outputChannel.appendLine(`[Forest] Pruned branch: ${tree.branch}`))
+        .catch(() => {});
+    }
+  }
+
   // Detect if current workspace is a tree
   const curPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   const state = stateManager.loadSync();
@@ -69,7 +85,6 @@ export async function activate(context: vscode.ExtensionContext) {
 
   vscode.commands.executeCommand('setContext', 'forest.isTree', !!currentTree);
 
-  const outputChannel = vscode.window.createOutputChannel('Forest');
   const portManager = new PortManager(config, stateManager);
   const shortcutManager = new ShortcutManager(config, currentTree, stateManager);
   const statusBarManager = new StatusBarManager(currentTree);
