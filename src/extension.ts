@@ -34,7 +34,10 @@ export async function activate(context: vscode.ExtensionContext) {
       vscode.window.registerTreeDataProvider('forest.setup', emptyProvider),
       vscode.commands.registerCommand('forest.copySetupPrompt', () => {
         vscode.env.clipboard.writeText('Set up Forest (https://github.com/vladstudio/forest) for this project. Create .forest/config.json with the required configuration.');
-        vscode.window.showInformationMessage('Copied to clipboard');
+        vscode.window.withProgress(
+          { location: vscode.ProgressLocation.Notification, title: 'Copied to clipboard' },
+          () => new Promise(resolve => setTimeout(resolve, 3000)),
+        );
       }),
     );
     return;
