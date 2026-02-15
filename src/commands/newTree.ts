@@ -26,7 +26,7 @@ export async function newTree(ctx: ForestContext, arg?: string | { ticketId: str
     ticketId = pick.issueId;
     title = pick.issueTitle;
   } else {
-    const input = await vscode.window.showInputBox({ prompt: 'Ticket ID', placeHolder: 'TEAM-1234' });
+    const input = await vscode.window.showInputBox({ prompt: 'Branch name', placeHolder: 'my-feature' });
     if (!input) return;
     ticketId = input;
   }
@@ -50,19 +50,18 @@ export async function newTree(ctx: ForestContext, arg?: string | { ticketId: str
     title = issue?.title;
   }
   if (!title) {
-    title = await vscode.window.showInputBox({ prompt: 'Issue title' });
+    title = await vscode.window.showInputBox({ prompt: 'Title' });
     if (!title) return;
   }
 
   // Confirm before creating
-  const confirm = await vscode.window.showQuickPick(
-    [
-      { label: `$(add) Create "${title}"`, id: 'create' },
-      { label: '$(link-external) Open in browser', id: 'open' },
-      { label: '$(close) Cancel', id: 'cancel' },
-    ],
-    { placeHolder: `Create tree for ${ticketId}?` },
-  );
+  const linearAvailable = ctx.config.linear.enabled && linear.isAvailable();
+  const confirmItems = [
+    { label: `$(add) Create "${title}"`, id: 'create' },
+    ...(linearAvailable ? [{ label: '$(link-external) Open in browser', id: 'open' }] : []),
+    { label: '$(close) Cancel', id: 'cancel' },
+  ];
+  const confirm = await vscode.window.showQuickPick(confirmItems, { placeHolder: `Create tree for ${ticketId}?` });
   if (confirm?.id === 'open') {
     const url = await linear.getIssueUrl(ticketId);
     if (url) vscode.env.openExternal(vscode.Uri.parse(url));
