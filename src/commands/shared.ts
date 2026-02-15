@@ -220,7 +220,9 @@ function generateWorkspaceFile(repoPath: string, treePath: string, ticketId: str
   const workspace = {
     folders: [{ path: treePath }],
     settings: {
-      'window.title': `${ticketId}: ${title}\${separator}\${activeEditorShort}`,
+      'window.title': ticketId === title
+        ? `${ticketId}\${separator}\${activeEditorShort}`
+        : `${ticketId}: ${title}\${separator}\${activeEditorShort}`,
       'terminal.integrated.enablePersistentSessions': false,
     },
   };

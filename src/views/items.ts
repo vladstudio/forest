@@ -74,7 +74,8 @@ function abbreviateAge(age: string): string {
 export class TreeItemView extends vscode.TreeItem {
   contextValue = 'tree';
   constructor(public readonly tree: TreeState, isCurrent: boolean, health?: TreeHealth) {
-    super(`${tree.ticketId}  ${tree.title}`, vscode.TreeItemCollapsibleState.None);
+    const label = tree.ticketId === tree.title ? tree.ticketId : `${tree.ticketId}  ${tree.title}`;
+    super(label, vscode.TreeItemCollapsibleState.None);
 
     const parts: string[] = [];
     if (health) {
