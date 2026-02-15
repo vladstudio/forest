@@ -45,6 +45,7 @@ export function copyConfigFiles(config: ForestConfig, repoPath: string, treePath
 }
 
 export function writeForestEnv(config: ForestConfig, treePath: string, portBase: number): void {
+  if (!Object.keys(config.env).length) return;
   const envLines: string[] = [];
   for (const [key, val] of Object.entries(config.env)) {
     envLines.push(`${key}=${resolvePortVars(val, config.ports.mapping, portBase)}`);
@@ -134,7 +135,7 @@ export async function createTree(opts: {
         writeForestEnv(config, treePath, portBase);
 
         generateWorkspaceFile(repoPath, treePath, ticketId, title);
-        writeGitExclude(treePath);
+        writeGitIgnore(treePath);
 
         const hadTemplate = await copyModulesFromTemplate(repoPath, treePath);
 
@@ -203,15 +204,14 @@ export function workspaceFilePath(repoPath: string, ticketId: string): string {
   return path.join(dir, `${ticketId}.code-workspace`);
 }
 
-function writeGitExclude(treePath: string): void {
-  const excludePath = path.join(treePath, '.git', 'info', 'exclude');
+function writeGitIgnore(treePath: string): void {
+  const gitignorePath = path.join(treePath, '.gitignore');
   const marker = '# Forest-generated';
   const entries = `\n${marker}\n.forest.env\n`;
   try {
-    const existing = fs.existsSync(excludePath) ? fs.readFileSync(excludePath, 'utf8') : '';
-    if (!existing.includes(marker)) {
-      fs.mkdirSync(path.dirname(excludePath), { recursive: true });
-      fs.appendFileSync(excludePath, entries);
+    const existing = fs.existsSync(gitignorePath) ? fs.readFileSync(gitignorePath, 'utf8') : '';
+    if (!existing.includes('.forest.env')) {
+      fs.appendFileSync(gitignorePath, entries);
     }
   } catch {}
 }
