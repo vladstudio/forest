@@ -17,7 +17,6 @@ VSCode extension for parallel feature development using git worktrees. One Linea
 | **Cancel**                  | Remove worktree + branch without merging + move ticket to canceled  |
 | **Update**                  | Rebase on latest + re-run setup (reinstall deps, re-copy env files) |
 | **List**                    | Quick-pick list of all active trees                                 |
-| **Commit**                  | AI-generated commit message from staged diff                        |
 
 ## Prerequisites
 
@@ -241,7 +240,9 @@ Switch between trees from the sidebar. All processes keep running in background 
 | `Forest: Cancel`                  | Remove tree without merging          |
 | `Forest: Update`                  | Rebase + refresh deps                |
 | `Forest: List`                    | List all trees                       |
-| `Forest: Commit — AI Message`     | AI-generated commit from staged diff |
+| `Forest: Copy Branch Name`        | Copy current tree's branch to clipboard |
+| `Forest: Open PR`                 | Open PR in browser                   |
+| `Forest: Copy Setup Prompt`       | Copy AI setup prompt to clipboard    |
 | `Forest: Warm Template`           | Rebuild node_modules template        |
 
 ## Install locally
