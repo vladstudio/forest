@@ -41,6 +41,18 @@ export async function activate(context: vscode.ExtensionContext) {
   }
 
   vscode.commands.executeCommand('setContext', 'forest.active', true);
+  const ghAvailable = await gh.isAvailable();
+  vscode.commands.executeCommand('setContext', 'forest.ghAvailable', ghAvailable);
+  if (!ghAvailable) {
+    const emptyProvider: vscode.TreeDataProvider<never> = {
+      getTreeItem: () => { throw new Error('no items'); },
+      getChildren: () => [],
+    };
+    context.subscriptions.push(
+      vscode.window.registerTreeDataProvider('forest.ghMissing', emptyProvider),
+    );
+    return;
+  }
   vscode.commands.executeCommand('setContext', 'forest.linearEnabled', config.linear.enabled);
   linear.configure(config.linear.apiKey);
 

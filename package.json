@@ -61,19 +61,24 @@
           "when": "!forest.active"
         },
         {
+          "id": "forest.ghMissing",
+          "name": "Setup",
+          "when": "forest.active && !forest.ghAvailable"
+        },
+        {
           "id": "forest.issues",
           "name": "My Issues",
-          "when": "forest.active && forest.linearEnabled"
+          "when": "forest.active && forest.ghAvailable && forest.linearEnabled"
         },
         {
           "id": "forest.trees",
           "name": "Trees",
-          "when": "forest.active"
+          "when": "forest.active && forest.ghAvailable"
         },
         {
           "id": "forest.shortcuts",
           "name": "Shortcuts",
-          "when": "forest.active && forest.isTree"
+          "when": "forest.active && forest.ghAvailable && forest.isTree"
         }
       ]
     },
@@ -87,6 +92,10 @@
         "view": "forest.setup",
         "contents": "$(gear) Forest is not configured for this workspace.\n\nAsk your AI agent:\n\n`Set up Forest (https://github.com/vladstudio/forest) for this project. Create .forest/config.json with the required configuration.`\n\n[Copy to Clipboard](command:forest.copySetupPrompt)",
         "when": "workspaceFolderCount != 0"
+      },
+      {
+        "view": "forest.ghMissing",
+        "contents": "$(warning) GitHub CLI (gh) is required.\n\nForest uses gh to create and manage pull requests.\n\n[Install GitHub CLI](https://cli.github.com)"
       },
       {
         "view": "forest.trees",
