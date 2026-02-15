@@ -100,7 +100,12 @@
       {
         "view": "forest.trees",
         "contents": "No trees yet.\nClick an issue above to create a tree.\n[New Linear Issue + Tree](command:forest.newIssueTree)",
-        "when": "forest.active && forest.noTrees"
+        "when": "forest.active && forest.noTrees && forest.linearEnabled"
+      },
+      {
+        "view": "forest.trees",
+        "contents": "No trees yet.\n[New Tree](command:forest.newTree)",
+        "when": "forest.active && forest.noTrees && !forest.linearEnabled"
       }
     ],
     "commands": [
