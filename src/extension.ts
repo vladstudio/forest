@@ -66,16 +66,15 @@ export async function activate(context: vscode.ExtensionContext) {
   const repoPath = getRepoPath();
   const outputChannel = vscode.window.createOutputChannel('Forest');
   const preState = stateManager.loadSync();
-  for (const tree of stateManager.getTreesForRepo(preState, repoPath)) {
-    if (!fs.existsSync(tree.path)) {
-      outputChannel.appendLine(`[Forest] Pruning orphan: ${tree.ticketId} (${tree.path} missing)`);
-      stateManager.removeTree(tree.repoPath, tree.ticketId).catch(() => {});
-      try { fs.unlinkSync(workspaceFilePath(tree.repoPath, tree.ticketId)); } catch {}
-      git.removeWorktree(tree.repoPath, tree.path).catch(() => {});
-      git.deleteBranch(tree.repoPath, tree.branch)
-        .then(() => outputChannel.appendLine(`[Forest] Pruned branch: ${tree.branch}`))
-        .catch(() => {});
-    }
+  const orphans = stateManager.getTreesForRepo(preState, repoPath).filter(t => !fs.existsSync(t.path));
+  for (const tree of orphans) {
+    outputChannel.appendLine(`[Forest] Pruning orphan: ${tree.ticketId} (${tree.path} missing)`);
+    await stateManager.removeTree(tree.repoPath, tree.ticketId);
+    try { fs.unlinkSync(workspaceFilePath(tree.repoPath, tree.ticketId)); } catch {}
+    // Git cleanup is best-effort and can run in background
+    git.deleteBranch(tree.repoPath, tree.branch)
+      .then(() => outputChannel.appendLine(`[Forest] Pruned branch: ${tree.branch}`))
+      .catch(() => {});
   }
 
   // Detect if current workspace is a tree

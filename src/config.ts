@@ -86,7 +86,7 @@ export async function loadConfig(): Promise<ForestConfig | null> {
     }
   }
 
-  // Auto-enable Linear when API key is present (unless explicitly disabled)
+  // Auto-enable Linear when API key is present
   if (merged.linear?.apiKey) {
     merged.linear.enabled = true;
   }
