@@ -29,6 +29,7 @@ export async function newTree(ctx: ForestContext, arg?: string | { ticketId: str
     const input = await vscode.window.showInputBox({ prompt: 'Branch name', placeHolder: 'my-feature' });
     if (!input) return;
     ticketId = input;
+    title = input;
   }
 
   // Check if tree already exists
@@ -44,7 +45,7 @@ export async function newTree(ctx: ForestContext, arg?: string | { ticketId: str
     return;
   }
 
-  // Fetch title if not already known
+  // Fetch title if not already known (Linear only)
   if (!title && ctx.config.linear.enabled && linear.isAvailable()) {
     const issue = await linear.getIssue(ticketId);
     title = issue?.title;
@@ -54,20 +55,21 @@ export async function newTree(ctx: ForestContext, arg?: string | { ticketId: str
     if (!title) return;
   }
 
-  // Confirm before creating
-  const linearAvailable = ctx.config.linear.enabled && linear.isAvailable();
-  const confirmItems = [
-    { label: `$(add) Create "${title}"`, id: 'create' },
-    ...(linearAvailable ? [{ label: '$(link-external) Open in browser', id: 'open' }] : []),
-    { label: '$(close) Cancel', id: 'cancel' },
-  ];
-  const confirm = await vscode.window.showQuickPick(confirmItems, { placeHolder: `Create tree for ${ticketId}?` });
-  if (confirm?.id === 'open') {
-    const url = await linear.getIssueUrl(ticketId);
-    if (url) vscode.env.openExternal(vscode.Uri.parse(url));
-    return;
+  // Confirm before creating (Linear only — non-Linear skips straight to create)
+  if (ctx.config.linear.enabled && linear.isAvailable()) {
+    const confirmItems = [
+      { label: `$(add) Create "${title}"`, id: 'create' },
+      { label: '$(link-external) Open in browser', id: 'open' },
+      { label: '$(close) Cancel', id: 'cancel' },
+    ];
+    const confirm = await vscode.window.showQuickPick(confirmItems, { placeHolder: `Create tree for ${ticketId}?` });
+    if (confirm?.id === 'open') {
+      const url = await linear.getIssueUrl(ticketId);
+      if (url) vscode.env.openExternal(vscode.Uri.parse(url));
+      return;
+    }
+    if (confirm?.id !== 'create') return;
   }
-  if (confirm?.id !== 'create') return;
 
   try {
     await createTree({ ticketId, title, config: ctx.config, stateManager: ctx.stateManager, portManager: ctx.portManager });
