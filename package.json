@@ -90,7 +90,7 @@
       },
       {
         "view": "forest.setup",
-        "contents": "$(gear) Forest is not configured for this workspace.\n\nAsk your AI agent:\n\n`Set up Forest (https://github.com/vladstudio/forest) for this project. Create .forest/config.json with the required configuration.`\n\n[Copy to Clipboard](command:forest.copySetupPrompt)",
+        "contents": "$(gear) Forest is not configured for this workspace.\n\nAsk your AI agent:\n\n`Set up Forest (https://github.com/vladstudio/forest) for this project. Create .forest/config.json with the required configuration.`\n\n[Copy to Clipboard](command:forest.copySetupPrompt)\n\n[Reload Window](command:workbench.action.reloadWindow)",
         "when": "workspaceFolderCount != 0"
       },
       {

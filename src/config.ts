@@ -29,7 +29,7 @@ const DEFAULTS: Partial<ForestConfig> = {
   shortcuts: [],
   env: {},
   ports: { baseRange: [3000, 4000], mapping: {} },
-  linear: { enabled: true, statuses: { issueList: ['triage', 'backlog', 'unstarted'], onNew: 'started', onShip: 'in review', onCleanup: 'completed', onCancel: 'canceled' } },
+  linear: { enabled: false, statuses: { issueList: ['triage', 'backlog', 'unstarted'], onNew: 'started', onShip: 'in review', onCleanup: 'completed', onCancel: 'canceled' } },
   github: { enabled: true },
   branchFormat: '${ticketId}-${slug}',
   baseBranch: 'origin/main',
@@ -84,6 +84,11 @@ export async function loadConfig(): Promise<ForestConfig | null> {
     } catch {
       vscode.window.showWarningMessage('Forest: local.json has syntax errors, ignoring overrides.');
     }
+  }
+
+  // Auto-enable Linear when API key is present (unless explicitly disabled)
+  if (merged.linear?.apiKey) {
+    merged.linear.enabled = true;
   }
 
   return merged as ForestConfig;
