@@ -188,15 +188,16 @@ export class ShortcutManager {
   private resolveVars(value: string): string {
     if (!this.currentTree) return value;
     const tree = this.currentTree;
-    const slug = tree.branch.startsWith(tree.ticketId)
-      ? tree.branch.slice(tree.ticketId.length).replace(/^-/, '')
+    const ticketId = tree.ticketId ?? '';
+    const slug = ticketId && tree.branch.startsWith(ticketId)
+      ? tree.branch.slice(ticketId.length).replace(/^-/, '')
       : tree.branch;
     const prNumber = tree.prUrl?.match(/\/pull\/(\d+)/)?.[1] ?? '';
     return value
-      .replace(/\$\{ticketId\}/g, tree.ticketId)
+      .replace(/\$\{ticketId\}/g, ticketId)
       .replace(/\$\{branch\}/g, tree.branch)
       .replace(/\$\{repo\}/g, path.basename(tree.repoPath))
-      .replace(/\$\{treePath\}/g, tree.path)
+      .replace(/\$\{treePath\}/g, tree.path ?? '')
       .replace(/\$\{slug\}/g, slug)
       .replace(/\$\{prNumber\}/g, prNumber)
       .replace(/\$\{prUrl\}/g, tree.prUrl ?? '');

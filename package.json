@@ -66,13 +66,8 @@
           "when": "forest.active && !forest.ghAvailable"
         },
         {
-          "id": "forest.issues",
-          "name": "My Issues",
-          "when": "forest.active && forest.ghAvailable && forest.linearEnabled"
-        },
-        {
           "id": "forest.trees",
-          "name": "Trees",
+          "name": "Forest",
           "when": "forest.active && forest.ghAvailable"
         },
         {
@@ -99,13 +94,8 @@
       },
       {
         "view": "forest.trees",
-        "contents": "No trees yet.\nClick an issue above to create a tree.\n[New Linear Issue + Branch + Tree](command:forest.newIssueTree)\n[New Branch + Tree](command:forest.newTree)\n[New Tree from Existing Branch](command:forest.newTreeFromBranch)",
-        "when": "forest.active && forest.noTrees && forest.linearEnabled"
-      },
-      {
-        "view": "forest.trees",
-        "contents": "No trees yet.\n[New Branch + Tree](command:forest.newTree)\n[New Tree from Existing Branch](command:forest.newTreeFromBranch)",
-        "when": "forest.active && forest.noTrees && !forest.linearEnabled"
+        "contents": "No trees yet.\n[New Tree](command:forest.create)",
+        "when": "forest.active && forest.noTrees"
       }
     ],
     "commands": [
@@ -115,28 +105,16 @@
         "category": "Forest"
       },
       {
-        "command": "forest.newIssueTree",
-        "title": "New Linear Issue + Branch + Tree",
-        "category": "Forest",
-        "icon": "$(add)"
-      },
-      {
-        "command": "forest.newTree",
-        "title": "New Branch + Tree",
-        "category": "Forest",
-        "icon": "$(git-branch)"
-      },
-      {
-        "command": "forest.newTreePicker",
+        "command": "forest.create",
         "title": "New Tree…",
         "category": "Forest",
         "icon": "$(add)"
       },
       {
-        "command": "forest.newTreeFromBranch",
-        "title": "New Tree from Existing Branch",
+        "command": "forest.start",
+        "title": "Start — Create Tree from Issue",
         "category": "Forest",
-        "icon": "$(git-pull-request)"
+        "icon": "$(play)"
       },
       {
         "command": "forest.switch",
@@ -169,6 +147,12 @@
         "icon": "$(archive)"
       },
       {
+        "command": "forest.resume",
+        "title": "Resume — Recreate Worktree",
+        "category": "Forest",
+        "icon": "$(debug-start)"
+      },
+      {
         "command": "forest.update",
         "title": "Update — Merge from Main",
         "category": "Forest",
@@ -187,14 +171,8 @@
         "icon": "$(copy)"
       },
       {
-        "command": "forest.refreshIssues",
-        "title": "Refresh Issues",
-        "category": "Forest",
-        "icon": "$(refresh)"
-      },
-      {
-        "command": "forest.refreshTrees",
-        "title": "Refresh Trees",
+        "command": "forest.refresh",
+        "title": "Refresh",
         "category": "Forest",
         "icon": "$(refresh)"
       },
@@ -238,70 +216,65 @@
     "menus": {
       "view/title": [
         {
-          "command": "forest.refreshIssues",
-          "when": "view == forest.issues",
-          "group": "navigation"
-        },
-        {
-          "command": "forest.newIssueTree",
-          "when": "view == forest.issues",
-          "group": "navigation"
-        },
-        {
-          "command": "forest.refreshTrees",
+          "command": "forest.refresh",
           "when": "view == forest.trees",
           "group": "navigation"
         },
         {
-          "command": "forest.newTreePicker",
+          "command": "forest.create",
           "when": "view == forest.trees",
           "group": "navigation"
         }
       ],
       "view/item/context": [
         {
-          "command": "forest.newTree",
-          "when": "view == forest.issues && viewItem == issue",
+          "command": "forest.start",
+          "when": "view == forest.trees && viewItem == inbox-issue",
           "group": "inline"
         },
         {
           "command": "forest.copyBranch",
-          "when": "viewItem =~ /^tree/",
+          "when": "viewItem =~ /^tree-/",
           "group": "1_navigation"
         },
         {
           "command": "forest.ship",
-          "when": "viewItem == tree",
+          "when": "viewItem == tree-progress",
           "group": "2_ship"
         },
         {
           "command": "forest.openPR",
-          "when": "viewItem == tree-shipped",
+          "when": "viewItem == tree-review || viewItem == tree-done",
           "group": "2_ship"
         },
         {
           "command": "forest.update",
-          "when": "viewItem =~ /^tree/",
+          "when": "viewItem == tree-progress || viewItem == tree-review",
           "group": "3_lifecycle"
         },
         {
           "command": "forest.rebase",
-          "when": "viewItem =~ /^tree/",
+          "when": "viewItem == tree-progress || viewItem == tree-review",
+          "group": "3_lifecycle"
+        },
+        {
+          "command": "forest.resume",
+          "when": "viewItem == tree-shelved",
           "group": "3_lifecycle"
         },
         {
           "command": "forest.cleanup",
-          "when": "viewItem == tree-shipped",
+          "when": "viewItem == tree-done",
           "group": "4_danger"
         },
         {
           "command": "forest.shelve",
-          "when": "viewItem =~ /^tree/",
+          "when": "viewItem == tree-progress || viewItem == tree-review",
           "group": "4_danger"
         },
         {
           "command": "forest.cancel",
-          "when": "viewItem =~ /^tree/",
+          "when": "viewItem =~ /^tree-/",
           "group": "4_danger"
         },
         {
@@ -331,6 +304,10 @@
         },
         {
           "command": "forest.restartShortcut",
+          "when": "false"
+        },
+        {
+          "command": "forest.start",
           "when": "false"
         }
       ]

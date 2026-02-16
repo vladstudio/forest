@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import type { TreeState } from '../state';
+import { displayName } from '../state';
 
 export class StatusBarManager {
   private item: vscode.StatusBarItem;
@@ -9,8 +10,9 @@ export class StatusBarManager {
 
   show(): void {
     if (!this.currentTree) return;
-    this.item.text = `$(git-branch) ${this.currentTree.ticketId}`;
-    this.item.tooltip = `${this.currentTree.ticketId}: ${this.currentTree.title}\nClick to list all trees`;
+    const name = displayName(this.currentTree);
+    this.item.text = `$(git-branch) ${this.currentTree.ticketId ?? this.currentTree.branch}`;
+    this.item.tooltip = `${name}\nClick to list all trees`;
     this.item.command = 'forest.list';
     this.item.show();
   }

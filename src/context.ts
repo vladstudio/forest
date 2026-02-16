@@ -3,8 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import type { ForestConfig } from './config';
 import type { StateManager, TreeState } from './state';
-import type { IssuesTreeProvider } from './views/IssuesTreeProvider';
-import type { TreesTreeProvider } from './views/TreesTreeProvider';
+import type { ForestTreeProvider } from './views/ForestTreeProvider';
 import type { ShortcutManager } from './managers/ShortcutManager';
 import type { StatusBarManager } from './managers/StatusBarManager';
 
@@ -13,8 +12,7 @@ export interface ForestContext {
   stateManager: StateManager;
   shortcutManager: ShortcutManager;
   statusBarManager: StatusBarManager;
-  issuesProvider: IssuesTreeProvider;
-  treesProvider: TreesTreeProvider;
+  forestProvider: ForestTreeProvider;
   outputChannel: vscode.OutputChannel;
   currentTree: TreeState | undefined;
 }

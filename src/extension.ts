@@ -7,17 +7,14 @@ import { StateManager } from './state';
 import { ForestContext, getRepoPath } from './context';
 import { ShortcutManager } from './managers/ShortcutManager';
 import { StatusBarManager } from './managers/StatusBarManager';
-import { IssuesTreeProvider } from './views/IssuesTreeProvider';
-import { TreesTreeProvider } from './views/TreesTreeProvider';
+import { ForestTreeProvider } from './views/ForestTreeProvider';
 import { ShortcutsTreeProvider } from './views/ShortcutsTreeProvider';
-import { newIssueTree } from './commands/newIssueTree';
-import { newTree } from './commands/newTree';
+import { create, start } from './commands/create';
 import { switchTree } from './commands/switch';
 import { ship } from './commands/ship';
-import { cleanup, cancel, cleanupMerged, shelve, consumePreservedBranch } from './commands/cleanup';
+import { cleanup, cancel, cleanupMerged, shelve, resume } from './commands/cleanup';
 import { update, rebase } from './commands/update';
 import { list } from './commands/list';
-import { newTreeFromBranch } from './commands/newTreeFromBranch';
 import { warmTemplate, workspaceFilePath } from './commands/shared';
 import * as git from './cli/git';
 import * as gh from './cli/gh';
@@ -26,7 +23,6 @@ import * as linear from './cli/linear';
 export async function activate(context: vscode.ExtensionContext) {
   const config = await loadConfig();
   if (!config) {
-    // Register empty provider so the setup welcome message is shown
     const emptyProvider: vscode.TreeDataProvider<never> = {
       getTreeItem: () => { throw new Error('no items'); },
       getChildren: () => [],
@@ -88,17 +84,14 @@ export async function activate(context: vscode.ExtensionContext) {
   // Prune orphaned trees (folder deleted from disk but state/branch still exist)
   const outputChannel = vscode.window.createOutputChannel('Forest');
   const preState = stateManager.loadSync();
-  const orphans = stateManager.getTreesForRepo(preState, repoPath).filter(t => !fs.existsSync(t.path));
+  const orphans = stateManager.getTreesForRepo(preState, repoPath).filter(t => t.path && !fs.existsSync(t.path));
   for (const tree of orphans) {
-    outputChannel.appendLine(`[Forest] Pruning orphan: ${tree.ticketId} (${tree.path} missing)`);
-    await stateManager.removeTree(tree.repoPath, tree.ticketId);
-    try { fs.unlinkSync(workspaceFilePath(tree.repoPath, tree.ticketId)); } catch {}
-    // Git cleanup is best-effort and can run in background
-    if (!consumePreservedBranch(tree.branch)) {
-      git.deleteBranch(tree.repoPath, tree.branch)
-        .then(() => outputChannel.appendLine(`[Forest] Pruned branch: ${tree.branch}`))
-        .catch(() => {});
-    }
+    outputChannel.appendLine(`[Forest] Pruning orphan: ${tree.branch} (${tree.path} missing)`);
+    await stateManager.removeTree(tree.repoPath, tree.branch);
+    try { fs.unlinkSync(workspaceFilePath(tree.repoPath, tree.branch)); } catch {}
+    git.deleteBranch(tree.repoPath, tree.branch)
+      .then(() => outputChannel.appendLine(`[Forest] Pruned branch: ${tree.branch}`))
+      .catch(() => {});
   }
 
   // Detect if current workspace is a tree
@@ -110,13 +103,11 @@ export async function activate(context: vscode.ExtensionContext) {
 
   const shortcutManager = new ShortcutManager(config, currentTree);
   const statusBarManager = new StatusBarManager(currentTree);
-  const issuesProvider = new IssuesTreeProvider(config, stateManager);
-  const treesProvider = new TreesTreeProvider(stateManager, config);
+  const forestProvider = new ForestTreeProvider(stateManager, config);
   const shortcutsProvider = new ShortcutsTreeProvider(config, shortcutManager);
-  const treesView = vscode.window.createTreeView('forest.trees', { treeDataProvider: treesProvider });
+  const forestView = vscode.window.createTreeView('forest.trees', { treeDataProvider: forestProvider });
   context.subscriptions.push(
-    vscode.window.registerTreeDataProvider('forest.issues', issuesProvider),
-    treesView,
+    forestView,
     vscode.window.registerTreeDataProvider('forest.shortcuts', shortcutsProvider),
   );
 
@@ -125,50 +116,33 @@ export async function activate(context: vscode.ExtensionContext) {
     const s = await stateManager.load();
     const trees = stateManager.getTreesForRepo(s, getRepoPath());
     vscode.commands.executeCommand('setContext', 'forest.noTrees', trees.length === 0);
-    treesView.badge = trees.length ? { value: trees.length, tooltip: `${trees.length} trees` } : undefined;
+    forestView.badge = trees.length ? { value: trees.length, tooltip: `${trees.length} trees` } : undefined;
   };
   updateNoTrees();
 
   const ctx: ForestContext = {
     config, stateManager, shortcutManager,
-    statusBarManager, issuesProvider, treesProvider, outputChannel, currentTree,
+    statusBarManager, forestProvider, outputChannel, currentTree,
   };
 
   // Register commands
   const reg = (id: string, fn: (...args: any[]) => any) =>
     context.subscriptions.push(vscode.commands.registerCommand(id, fn));
 
-  reg('forest.newIssueTree', () => newIssueTree(ctx));
-  reg('forest.newTree', (arg?: string | { ticketId: string; title: string }) => newTree(ctx, arg));
-  reg('forest.newTreeFromBranch', () => newTreeFromBranch(ctx));
-  reg('forest.newTreePicker', async () => {
-    const items = config.linear.enabled
-      ? [
-          { label: '$(add) New Linear Issue + Branch + Tree', id: 'issue' },
-          { label: '$(git-branch) New Branch + Tree', id: 'tree' },
-          { label: '$(git-pull-request) New Tree from Existing Branch', id: 'branch' },
-        ]
-      : [
-          { label: '$(git-branch) New Branch + Tree', id: 'tree' },
-          { label: '$(git-pull-request) New Tree from Existing Branch', id: 'branch' },
-        ];
-    const pick = await vscode.window.showQuickPick(items, { placeHolder: 'Create a new tree' });
-    if (pick?.id === 'issue') newIssueTree(ctx);
-    else if (pick?.id === 'tree') newTree(ctx);
-    else if (pick?.id === 'branch') newTreeFromBranch(ctx);
-  });
-  reg('forest.switch', (arg?: string | TreeItemView) => switchTree(ctx, arg instanceof TreeItemView ? arg.tree.ticketId : arg));
-  const andRefresh = <T>(fn: () => Promise<T>) => async () => { await fn(); treesProvider.refresh(); };
+  reg('forest.create', () => create(ctx));
+  reg('forest.start', (arg: { ticketId: string; title: string }) => start(ctx, arg));
+  reg('forest.switch', (arg?: string | TreeItemView) => switchTree(ctx, arg instanceof TreeItemView ? arg.tree.branch : arg));
+  const andRefresh = <T>(fn: () => Promise<T>) => async () => { await fn(); forestProvider.refreshTrees(); };
   reg('forest.ship', (arg?: TreeItemView) => andRefresh(() => ship(ctx, arg instanceof TreeItemView ? arg.tree : undefined))());
-  reg('forest.cleanup', (arg?: string | TreeItemView) => cleanup(ctx, arg instanceof TreeItemView ? arg.tree.ticketId : arg));
-  reg('forest.cancel', (arg?: string | TreeItemView) => cancel(ctx, arg instanceof TreeItemView ? arg.tree.ticketId : arg));
-  reg('forest.shelve', (arg?: string | TreeItemView) => shelve(ctx, arg instanceof TreeItemView ? arg.tree.ticketId : arg));
+  reg('forest.cleanup', (arg?: string | TreeItemView) => cleanup(ctx, arg instanceof TreeItemView ? arg.tree.branch : arg));
+  reg('forest.cancel', (arg?: string | TreeItemView) => cancel(ctx, arg instanceof TreeItemView ? arg.tree.branch : arg));
+  reg('forest.shelve', (arg?: string | TreeItemView) => shelve(ctx, arg instanceof TreeItemView ? arg.tree.branch : arg));
+  reg('forest.resume', (arg?: string | TreeItemView) => resume(ctx, arg instanceof TreeItemView ? arg.tree.branch : arg));
   reg('forest.update', (arg?: TreeItemView) => andRefresh(() => update(ctx, arg instanceof TreeItemView ? arg.tree : undefined))());
   reg('forest.rebase', (arg?: TreeItemView) => andRefresh(() => rebase(ctx, arg instanceof TreeItemView ? arg.tree : undefined))());
   reg('forest.list', () => list(ctx));
   reg('forest.warmTemplate', () => warmTemplate());
-  reg('forest.refreshIssues', () => issuesProvider.refresh());
-  reg('forest.refreshTrees', () => treesProvider.refresh());
+  reg('forest.refresh', () => forestProvider.refresh());
   reg('forest.copyBranch', (arg?: TreeItemView) => {
     const tree = arg instanceof TreeItemView ? arg.tree : ctx.currentTree;
     if (tree) vscode.env.clipboard.writeText(tree.branch);
@@ -182,12 +156,11 @@ export async function activate(context: vscode.ExtensionContext) {
   reg('forest.stopShortcut', (arg: any) => shortcutManager.stop(unwrap(arg)));
   reg('forest.restartShortcut', (arg: any) => shortcutManager.restart(unwrap(arg)));
 
-  // If this is a tree window, open launch shortcuts + auto-cleanup polling
+  // If this is a tree window, open launch shortcuts
   if (currentTree) {
     statusBarManager.show();
     shortcutManager.openOnLaunchShortcuts();
     vscode.commands.executeCommand('forest.trees.focus');
-
   }
 
   // Auto-cleanup polling: check merged PRs every 5 minutes
@@ -201,14 +174,15 @@ export async function activate(context: vscode.ExtensionContext) {
       const s = await stateManager.load();
       const trees = stateManager.getTreesForRepo(s, getRepoPath());
       for (const tree of trees) {
-        if (!tree.prUrl || dismissedPRs.has(tree.ticketId)) continue;
+        if (!tree.prUrl || !tree.path || dismissedPRs.has(tree.branch)) continue;
         if (await gh.prIsMerged(tree.repoPath, tree.branch)) {
+          const name = tree.ticketId ?? tree.branch;
           const action = await vscode.window.showInformationMessage(
-            `${tree.ticketId} PR was merged. Clean up?`,
+            `${name} PR was merged. Clean up?`,
             'Cleanup', 'Dismiss',
           );
           if (action === 'Cleanup') await cleanupMerged(ctx, tree);
-          else dismissedPRs.add(tree.ticketId);
+          else dismissedPRs.add(tree.branch);
         }
       }
     } finally {
@@ -227,17 +201,15 @@ export async function activate(context: vscode.ExtensionContext) {
       const trees = stateManager.getTreesForRepo(s, repoPath);
       let pruned = false;
       for (const tree of trees) {
-        if (!fs.existsSync(tree.path)) {
-          outputChannel.appendLine(`[Forest] Detected missing worktree: ${tree.ticketId} (${tree.path})`);
-          await stateManager.removeTree(tree.repoPath, tree.ticketId);
-          try { fs.unlinkSync(workspaceFilePath(tree.repoPath, tree.ticketId)); } catch {}
-          if (!consumePreservedBranch(tree.branch)) {
-            git.deleteBranch(tree.repoPath, tree.branch).catch(() => {});
-          }
+        if (tree.path && !fs.existsSync(tree.path)) {
+          outputChannel.appendLine(`[Forest] Detected missing worktree: ${tree.branch} (${tree.path})`);
+          await stateManager.removeTree(tree.repoPath, tree.branch);
+          try { fs.unlinkSync(workspaceFilePath(tree.repoPath, tree.branch)); } catch {}
+          git.deleteBranch(tree.repoPath, tree.branch).catch(() => {});
           pruned = true;
         }
       }
-      if (pruned) treesProvider.refresh();
+      if (pruned) forestProvider.refresh();
     } finally {
       orphanCheckRunning = false;
     }
@@ -248,7 +220,7 @@ export async function activate(context: vscode.ExtensionContext) {
   let previousTrees = stateManager.getTreesForRepo(stateManager.loadSync(), getRepoPath());
   stateManager.onDidChange((newState) => {
     if (ctx.currentTree) {
-      const updated = stateManager.getTree(newState, getRepoPath(), ctx.currentTree.ticketId);
+      const updated = stateManager.getTree(newState, getRepoPath(), ctx.currentTree.branch);
       if (updated) {
         ctx.currentTree = updated;
         statusBarManager.update(updated);
@@ -256,29 +228,25 @@ export async function activate(context: vscode.ExtensionContext) {
       }
     }
     // Clean up git artifacts for trees removed by other windows.
-    // All windows participate — operations are idempotent, races are harmless.
     const currentTrees = stateManager.getTreesForRepo(newState, getRepoPath());
-    const currentIds = new Set(currentTrees.map(t => t.ticketId));
+    const currentBranches = new Set(currentTrees.map(t => t.branch));
     for (const prev of previousTrees) {
-      // Skip self — teardownTree handles our own window
-      if (prev.ticketId === currentTree?.ticketId) continue;
-      if (!currentIds.has(prev.ticketId)) {
-        const keepBranch = consumePreservedBranch(prev.branch);
-        try { fs.unlinkSync(workspaceFilePath(prev.repoPath, prev.ticketId)); } catch {}
-        git.removeWorktree(prev.repoPath, prev.path)
-          .then(() => {
-            outputChannel.appendLine(`[Forest] Cleaned worktree: ${prev.ticketId}`);
-            if (!keepBranch) return git.deleteBranch(prev.repoPath, prev.branch);
-          })
-          .then(() => {
-            if (!keepBranch) outputChannel.appendLine(`[Forest] Deleted branch: ${prev.branch}`);
-          })
-          .catch(e => outputChannel.appendLine(`[Forest] Cleanup failed (${prev.ticketId}): ${e.message}`));
+      if (prev.branch === currentTree?.branch) continue;
+      if (!currentBranches.has(prev.branch)) {
+        try { fs.unlinkSync(workspaceFilePath(prev.repoPath, prev.branch)); } catch {}
+        if (prev.path) {
+          git.removeWorktree(prev.repoPath, prev.path)
+            .then(() => {
+              outputChannel.appendLine(`[Forest] Cleaned worktree: ${prev.branch}`);
+              return git.deleteBranch(prev.repoPath, prev.branch);
+            })
+            .then(() => outputChannel.appendLine(`[Forest] Deleted branch: ${prev.branch}`))
+            .catch(e => outputChannel.appendLine(`[Forest] Cleanup failed (${prev.branch}): ${e.message}`));
+        }
       }
     }
     previousTrees = currentTrees;
-    issuesProvider.refresh();
-    treesProvider.refresh();
+    forestProvider.refresh();
     updateNoTrees();
   });
 

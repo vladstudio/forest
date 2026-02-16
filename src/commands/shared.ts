@@ -5,6 +5,7 @@ import * as os from 'os';
 import { type ForestConfig, getTreesDir } from '../config';
 import type { ForestContext } from '../context';
 import type { TreeState, StateManager } from '../state';
+import { displayName } from '../state';
 import { slugify } from '../utils/slug';
 import * as git from '../cli/git';
 import * as linear from '../cli/linear';
@@ -78,42 +79,47 @@ export async function runSetupCommands(config: ForestConfig, treePath: string, c
   }
 }
 
-/** Shared tree creation logic for newIssueTree + newTree + newTreeFromBranch. */
+/** Sanitize branch name for use as filename (replace / with --). */
+function sanitizeBranch(branch: string): string {
+  return branch.replace(/\//g, '--');
+}
+
+/** Shared tree creation logic. */
 export async function createTree(opts: {
-  ticketId: string;
-  title: string;
+  branch: string;
   config: ForestConfig;
   stateManager: StateManager;
-  existingBranch?: string;
+  ticketId?: string;
+  title?: string;
+  existingBranch?: boolean;
 }): Promise<TreeState> {
-  const { ticketId, title, config, stateManager, existingBranch } = opts;
+  const { branch, config, stateManager, ticketId, title, existingBranch } = opts;
   const repoPath = getRepoPath();
 
   // Check existing
   const state = await stateManager.load();
-  if (stateManager.getTree(state, repoPath, ticketId)) {
-    throw new Error(`Tree for ${ticketId} already exists`);
+  if (stateManager.getTree(state, repoPath, branch)) {
+    throw new Error(`Tree for branch "${branch}" already exists`);
   }
 
   // Check max trees
   const trees = stateManager.getTreesForRepo(state, repoPath);
-  if (trees.length >= config.maxTrees) {
+  const activeTrees = trees.filter(t => t.path);
+  if (activeTrees.length >= config.maxTrees) {
     throw new Error(`Max trees (${config.maxTrees}) reached. Clean up some trees first.`);
   }
 
-  // Use existing branch or generate new one
-  const branch = existingBranch ?? config.branchFormat
-    .replace('${ticketId}', ticketId)
-    .replace('${slug}', slugify(title));
-
-  // Worktree path
+  // Worktree path — use ticketId if available (shorter, cleaner), else sanitized branch
   const treesDir = getTreesDir(repoPath);
   fs.mkdirSync(treesDir, { recursive: true });
-  const treePath = path.join(treesDir, ticketId);
+  const dirName = ticketId ?? sanitizeBranch(branch);
+  const treePath = path.join(treesDir, dirName);
 
   const tree: TreeState = {
-    ticketId, title, branch, path: treePath, repoPath,
+    branch, repoPath, path: treePath,
     createdAt: new Date().toISOString(),
+    ...(ticketId ? { ticketId } : {}),
+    ...(title ? { title } : {}),
   };
 
   // Save state early to prevent duplicates across windows.
@@ -121,7 +127,7 @@ export async function createTree(opts: {
 
   try {
     return await vscode.window.withProgress(
-      { location: vscode.ProgressLocation.Notification, title: `Creating tree for ${ticketId}...`, cancellable: false },
+      { location: vscode.ProgressLocation.Notification, title: `Creating tree for ${displayName(tree)}...`, cancellable: false },
       async (progress) => {
         progress.report({ message: 'Creating worktree...' });
         if (existingBranch) {
@@ -133,7 +139,7 @@ export async function createTree(opts: {
         progress.report({ message: 'Copying files...' });
         copyConfigFiles(config, repoPath, treePath);
 
-        generateWorkspaceFile(repoPath, treePath, ticketId, title);
+        generateWorkspaceFile(repoPath, treePath, tree);
 
         const hadTemplate = await copyModulesFromTemplate(repoPath, treePath);
 
@@ -147,18 +153,72 @@ export async function createTree(opts: {
         if (!hadTemplate) await saveTemplate(repoPath, treePath);
 
         progress.report({ message: 'Opening window...' });
-        const wsFile = workspaceFilePath(repoPath, ticketId);
+        const wsFile = workspaceFilePath(repoPath, branch);
         await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(wsFile), { forceNewWindow: true });
 
         return tree;
       },
     );
   } catch (e) {
-    await stateManager.removeTree(repoPath, ticketId);
+    await stateManager.removeTree(repoPath, branch);
     await git.removeWorktree(repoPath, treePath).catch(() => {});
     if (!existingBranch) await git.deleteBranch(repoPath, branch).catch(() => {});
     throw e;
   }
+}
+
+/** Recreate a worktree for a shelved tree. */
+export async function resumeTree(opts: {
+  tree: TreeState;
+  config: ForestConfig;
+  stateManager: StateManager;
+}): Promise<TreeState> {
+  const { tree, config, stateManager } = opts;
+  const repoPath = tree.repoPath;
+
+  // Check max trees
+  const state = await stateManager.load();
+  const trees = stateManager.getTreesForRepo(state, repoPath);
+  const activeTrees = trees.filter(t => t.path);
+  if (activeTrees.length >= config.maxTrees) {
+    throw new Error(`Max trees (${config.maxTrees}) reached. Clean up some trees first.`);
+  }
+
+  const treesDir = getTreesDir(repoPath);
+  fs.mkdirSync(treesDir, { recursive: true });
+  const dirName = tree.ticketId ?? sanitizeBranch(tree.branch);
+  const treePath = path.join(treesDir, dirName);
+
+  return await vscode.window.withProgress(
+    { location: vscode.ProgressLocation.Notification, title: `Resuming ${displayName(tree)}...`, cancellable: false },
+    async (progress) => {
+      progress.report({ message: 'Creating worktree...' });
+      await git.checkoutWorktree(repoPath, treePath, tree.branch);
+
+      progress.report({ message: 'Copying files...' });
+      copyConfigFiles(config, repoPath, treePath);
+
+      generateWorkspaceFile(repoPath, treePath, tree);
+
+      await copyModulesFromTemplate(repoPath, treePath);
+
+      if (fs.existsSync(path.join(treePath, '.envrc'))) {
+        try { await execShell('direnv allow', { cwd: treePath, timeout: 10_000 }); } catch {}
+      }
+
+      progress.report({ message: 'Running setup...' });
+      await runSetupCommands(config, treePath);
+
+      // Update state with new path
+      await stateManager.updateTree(repoPath, tree.branch, { path: treePath });
+
+      progress.report({ message: 'Opening window...' });
+      const wsFile = workspaceFilePath(repoPath, tree.branch);
+      await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(wsFile), { forceNewWindow: true });
+
+      return { ...tree, path: treePath };
+    },
+  );
 }
 
 function templateDir(repoPath: string): string {
@@ -196,21 +256,20 @@ export async function warmTemplate(): Promise<void> {
   vscode.window.showInformationMessage('Forest: Template warmed from current tree.');
 }
 
-export function workspaceFilePath(repoPath: string, ticketId: string): string {
+export function workspaceFilePath(repoPath: string, branch: string): string {
   const dir = path.join(os.homedir(), '.forest', 'workspaces');
   fs.mkdirSync(dir, { recursive: true });
-  return path.join(dir, `${ticketId}.code-workspace`);
+  return path.join(dir, `${sanitizeBranch(branch)}.code-workspace`);
 }
 
-function generateWorkspaceFile(repoPath: string, treePath: string, ticketId: string, title: string): void {
+function generateWorkspaceFile(repoPath: string, treePath: string, tree: TreeState): void {
+  const name = displayName(tree);
   const workspace = {
     folders: [{ path: treePath }],
     settings: {
-      'window.title': ticketId === title
-        ? `${ticketId}\${separator}\${activeEditorShort}`
-        : `${ticketId}: ${title}\${separator}\${activeEditorShort}`,
+      'window.title': `${name}\${separator}\${activeEditorShort}`,
       'terminal.integrated.enablePersistentSessions': false,
     },
   };
-  fs.writeFileSync(workspaceFilePath(repoPath, ticketId), JSON.stringify(workspace, null, 2));
+  fs.writeFileSync(workspaceFilePath(repoPath, tree.branch), JSON.stringify(workspace, null, 2));
 }
