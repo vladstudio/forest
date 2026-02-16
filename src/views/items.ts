@@ -40,14 +40,15 @@ export class ShortcutItem extends vscode.TreeItem {
 
     if (shortcut.type === 'terminal') {
       const running = state === 'running';
+      const mode = shortcut.mode ?? 'single-tree';
       this.contextValue = running
-        ? (shortcut.allowMultiple ? 'shortcut-terminal-multi' : 'shortcut-terminal-running')
+        ? (mode === 'multiple' ? 'shortcut-terminal-multi' : 'shortcut-terminal-running')
         : 'shortcut-terminal-stopped';
       this.iconPath = new vscode.ThemeIcon(
         'terminal',
         running ? new vscode.ThemeColor('charts.green') : undefined,
       );
-      if (running && !shortcut.allowMultiple) this.description = 'running';
+      if (running && mode !== 'multiple') this.description = 'running';
     } else if (shortcut.type === 'browser') {
       this.contextValue = 'shortcut-browser';
       this.iconPath = new vscode.ThemeIcon('globe');
@@ -94,7 +95,7 @@ export class TreeItemView extends vscode.TreeItem {
     this.tooltip = [
       `${tree.ticketId}: ${tree.title}`,
       `Branch: ${tree.branch}`,
-      `Ports: ${tree.portBase}`,
+      `Path: ${tree.path}`,
       tree.prUrl ? `PR: ${tree.prUrl}` : 'PR: none',
     ].join('\n');
     this.contextValue = tree.prUrl ? 'tree-shipped' : 'tree';

@@ -143,7 +143,7 @@ export async function newTreeFromBranch(ctx: ForestContext): Promise<void> {
 
   // 4. Create tree
   try {
-    await createTree({ ticketId, title, config, stateManager: ctx.stateManager, portManager: ctx.portManager, existingBranch: branch });
+    await createTree({ ticketId, title, config, stateManager: ctx.stateManager, existingBranch: branch });
     if (linkedLinear) {
       await updateLinear(ctx, ticketId, config.linear.statuses.onNew);
     }

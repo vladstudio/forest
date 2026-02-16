@@ -4,7 +4,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { resolveMainRepo } from './context';
 
-interface ShortcutBase { name: string; openOnLaunch?: number | false; allowMultiple?: boolean; }
+interface ShortcutBase { name: string; openOnLaunch?: number | false; mode?: 'single-repo' | 'single-tree' | 'multiple'; }
 interface TerminalShortcut extends ShortcutBase { type: 'terminal'; command?: string; env?: Record<string, string>; }
 interface BrowserShortcut extends ShortcutBase { type: 'browser'; url: string; }
 interface FileShortcut extends ShortcutBase { type: 'file'; path: string; }
@@ -15,8 +15,6 @@ export interface ForestConfig {
   copy: string[];
   setup: string | string[];
   shortcuts: ShortcutConfig[];
-  ports: { baseRange: [number, number]; mapping: Record<string, string> };
-  env: Record<string, string>;
   linear: { enabled: boolean; apiKey?: string; team?: string; statuses: { issueList: string[]; onNew: string; onShip: string; onCleanup: string; onCancel: string } };
   github: { enabled: boolean };
   branchFormat: string;
@@ -27,8 +25,6 @@ export interface ForestConfig {
 const DEFAULTS: Partial<ForestConfig> = {
   copy: [],
   shortcuts: [],
-  env: {},
-  ports: { baseRange: [3000, 4000], mapping: {} },
   linear: { enabled: false, statuses: { issueList: ['triage', 'backlog', 'unstarted'], onNew: 'started', onShip: 'in review', onCleanup: 'completed', onCancel: 'canceled' } },
   github: { enabled: true },
   branchFormat: '${ticketId}-${slug}',

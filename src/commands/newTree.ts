@@ -72,7 +72,7 @@ export async function newTree(ctx: ForestContext, arg?: string | { ticketId: str
   }
 
   try {
-    await createTree({ ticketId, title, config: ctx.config, stateManager: ctx.stateManager, portManager: ctx.portManager });
+    await createTree({ ticketId, title, config: ctx.config, stateManager: ctx.stateManager });
     await updateLinear(ctx, ticketId, ctx.config.linear.statuses.onNew);
   } catch (e: any) {
     vscode.window.showErrorMessage(e.message);

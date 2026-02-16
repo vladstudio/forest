@@ -57,10 +57,16 @@ export async function lastCommitAge(worktreePath: string): Promise<string> {
 }
 
 /** Check out an existing branch into a new worktree (no -b flag).
- *  Caller should fetch first (e.g. listBranches already does). */
+ *  Caller should fetch first (e.g. listBranches already does).
+ *  If the branch is checked out in the main repo, detaches HEAD first. */
 export async function checkoutWorktree(
   repoPath: string, worktreePath: string, branch: string,
 ): Promise<void> {
+  // If branch is checked out in main repo, detach so worktree add can use it
+  const { stdout } = await exec('git', ['symbolic-ref', '--short', 'HEAD'], { cwd: repoPath }).catch(() => ({ stdout: '' }));
+  if (stdout.trim() === branch) {
+    await exec('git', ['checkout', '--detach'], { cwd: repoPath });
+  }
   await exec('git', ['worktree', 'add', worktreePath, branch], { cwd: repoPath });
 }
 
@@ -68,13 +74,14 @@ export async function checkoutWorktree(
 export async function listBranches(repoPath: string, baseBranch: string): Promise<string[]> {
   await exec('git', ['fetch', 'origin'], { cwd: repoPath });
 
-  // Get branches already checked out in worktrees
+  // Get branches checked out in non-main worktrees (main repo's branch is okay — we'll detach it)
   const { stdout: wtOut } = await exec('git', ['worktree', 'list', '--porcelain'], { cwd: repoPath });
-  const wtBranches = new Set(
-    wtOut.split('\n')
-      .filter(l => l.startsWith('branch '))
-      .map(l => l.replace('branch refs/heads/', '')),
-  );
+  const wtBranches = new Set<string>();
+  let wtIndex = 0; // first entry (index 0) is always the main worktree
+  for (const line of wtOut.split('\n')) {
+    if (line.startsWith('worktree ')) { wtIndex++; continue; }
+    if (wtIndex > 1 && line.startsWith('branch ')) wtBranches.add(line.replace('branch refs/heads/', ''));
+  }
 
   // Local branches
   const { stdout: localOut } = await exec('git', ['branch', '--format=%(refname:short)'], { cwd: repoPath });

@@ -5,9 +5,7 @@ import * as os from 'os';
 import { type ForestConfig, getTreesDir } from '../config';
 import type { ForestContext } from '../context';
 import type { TreeState, StateManager } from '../state';
-import type { PortManager } from '../managers/PortManager';
 import { slugify } from '../utils/slug';
-import { resolvePortVars } from '../utils/ports';
 import * as git from '../cli/git';
 import * as linear from '../cli/linear';
 import { exec as execUtil, execShell, execStream } from '../utils/exec';
@@ -44,15 +42,6 @@ export function copyConfigFiles(config: ForestConfig, repoPath: string, treePath
   }
 }
 
-export function writeForestEnv(config: ForestConfig, treePath: string, portBase: number): void {
-  if (!Object.keys(config.env).length) return;
-  const envLines: string[] = [];
-  for (const [key, val] of Object.entries(config.env)) {
-    envLines.push(`${key}=${resolvePortVars(val, config.ports.mapping, portBase)}`);
-  }
-  fs.writeFileSync(path.join(treePath, '.forest.env'), envLines.join('\n'));
-}
-
 export async function runSetupCommands(config: ForestConfig, treePath: string, channel?: vscode.OutputChannel): Promise<void> {
   const cmds = Array.isArray(config.setup) ? config.setup : config.setup ? [config.setup] : [];
   for (const cmd of cmds) {
@@ -81,10 +70,9 @@ export async function createTree(opts: {
   title: string;
   config: ForestConfig;
   stateManager: StateManager;
-  portManager: PortManager;
   existingBranch?: string;
 }): Promise<TreeState> {
-  const { ticketId, title, config, stateManager, portManager, existingBranch } = opts;
+  const { ticketId, title, config, stateManager, existingBranch } = opts;
   const repoPath = getRepoPath();
 
   // Check existing
@@ -104,9 +92,6 @@ export async function createTree(opts: {
     .replace('${ticketId}', ticketId)
     .replace('${slug}', slugify(title));
 
-  // Allocate ports
-  const portBase = await portManager.allocate(repoPath);
-
   // Worktree path
   const treesDir = getTreesDir(repoPath);
   fs.mkdirSync(treesDir, { recursive: true });
@@ -114,11 +99,10 @@ export async function createTree(opts: {
 
   const tree: TreeState = {
     ticketId, title, branch, path: treePath, repoPath,
-    portBase, createdAt: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
   };
 
-  // Save state early to reserve port and prevent duplicates across windows.
-  // The state watcher cleanup handles removal if any step below fails.
+  // Save state early to prevent duplicates across windows.
   await stateManager.addTree(repoPath, tree);
 
   try {
@@ -135,11 +119,7 @@ export async function createTree(opts: {
         progress.report({ message: 'Copying files...' });
         copyConfigFiles(config, repoPath, treePath);
 
-        progress.report({ message: 'Configuring ports...' });
-        writeForestEnv(config, treePath, portBase);
-
         generateWorkspaceFile(repoPath, treePath, ticketId, title);
-        writeGitIgnore(treePath);
 
         const hadTemplate = await copyModulesFromTemplate(repoPath, treePath);
 
@@ -206,18 +186,6 @@ export function workspaceFilePath(repoPath: string, ticketId: string): string {
   const dir = path.join(os.homedir(), '.forest', 'workspaces');
   fs.mkdirSync(dir, { recursive: true });
   return path.join(dir, `${ticketId}.code-workspace`);
-}
-
-function writeGitIgnore(treePath: string): void {
-  const gitignorePath = path.join(treePath, '.gitignore');
-  const marker = '# Forest-generated';
-  const entries = `\n${marker}\n.forest.env\n`;
-  try {
-    const existing = fs.existsSync(gitignorePath) ? fs.readFileSync(gitignorePath, 'utf8') : '';
-    if (!existing.includes('.forest.env')) {
-      fs.appendFileSync(gitignorePath, entries);
-    }
-  } catch {}
 }
 
 function generateWorkspaceFile(repoPath: string, treePath: string, ticketId: string, title: string): void {

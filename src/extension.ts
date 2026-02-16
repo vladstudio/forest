@@ -4,7 +4,6 @@ import { loadConfig } from './config';
 import { ShortcutItem, TreeItemView } from './views/items';
 import { StateManager } from './state';
 import { ForestContext, getRepoPath } from './context';
-import { PortManager } from './managers/PortManager';
 import { ShortcutManager } from './managers/ShortcutManager';
 import { StatusBarManager } from './managers/StatusBarManager';
 import { IssuesTreeProvider } from './views/IssuesTreeProvider';
@@ -85,8 +84,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   vscode.commands.executeCommand('setContext', 'forest.isTree', !!currentTree);
 
-  const portManager = new PortManager(config, stateManager);
-  const shortcutManager = new ShortcutManager(config, currentTree, stateManager);
+  const shortcutManager = new ShortcutManager(config, currentTree);
   const statusBarManager = new StatusBarManager(currentTree);
   const issuesProvider = new IssuesTreeProvider(config, stateManager);
   const treesProvider = new TreesTreeProvider(stateManager, config);
@@ -108,7 +106,7 @@ export async function activate(context: vscode.ExtensionContext) {
   updateNoTrees();
 
   const ctx: ForestContext = {
-    config, stateManager, portManager, shortcutManager,
+    config, stateManager, shortcutManager,
     statusBarManager, issuesProvider, treesProvider, outputChannel, currentTree,
   };
 

@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import type { ForestContext } from '../context';
 import * as git from '../cli/git';
-import { copyConfigFiles, writeForestEnv, runSetupCommands } from './shared';
+import { copyConfigFiles, runSetupCommands } from './shared';
 
 export async function update(ctx: ForestContext, treeArg?: import('../state').TreeState): Promise<void> {
   const tree = treeArg || ctx.currentTree;
@@ -24,9 +24,6 @@ export async function update(ctx: ForestContext, treeArg?: import('../state').Tr
 
       progress.report({ message: 'Copying files...' });
       copyConfigFiles(config, tree.repoPath, tree.path);
-
-      progress.report({ message: 'Configuring ports...' });
-      writeForestEnv(config, tree.path, tree.portBase);
 
       progress.report({ message: 'Running setup...' });
       await runSetupCommands(config, tree.path, ctx.outputChannel);
@@ -57,9 +54,6 @@ export async function rebase(ctx: ForestContext, treeArg?: import('../state').Tr
 
       progress.report({ message: 'Copying files...' });
       copyConfigFiles(config, tree.repoPath, tree.path);
-
-      progress.report({ message: 'Configuring ports...' });
-      writeForestEnv(config, tree.path, tree.portBase);
 
       progress.report({ message: 'Running setup...' });
       await runSetupCommands(config, tree.path, ctx.outputChannel);

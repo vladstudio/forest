@@ -6,13 +6,11 @@ import type { StateManager, TreeState } from './state';
 import type { IssuesTreeProvider } from './views/IssuesTreeProvider';
 import type { TreesTreeProvider } from './views/TreesTreeProvider';
 import type { ShortcutManager } from './managers/ShortcutManager';
-import type { PortManager } from './managers/PortManager';
 import type { StatusBarManager } from './managers/StatusBarManager';
 
 export interface ForestContext {
   config: ForestConfig;
   stateManager: StateManager;
-  portManager: PortManager;
   shortcutManager: ShortcutManager;
   statusBarManager: StatusBarManager;
   issuesProvider: IssuesTreeProvider;

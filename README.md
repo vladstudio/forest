@@ -34,18 +34,10 @@ Add `.forest/config.json` to your repo root (tip: ask Claude to generate one for
   "setup": "bun install --frozen-lockfile",
   "shortcuts": [
     { "name": "dev", "type": "terminal", "command": "bunx turbo dev", "openOnLaunch": 1 },
-    { "name": "claude", "type": "terminal", "command": "claude", "openOnLaunch": 1, "allowMultiple": true },
-    { "name": "shell", "type": "terminal", "allowMultiple": true },
-    { "name": "App", "type": "browser", "url": "http://localhost:${ports.app}", "openOnLaunch": 2 }
+    { "name": "claude", "type": "terminal", "command": "claude", "openOnLaunch": 1, "mode": "multiple" },
+    { "name": "shell", "type": "terminal", "mode": "multiple" },
+    { "name": "App", "type": "browser", "url": "http://localhost:3000", "openOnLaunch": 2 }
   ],
-  "ports": {
-    "baseRange": [14000, 15000],
-    "mapping": { "app": "+0", "api": "+1" }
-  },
-  "env": {
-    "APP_PORT": "${ports.app}",
-    "API_PORT": "${ports.api}"
-  },
   "linear": {
     "enabled": true,
     "team": "ENG",
@@ -80,8 +72,7 @@ To set up Forest, ask Claude (or any AI) to read this README and generate `.fore
 1. **Setup command?** → detect from lockfile: `bun install`, `npm install`, `yarn`, `pnpm install`
 3. **Files to copy into trees?** → check which of `.env`, `.env.local`, `.envrc` exist
 4. **Shortcuts?** → what terminals to open (dev server, claude, shell), any browser URLs
-5. **Ports?** → does the project use specific ports? set `baseRange` and `mapping` so each tree gets unique ports
-6. **Linear integration?** → yes/no, and team name (e.g. `ENG`)
+5. **Linear integration?** → yes/no, and team name (e.g. `ENG`)
 
 ### Config reference
 
@@ -91,18 +82,15 @@ To set up Forest, ask Claude (or any AI) to read this README and generate `.fore
 | `setup`           | no       | —                     | Command(s) to run after creating a tree                                                                                                                                                                                                                                                                                    |
 | `copy`            | no       | `[]`                  | Files to copy from repo root into each tree                                                                                                                                                                                                                                                                                |
 | `shortcuts`       | no       | `[]`                  | Terminals, browsers, files to open per tree                                                                                                                                                                                                                                                                                |
-| `ports.baseRange` | no       | `[3000, 4000]`        | Port range to allocate from                                                                                                                                                                                                                                                                                                |
-| `ports.mapping`   | no       | `{}`                  | Named ports as offsets: `{ "app": "+0", "api": "+1" }`                                                                                                                                                                                                                                                                     |
-| `env`             | no       | `{}`                  | Extra env vars injected into tree. Supports `${ports.X}`                                                                                                                                                                                                                                                                   |
 | `linear`          | no       | `{ enabled: false }`  | Linear integration. Auto-enabled when `apiKey` is set. `team` is the team **key** (e.g. `ENG`), not the display name. `statuses` controls issue list and lifecycle transitions including `onCancel` (**must use lowercase** state names: `triage`, `backlog`, `unstarted`, `started`, `completed`, `canceled`) |
 | `github`          | no       | `{ enabled: true }`   | GitHub integration toggle                                                                                                                                                                                                                                                                                                  |
 | `branchFormat`    | no       | `${ticketId}-${slug}` | Branch naming. Supports `${ticketId}`, `${slug}`                                                                                                                                                                                                                                                                           |
 | `baseBranch`      | no       | `origin/main`         | Branch to rebase on                                                                                                                                                                                                                                                                                                        |
 | `maxTrees`        | no       | `10`                  | Max concurrent worktrees                                                                                                                                                                                                                                                                                                   |
 
-**Shortcut types:** `terminal` (with optional `command`, `env`, `allowMultiple`), `browser` (with `url`), `file` (with `path`). All support `openOnLaunch: N` (priority order, `false` to disable). Terminal shortcuts with `allowMultiple: true` open a new instance on each click (no stop/restart buttons).
+**Shortcut types:** `terminal` (with optional `command`, `env`, `mode`), `browser` (with `url`), `file` (with `path`). All support `openOnLaunch: N` (priority order, `false` to disable). Terminal `mode`: `single-tree` (default, one instance per tree), `single-repo` (kills previous on reopen), `multiple` (new instance each click, no stop/restart buttons).
 
-**Variable expansion in shortcuts:** `${ticketId}`, `${branch}`, `${slug}`, `${repo}`, `${treePath}`, `${prNumber}`, `${prUrl}`, `${ports.X}`.
+**Variable expansion in shortcuts:** `${ticketId}`, `${branch}`, `${slug}`, `${repo}`, `${treePath}`, `${prNumber}`, `${prUrl}`.
 
 **`local.json`** (gitignored) merges over `config.json` — use for per-dev AI keys and overrides.
 
@@ -150,7 +138,6 @@ Shortcuts support these variables in commands, URLs, and file paths:
 | `${treePath}` | Absolute path to the worktree     | `/Users/you/.forest/trees/my-app/ENG-123` |
 | `${prNumber}` | PR number (after ship)            | `42`                                      |
 | `${prUrl}`    | PR URL (after ship)               | `https://github.com/org/repo/pull/42`     |
-| `${ports.X}`  | Allocated port for named mapping  | `14000`                                   |
 
 ```json
 { "name": "Linear", "type": "browser", "url": "https://linear.app/team/issue/${ticketId}" },
@@ -165,10 +152,6 @@ Setup commands stream their output in real-time to the **Forest** output channel
 ### Browser Wait-for-Port
 
 Browser shortcuts targeting `localhost` automatically wait up to 2 minutes for the port to open before launching, with a progress notification. No more refreshing a blank page while the dev server starts.
-
-### Port Conflict Detection
-
-When a tree window opens, Forest checks if any allocated ports are already in use and warns you — including which other tree might be using them.
 
 ### Pre-Warm Template
 
@@ -220,7 +203,7 @@ All commands are available from the Forest sidebar (tree icon in activity bar) o
 **Typical workflow:**
 
 1. **New Tree** from a Linear ticket (or **New Linear Issue + Tree** to create a new ticket)
-2. A new VSCode window opens with terminals running and ports allocated
+2. A new VSCode window opens with terminals running
 3. Code, test, iterate — each tree is fully isolated
 4. **Ship** when ready — pushes and creates a PR
 5. **Cleanup** after merge — removes worktree, branch, and ticket

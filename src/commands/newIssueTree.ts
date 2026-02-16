@@ -40,7 +40,7 @@ export async function newIssueTree(ctx: ForestContext): Promise<void> {
   }
 
   try {
-    await createTree({ ticketId, title: issueTitle, config, stateManager: ctx.stateManager, portManager: ctx.portManager });
+    await createTree({ ticketId, title: issueTitle, config, stateManager: ctx.stateManager });
   } catch (e: any) {
     vscode.window.showErrorMessage(e.message);
   }
