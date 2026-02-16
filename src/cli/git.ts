@@ -55,3 +55,42 @@ export async function lastCommitAge(worktreePath: string): Promise<string> {
     return stdout || 'unknown';
   } catch { return 'unknown'; }
 }
+
+/** Check out an existing branch into a new worktree (no -b flag).
+ *  Caller should fetch first (e.g. listBranches already does). */
+export async function checkoutWorktree(
+  repoPath: string, worktreePath: string, branch: string,
+): Promise<void> {
+  await exec('git', ['worktree', 'add', worktreePath, branch], { cwd: repoPath });
+}
+
+/** List local branches suitable for worktree checkout, excluding base branch and those already in worktrees. */
+export async function listBranches(repoPath: string, baseBranch: string): Promise<string[]> {
+  await exec('git', ['fetch', 'origin'], { cwd: repoPath });
+
+  // Get branches already checked out in worktrees
+  const { stdout: wtOut } = await exec('git', ['worktree', 'list', '--porcelain'], { cwd: repoPath });
+  const wtBranches = new Set(
+    wtOut.split('\n')
+      .filter(l => l.startsWith('branch '))
+      .map(l => l.replace('branch refs/heads/', '')),
+  );
+
+  // Local branches
+  const { stdout: localOut } = await exec('git', ['branch', '--format=%(refname:short)'], { cwd: repoPath });
+  const allBranches = new Set(localOut.split('\n').map(b => b.trim()).filter(Boolean));
+
+  // Remote branches (strip origin/ prefix), add those not already local
+  const { stdout: remoteOut } = await exec('git', ['branch', '-r', '--format=%(refname:short)'], { cwd: repoPath });
+  const remote = remoteOut.split('\n').map(b => b.trim()).filter(Boolean)
+    .filter(b => b.startsWith('origin/') && !b.includes('HEAD'))
+    .map(b => b.replace('origin/', ''));
+
+  for (const b of remote) allBranches.add(b);
+
+  // Strip "origin/" from baseBranch for comparison
+  const base = baseBranch.replace(/^origin\//, '');
+  return [...allBranches]
+    .filter(b => b !== base && !wtBranches.has(b))
+    .sort();
+}

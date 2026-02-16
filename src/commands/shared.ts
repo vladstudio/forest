@@ -75,15 +75,16 @@ export async function runSetupCommands(config: ForestConfig, treePath: string, c
   }
 }
 
-/** Shared tree creation logic for newIssueTree + newTree. */
+/** Shared tree creation logic for newIssueTree + newTree + newTreeFromBranch. */
 export async function createTree(opts: {
   ticketId: string;
   title: string;
   config: ForestConfig;
   stateManager: StateManager;
   portManager: PortManager;
+  existingBranch?: string;
 }): Promise<TreeState> {
-  const { ticketId, title, config, stateManager, portManager } = opts;
+  const { ticketId, title, config, stateManager, portManager, existingBranch } = opts;
   const repoPath = getRepoPath();
 
   // Check existing
@@ -98,11 +99,10 @@ export async function createTree(opts: {
     throw new Error(`Max trees (${config.maxTrees}) reached. Clean up some trees first.`);
   }
 
-  // Generate branch
-  const slug = slugify(title);
-  const branch = config.branchFormat
+  // Use existing branch or generate new one
+  const branch = existingBranch ?? config.branchFormat
     .replace('${ticketId}', ticketId)
-    .replace('${slug}', slug);
+    .replace('${slug}', slugify(title));
 
   // Allocate ports
   const portBase = await portManager.allocate(repoPath);
@@ -126,7 +126,11 @@ export async function createTree(opts: {
       { location: vscode.ProgressLocation.Notification, title: `Creating tree for ${ticketId}...`, cancellable: false },
       async (progress) => {
         progress.report({ message: 'Creating worktree...' });
-        await git.createWorktree(repoPath, treePath, branch, config.baseBranch);
+        if (existingBranch) {
+          await git.checkoutWorktree(repoPath, treePath, branch);
+        } else {
+          await git.createWorktree(repoPath, treePath, branch, config.baseBranch);
+        }
 
         progress.report({ message: 'Copying files...' });
         copyConfigFiles(config, repoPath, treePath);
@@ -158,7 +162,7 @@ export async function createTree(opts: {
   } catch (e) {
     await stateManager.removeTree(repoPath, ticketId);
     await git.removeWorktree(repoPath, treePath).catch(() => {});
-    await git.deleteBranch(repoPath, branch).catch(() => {});
+    if (!existingBranch) await git.deleteBranch(repoPath, branch).catch(() => {});
     throw e;
   }
 }

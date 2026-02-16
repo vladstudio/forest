@@ -133,6 +133,12 @@
         "icon": "$(add)"
       },
       {
+        "command": "forest.newTreeFromBranch",
+        "title": "From Existing Branch",
+        "category": "Forest",
+        "icon": "$(git-pull-request)"
+      },
+      {
         "command": "forest.switch",
         "title": "Switch Tree",
         "category": "Forest",

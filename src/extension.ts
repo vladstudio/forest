@@ -17,6 +17,7 @@ import { ship } from './commands/ship';
 import { cleanup, cancel, cleanupMerged } from './commands/cleanup';
 import { update, rebase } from './commands/update';
 import { list } from './commands/list';
+import { newTreeFromBranch } from './commands/newTreeFromBranch';
 import { warmTemplate, workspaceFilePath } from './commands/shared';
 import * as git from './cli/git';
 import * as gh from './cli/gh';
@@ -117,14 +118,22 @@ export async function activate(context: vscode.ExtensionContext) {
 
   reg('forest.newIssueTree', () => newIssueTree(ctx));
   reg('forest.newTree', (arg?: string | { ticketId: string; title: string }) => newTree(ctx, arg));
+  reg('forest.newTreeFromBranch', () => newTreeFromBranch(ctx));
   reg('forest.newTreePicker', async () => {
-    if (!config.linear.enabled) { newTree(ctx); return; }
-    const pick = await vscode.window.showQuickPick([
-      { label: '$(add) New Linear Issue + Tree', id: 'issue' },
-      { label: '$(git-branch) New Tree', id: 'tree' },
-    ], { placeHolder: 'Create a new tree' });
+    const items = config.linear.enabled
+      ? [
+          { label: '$(add) New Linear Issue + Tree', id: 'issue' },
+          { label: '$(git-branch) New Tree', id: 'tree' },
+          { label: '$(git-pull-request) From Existing Branch', id: 'branch' },
+        ]
+      : [
+          { label: '$(git-branch) New Tree', id: 'tree' },
+          { label: '$(git-pull-request) From Existing Branch', id: 'branch' },
+        ];
+    const pick = await vscode.window.showQuickPick(items, { placeHolder: 'Create a new tree' });
     if (pick?.id === 'issue') newIssueTree(ctx);
     else if (pick?.id === 'tree') newTree(ctx);
+    else if (pick?.id === 'branch') newTreeFromBranch(ctx);
   });
   reg('forest.switch', (arg?: string | TreeItemView) => switchTree(ctx, arg instanceof TreeItemView ? arg.tree.ticketId : arg));
   const andRefresh = <T>(fn: () => Promise<T>) => async () => { await fn(); treesProvider.refresh(); };
