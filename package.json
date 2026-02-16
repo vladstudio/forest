@@ -163,6 +163,12 @@
         "icon": "$(trash)"
       },
       {
+        "command": "forest.shelve",
+        "title": "Shelve — Remove Worktree, Keep Branch",
+        "category": "Forest",
+        "icon": "$(archive)"
+      },
+      {
         "command": "forest.update",
         "title": "Update — Merge from Main",
         "category": "Forest",
@@ -286,6 +292,11 @@
         {
           "command": "forest.cleanup",
           "when": "viewItem == tree-shipped",
+          "group": "4_danger"
+        },
+        {
+          "command": "forest.shelve",
+          "when": "viewItem =~ /^tree/",
           "group": "4_danger"
         },
         {

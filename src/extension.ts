@@ -13,7 +13,7 @@ import { newIssueTree } from './commands/newIssueTree';
 import { newTree } from './commands/newTree';
 import { switchTree } from './commands/switch';
 import { ship } from './commands/ship';
-import { cleanup, cancel, cleanupMerged } from './commands/cleanup';
+import { cleanup, cancel, cleanupMerged, shelve, consumePreservedBranch } from './commands/cleanup';
 import { update, rebase } from './commands/update';
 import { list } from './commands/list';
 import { newTreeFromBranch } from './commands/newTreeFromBranch';
@@ -72,9 +72,11 @@ export async function activate(context: vscode.ExtensionContext) {
     await stateManager.removeTree(tree.repoPath, tree.ticketId);
     try { fs.unlinkSync(workspaceFilePath(tree.repoPath, tree.ticketId)); } catch {}
     // Git cleanup is best-effort and can run in background
-    git.deleteBranch(tree.repoPath, tree.branch)
-      .then(() => outputChannel.appendLine(`[Forest] Pruned branch: ${tree.branch}`))
-      .catch(() => {});
+    if (!consumePreservedBranch(tree.branch)) {
+      git.deleteBranch(tree.repoPath, tree.branch)
+        .then(() => outputChannel.appendLine(`[Forest] Pruned branch: ${tree.branch}`))
+        .catch(() => {});
+    }
   }
 
   // Detect if current workspace is a tree
@@ -138,6 +140,7 @@ export async function activate(context: vscode.ExtensionContext) {
   reg('forest.ship', (arg?: TreeItemView) => andRefresh(() => ship(ctx, arg instanceof TreeItemView ? arg.tree : undefined))());
   reg('forest.cleanup', (arg?: string | TreeItemView) => cleanup(ctx, arg instanceof TreeItemView ? arg.tree.ticketId : arg));
   reg('forest.cancel', (arg?: string | TreeItemView) => cancel(ctx, arg instanceof TreeItemView ? arg.tree.ticketId : arg));
+  reg('forest.shelve', (arg?: string | TreeItemView) => shelve(ctx, arg instanceof TreeItemView ? arg.tree.ticketId : arg));
   reg('forest.update', (arg?: TreeItemView) => andRefresh(() => update(ctx, arg instanceof TreeItemView ? arg.tree : undefined))());
   reg('forest.rebase', (arg?: TreeItemView) => andRefresh(() => rebase(ctx, arg instanceof TreeItemView ? arg.tree : undefined))());
   reg('forest.list', () => list(ctx));
@@ -211,13 +214,16 @@ export async function activate(context: vscode.ExtensionContext) {
       // Skip self — teardownTree handles our own window
       if (prev.ticketId === currentTree?.ticketId) continue;
       if (!currentIds.has(prev.ticketId)) {
+        const keepBranch = consumePreservedBranch(prev.branch);
         try { fs.unlinkSync(workspaceFilePath(prev.repoPath, prev.ticketId)); } catch {}
         git.removeWorktree(prev.repoPath, prev.path)
           .then(() => {
             outputChannel.appendLine(`[Forest] Cleaned worktree: ${prev.ticketId}`);
-            return git.deleteBranch(prev.repoPath, prev.branch);
+            if (!keepBranch) return git.deleteBranch(prev.repoPath, prev.branch);
           })
-          .then(() => outputChannel.appendLine(`[Forest] Deleted branch: ${prev.branch}`))
+          .then(() => {
+            if (!keepBranch) outputChannel.appendLine(`[Forest] Deleted branch: ${prev.branch}`);
+          })
           .catch(e => outputChannel.appendLine(`[Forest] Cleanup failed (${prev.ticketId}): ${e.message}`));
       }
     }
