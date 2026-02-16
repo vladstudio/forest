@@ -99,12 +99,12 @@
       },
       {
         "view": "forest.trees",
-        "contents": "No trees yet.\nClick an issue above to create a tree.\n[New Linear Issue + Branch + Tree](command:forest.newIssueTree)",
+        "contents": "No trees yet.\nClick an issue above to create a tree.\n[New Linear Issue + Branch + Tree](command:forest.newIssueTree)\n[New Branch + Tree](command:forest.newTree)\n[New Tree from Existing Branch](command:forest.newTreeFromBranch)",
         "when": "forest.active && forest.noTrees && forest.linearEnabled"
       },
       {
         "view": "forest.trees",
-        "contents": "No trees yet.\n[New Branch + Tree](command:forest.newTree)",
+        "contents": "No trees yet.\n[New Branch + Tree](command:forest.newTree)\n[New Tree from Existing Branch](command:forest.newTreeFromBranch)",
         "when": "forest.active && forest.noTrees && !forest.linearEnabled"
       }
     ],
