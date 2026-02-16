@@ -15,7 +15,7 @@ export interface ForestConfig {
   copy: string[];
   setup: string | string[];
   shortcuts: ShortcutConfig[];
-  linear: { enabled: boolean; apiKey?: string; team?: string; statuses: { issueList: string[]; onNew: string; onShip: string; onCleanup: string; onCancel: string } };
+  linear: { enabled: boolean; apiKey?: string; teams?: string[]; statuses: { issueList: string[]; onNew: string; onShip: string; onCleanup: string; onCancel: string } };
   github: { enabled: boolean };
   branchFormat: string;
   baseBranch: string;
@@ -31,24 +31,6 @@ const DEFAULTS: Partial<ForestConfig> = {
   baseBranch: 'origin/main',
   maxTrees: 10,
 };
-
-/** Migrate old `integrations` + `linearStatuses` → `linear` + `github`. Mutates in place. */
-function migrateConfig(config: any): void {
-  if (config.integrations) {
-    const { linear: linearEnabled, github: githubEnabled, linearTeam } = config.integrations;
-    if (!config.linear) config.linear = {};
-    if (linearEnabled !== undefined) config.linear.enabled = linearEnabled;
-    if (linearTeam !== undefined) config.linear.team = linearTeam;
-    if (!config.github) config.github = {};
-    if (githubEnabled !== undefined) config.github.enabled = githubEnabled;
-    delete config.integrations;
-  }
-  if (config.linearStatuses) {
-    if (!config.linear) config.linear = {};
-    config.linear.statuses = config.linearStatuses;
-    delete config.linearStatuses;
-  }
-}
 
 export async function loadConfig(): Promise<ForestConfig | null> {
   const ws = vscode.workspace.workspaceFolders?.[0];
@@ -66,16 +48,12 @@ export async function loadConfig(): Promise<ForestConfig | null> {
     return null;
   }
 
-  // Migrate v1 config shape
-  migrateConfig(config);
-
   // Merge: defaults → config → local
   let merged: any = mergeConfig(DEFAULTS, config);
   const localPath = path.join(repoRoot, '.forest', 'local.json');
   if (fs.existsSync(localPath)) {
     try {
       const local = JSON.parse(fs.readFileSync(localPath, 'utf8'));
-      migrateConfig(local);
       merged = mergeConfig(merged, local);
     } catch {
       vscode.window.showWarningMessage('Forest: local.json has syntax errors, ignoring overrides.');

@@ -63,14 +63,14 @@ async function resolveStateId(teamKey: string, nameOrType: string): Promise<stri
   throw new Error(`Unknown Linear state "${nameOrType}" for team ${teamKey}`);
 }
 
-export async function listMyIssues(states: string[], team?: string): Promise<LinearIssue[]> {
+export async function listMyIssues(states: string[], teams?: string[]): Promise<LinearIssue[]> {
   try {
     // states are type-level names like "triage", "backlog", etc.
     const filter: Record<string, unknown> = {
       assignee: { isMe: { eq: true } },
       state: { type: { in: states } },
     };
-    if (team) filter.team = { key: { eq: team } };
+    if (teams?.length) filter.team = { key: { in: teams } };
     const data = await gql<{ issues: { nodes: { identifier: string; title: string; state: { name: string; type: string }; priority: number }[] } }>(
       `query($filter: IssueFilter!) {
         issues(filter: $filter, orderBy: updatedAt, first: 50) {

@@ -16,7 +16,7 @@ export async function newTree(ctx: ForestContext, arg?: string | { ticketId: str
       title = arg.title;
     }
   } else if (ctx.config.linear.enabled && linear.isAvailable()) {
-    const issues = await linear.listMyIssues(ctx.config.linear.statuses.issueList, ctx.config.linear.team);
+    const issues = await linear.listMyIssues(ctx.config.linear.statuses.issueList, ctx.config.linear.teams);
     if (!issues.length) { vscode.window.showInformationMessage('No issues found.'); return; }
     const pick = await vscode.window.showQuickPick(
       issues.map(i => ({ label: `${i.id}  ${i.title}`, description: i.state, issueId: i.id, issueTitle: i.title })),

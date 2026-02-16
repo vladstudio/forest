@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import type { ForestContext } from '../context';
 import * as linear from '../cli/linear';
-import { createTree } from './shared';
+import { createTree, pickTeam } from './shared';
 
 export async function newIssueTree(ctx: ForestContext): Promise<void> {
   const config = ctx.config;
@@ -18,11 +18,14 @@ export async function newIssueTree(ctx: ForestContext): Promise<void> {
       { placeHolder: 'Priority (optional — Enter to skip)' },
     ) as any;
 
+    const team = await pickTeam(config.linear.teams);
+    if (!team) return;
+
     try {
       ticketId = await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: 'Creating Linear issue...', cancellable: false },
         async () => {
-          const id = await linear.createIssue({ title, priority: priority?.value, team: config.linear.team });
+          const id = await linear.createIssue({ title, priority: priority?.value, team });
           const issue = await linear.getIssue(id);
           if (issue) issueTitle = issue.title;
           return id;

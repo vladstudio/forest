@@ -40,7 +40,7 @@ Add `.forest/config.json` to your repo root (tip: ask Claude to generate one for
   ],
   "linear": {
     "enabled": true,
-    "team": "ENG",
+    "teams": ["ENG"],
     "statuses": {
       "issueList": ["triage", "backlog", "unstarted"],
       "onNew": "started",
@@ -72,7 +72,7 @@ To set up Forest, ask Claude (or any AI) to read this README and generate `.fore
 1. **Setup command?** → detect from lockfile: `bun install`, `npm install`, `yarn`, `pnpm install`
 3. **Files to copy into trees?** → check which of `.env`, `.env.local`, `.envrc` exist
 4. **Shortcuts?** → what terminals to open (dev server, claude, shell), any browser URLs
-5. **Linear integration?** → yes/no, and team name (e.g. `ENG`)
+5. **Linear integration?** → yes/no, and team key(s) (e.g. `["ENG"]` or `["ENG", "UX"]`)
 
 ### Config reference
 
@@ -82,7 +82,7 @@ To set up Forest, ask Claude (or any AI) to read this README and generate `.fore
 | `setup`           | no       | —                     | Command(s) to run after creating a tree                                                                                                                                                                                                                                                                                    |
 | `copy`            | no       | `[]`                  | Files to copy from repo root into each tree                                                                                                                                                                                                                                                                                |
 | `shortcuts`       | no       | `[]`                  | Terminals, browsers, files to open per tree                                                                                                                                                                                                                                                                                |
-| `linear`          | no       | `{ enabled: false }`  | Linear integration. Auto-enabled when `apiKey` is set. `team` is the team **key** (e.g. `ENG`), not the display name. `statuses` controls issue list and lifecycle transitions including `onCancel` (**must use lowercase** state names: `triage`, `backlog`, `unstarted`, `started`, `completed`, `canceled`) |
+| `linear`          | no       | `{ enabled: false }`  | Linear integration. Auto-enabled when `apiKey` is set. `teams` is an array of team **keys** (e.g. `["ENG"]` or `["ENG", "UX"]`). `statuses` controls issue list and lifecycle transitions including `onCancel` (**must use lowercase** state names: `triage`, `backlog`, `unstarted`, `started`, `completed`, `canceled`) |
 | `github`          | no       | `{ enabled: true }`   | GitHub integration toggle                                                                                                                                                                                                                                                                                                  |
 | `branchFormat`    | no       | `${ticketId}-${slug}` | Branch naming. Supports `${ticketId}`, `${slug}`                                                                                                                                                                                                                                                                           |
 | `baseBranch`      | no       | `origin/main`         | Branch to rebase on                                                                                                                                                                                                                                                                                                        |
@@ -180,12 +180,12 @@ Replace `/Users/you` with your actual home directory.
 
 Customize which Linear states to show in the issues sidebar and which states to set on new/ship/cleanup.
 
-Status names in `issueList` use Linear's built-in types: `triage`, `backlog`, `unstarted`, `started`, `completed`, `canceled`. Status names in `onShip`, `onNew`, etc. can be custom workflow state names (e.g. `"in review"`) — Forest resolves them via the Linear API. Use the team **key** (e.g. `ENG`), not the display name.
+Status names in `issueList` use Linear's built-in types: `triage`, `backlog`, `unstarted`, `started`, `completed`, `canceled`. Status names in `onShip`, `onNew`, etc. can be custom workflow state names (e.g. `"in review"`) — Forest resolves them via the Linear API. Use team **keys** (e.g. `ENG`), not display names. Multiple teams are supported.
 
 ```json
 "linear": {
   "enabled": true,
-  "team": "ENG",
+  "teams": ["ENG"],
   "statuses": {
     "issueList": ["triage", "backlog", "unstarted"],
     "onNew": "started",

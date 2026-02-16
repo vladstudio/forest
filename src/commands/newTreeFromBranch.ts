@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import type { ForestContext } from '../context';
 import * as git from '../cli/git';
 import * as linear from '../cli/linear';
-import { createTree, updateLinear } from './shared';
+import { createTree, updateLinear, pickTeam } from './shared';
 import { getRepoPath } from '../context';
 
 /** Try to extract a ticketId from a branch name using the configured branchFormat.
@@ -85,7 +85,7 @@ export async function newTreeFromBranch(ctx: ForestContext): Promise<void> {
     if (!choice) return;
 
     if (choice.id === 'select') {
-      const issues = await linear.listMyIssues(config.linear.statuses.issueList, config.linear.team);
+      const issues = await linear.listMyIssues(config.linear.statuses.issueList, config.linear.teams);
       // Filter out issues that already have trees
       const existingTickets = new Set(
         ctx.stateManager.getTreesForRepo(state, repoPath).map(t => t.ticketId),
@@ -107,8 +107,10 @@ export async function newTreeFromBranch(ctx: ForestContext): Promise<void> {
         [{ label: 'Urgent', value: 1 }, { label: 'High', value: 2 }, { label: 'Normal', value: 3 }, { label: 'Low', value: 4 }],
         { placeHolder: 'Priority (optional — Enter to skip)' },
       ) as any;
+      const team = await pickTeam(config.linear.teams);
+      if (!team) return;
       try {
-        ticketId = await linear.createIssue({ title: issueTitle, priority: priority?.value, team: config.linear.team });
+        ticketId = await linear.createIssue({ title: issueTitle, priority: priority?.value, team });
         const issue = await linear.getIssue(ticketId);
         title = issue?.title ?? issueTitle;
         linkedLinear = true;

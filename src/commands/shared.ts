@@ -25,6 +25,20 @@ export async function runStep(ctx: ForestContext, label: string, fn: () => Promi
   }
 }
 
+/** Pick a team key for issue creation. Returns undefined if cancelled. */
+export async function pickTeam(teams?: string[]): Promise<string | undefined> {
+  if (!teams?.length) {
+    vscode.window.showErrorMessage('Forest: No Linear teams configured. Set "teams" in .forest/config.json.');
+    return undefined;
+  }
+  if (teams.length === 1) return teams[0];
+  const pick = await vscode.window.showQuickPick(
+    teams.map(t => ({ label: t })),
+    { placeHolder: 'Which team?' },
+  );
+  return pick?.label;
+}
+
 export async function updateLinear(ctx: ForestContext, ticketId: string, status: string): Promise<void> {
   if (ctx.config.linear.enabled && linear.isAvailable()) {
     await runStep(ctx, `Linear ${ticketId} → ${status}`, () => linear.updateIssueState(ticketId, status));

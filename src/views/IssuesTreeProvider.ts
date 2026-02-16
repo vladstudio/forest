@@ -24,7 +24,7 @@ export class IssuesTreeProvider implements vscode.TreeDataProvider<IssueTreeNode
     if (!this.config.linear.enabled || !linear.isAvailable()) return [];
 
     if (Date.now() - this.lastFetch > this.TTL) {
-      this.issues = await linear.listMyIssues(this.config.linear.statuses.issueList, this.config.linear.team);
+      this.issues = await linear.listMyIssues(this.config.linear.statuses.issueList, this.config.linear.teams);
       this.lastFetch = Date.now();
     }
 
