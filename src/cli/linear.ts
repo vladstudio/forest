@@ -1,6 +1,9 @@
+import * as vscode from 'vscode';
+
 const API = 'https://api.linear.app/graphql';
 
 let _apiKey: string | undefined;
+let _authWarned = false;
 
 export function configure(apiKey?: string): void {
   _apiKey = apiKey;
@@ -25,19 +28,27 @@ async function gql<T>(query: string, variables?: Record<string, unknown>): Promi
     headers: { 'Content-Type': 'application/json', Authorization: _apiKey },
     body: JSON.stringify({ query, variables }),
   });
-  if (!res.ok) throw new Error(`Linear API ${res.status}: ${res.statusText}`);
+  if (!res.ok) {
+    if ((res.status === 401 || res.status === 403) && !_authWarned) {
+      _authWarned = true;
+      vscode.window.showWarningMessage('Forest: Linear API key is invalid or expired. Update linear.apiKey in .forest/local.json.');
+    }
+    throw new Error(`Linear API ${res.status}: ${res.statusText}`);
+  }
   const json = await res.json() as { data?: T; errors?: { message: string }[] };
   if (json.errors?.length) throw new Error(json.errors[0].message);
   return json.data as T;
 }
 
-// Cache workflow states per team to avoid repeated lookups
-const stateCache = new Map<string, { id: string; name: string; type: string; position: number }[]>();
+// Cache workflow states per team (5-minute TTL)
+type WorkflowState = { id: string; name: string; type: string; position: number };
+const STATE_CACHE_TTL = 5 * 60_000;
+const stateCache = new Map<string, { states: WorkflowState[]; time: number }>();
 
-async function getWorkflowStates(teamKey: string): Promise<{ id: string; name: string; type: string; position: number }[]> {
+async function getWorkflowStates(teamKey: string): Promise<WorkflowState[]> {
   const cached = stateCache.get(teamKey);
-  if (cached) return cached;
-  const data = await gql<{ workflowStates: { nodes: { id: string; name: string; type: string; position: number }[] } }>(
+  if (cached && Date.now() - cached.time < STATE_CACHE_TTL) return cached.states;
+  const data = await gql<{ workflowStates: { nodes: WorkflowState[] } }>(
     `query($teamKey: String!) {
       workflowStates(filter: { team: { key: { eq: $teamKey } } }) {
         nodes { id name type position }
@@ -46,7 +57,7 @@ async function getWorkflowStates(teamKey: string): Promise<{ id: string; name: s
     { teamKey },
   );
   const states = data.workflowStates.nodes;
-  stateCache.set(teamKey, states);
+  stateCache.set(teamKey, { states, time: Date.now() });
   return states;
 }
 

@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
+import * as path from 'path';
 import { loadConfig } from './config';
 import { ShortcutItem, TreeItemView } from './views/items';
 import { StateManager } from './state';
@@ -59,11 +60,32 @@ export async function activate(context: vscode.ExtensionContext) {
   vscode.commands.executeCommand('setContext', 'forest.linearEnabled', config.linear.enabled);
   linear.configure(config.linear.apiKey);
 
+  // Watch config files for external edits
+  const repoPath = getRepoPath();
+  const configWatcher = vscode.workspace.createFileSystemWatcher(
+    new vscode.RelativePattern(path.join(repoPath, '.forest'), '{config,local}.json'),
+  );
+  let configDebounce: ReturnType<typeof setTimeout> | undefined;
+  const onConfigChange = () => {
+    clearTimeout(configDebounce);
+    configDebounce = setTimeout(() => {
+      vscode.window.showInformationMessage(
+        'Forest config changed. Reload to apply?',
+        'Reload Window',
+      ).then(action => {
+        if (action === 'Reload Window') vscode.commands.executeCommand('workbench.action.reloadWindow');
+      });
+    }, 500);
+  };
+  configWatcher.onDidChange(onConfigChange);
+  configWatcher.onDidCreate(onConfigChange);
+  configWatcher.onDidDelete(onConfigChange);
+  context.subscriptions.push(configWatcher);
+
   const stateManager = new StateManager();
   await stateManager.initialize();
 
   // Prune orphaned trees (folder deleted from disk but state/branch still exist)
-  const repoPath = getRepoPath();
   const outputChannel = vscode.window.createOutputChannel('Forest');
   const preState = stateManager.loadSync();
   const orphans = stateManager.getTreesForRepo(preState, repoPath).filter(t => !fs.existsSync(t.path));
@@ -194,6 +216,33 @@ export async function activate(context: vscode.ExtensionContext) {
     }
   }, 5 * 60 * 1000);
   context.subscriptions.push({ dispose: () => clearInterval(autoCleanupInterval) });
+
+  // Periodic orphan check: detect worktree folders deleted externally
+  let orphanCheckRunning = false;
+  const orphanCheckInterval = setInterval(async () => {
+    if (orphanCheckRunning) return;
+    orphanCheckRunning = true;
+    try {
+      const s = await stateManager.load();
+      const trees = stateManager.getTreesForRepo(s, repoPath);
+      let pruned = false;
+      for (const tree of trees) {
+        if (!fs.existsSync(tree.path)) {
+          outputChannel.appendLine(`[Forest] Detected missing worktree: ${tree.ticketId} (${tree.path})`);
+          await stateManager.removeTree(tree.repoPath, tree.ticketId);
+          try { fs.unlinkSync(workspaceFilePath(tree.repoPath, tree.ticketId)); } catch {}
+          if (!consumePreservedBranch(tree.branch)) {
+            git.deleteBranch(tree.repoPath, tree.branch).catch(() => {});
+          }
+          pruned = true;
+        }
+      }
+      if (pruned) treesProvider.refresh();
+    } finally {
+      orphanCheckRunning = false;
+    }
+  }, 60_000);
+  context.subscriptions.push({ dispose: () => clearInterval(orphanCheckInterval) });
 
   // Watch state for changes from other windows
   let previousTrees = stateManager.getTreesForRepo(stateManager.loadSync(), getRepoPath());
