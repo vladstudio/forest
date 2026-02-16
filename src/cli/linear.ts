@@ -32,15 +32,15 @@ async function gql<T>(query: string, variables?: Record<string, unknown>): Promi
 }
 
 // Cache workflow states per team to avoid repeated lookups
-const stateCache = new Map<string, { id: string; name: string; type: string }[]>();
+const stateCache = new Map<string, { id: string; name: string; type: string; position: number }[]>();
 
-async function getWorkflowStates(teamKey: string): Promise<{ id: string; name: string; type: string }[]> {
+async function getWorkflowStates(teamKey: string): Promise<{ id: string; name: string; type: string; position: number }[]> {
   const cached = stateCache.get(teamKey);
   if (cached) return cached;
-  const data = await gql<{ workflowStates: { nodes: { id: string; name: string; type: string }[] } }>(
+  const data = await gql<{ workflowStates: { nodes: { id: string; name: string; type: string; position: number }[] } }>(
     `query($teamKey: String!) {
       workflowStates(filter: { team: { key: { eq: $teamKey } } }) {
-        nodes { id name type }
+        nodes { id name type position }
       }
     }`,
     { teamKey },
@@ -57,9 +57,9 @@ async function resolveStateId(teamKey: string, nameOrType: string): Promise<stri
   // Try exact name match first (case-insensitive)
   const byName = states.find(s => s.name.toLowerCase() === lower);
   if (byName) return byName.id;
-  // Fall back to type match
-  const byType = states.find(s => s.type === lower);
-  if (byType) return byType.id;
+  // Fall back to type match (pick lowest position when multiple states share a type)
+  const byType = states.filter(s => s.type === lower).sort((a, b) => a.position - b.position);
+  if (byType.length) return byType[0].id;
   throw new Error(`Unknown Linear state "${nameOrType}" for team ${teamKey}`);
 }
 
@@ -118,9 +118,9 @@ export async function createIssue(opts: {
   const teamId = teamData.teams.nodes[0]?.id;
   if (!teamId) throw new Error(`Team "${teamKey}" not found`);
 
-  // Get the "started" state for auto-start
+  // Get the first "started" state for auto-start (lowest position in workflow)
   const states = await getWorkflowStates(teamKey);
-  const startedState = states.find(s => s.type === 'started');
+  const startedState = states.filter(s => s.type === 'started').sort((a, b) => a.position - b.position)[0];
 
   const input: Record<string, unknown> = {
     title: opts.title,
