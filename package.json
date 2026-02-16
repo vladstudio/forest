@@ -99,12 +99,12 @@
       },
       {
         "view": "forest.trees",
-        "contents": "No trees yet.\nClick an issue above to create a tree.\n[New Linear Issue + Tree](command:forest.newIssueTree)",
+        "contents": "No trees yet.\nClick an issue above to create a tree.\n[New Linear Issue + Branch + Tree](command:forest.newIssueTree)",
         "when": "forest.active && forest.noTrees && forest.linearEnabled"
       },
       {
         "view": "forest.trees",
-        "contents": "No trees yet.\n[New Tree](command:forest.newTree)",
+        "contents": "No trees yet.\n[New Branch + Tree](command:forest.newTree)",
         "when": "forest.active && forest.noTrees && !forest.linearEnabled"
       }
     ],
@@ -116,13 +116,13 @@
       },
       {
         "command": "forest.newIssueTree",
-        "title": "New Linear Issue + Tree",
+        "title": "New Linear Issue + Branch + Tree",
         "category": "Forest",
         "icon": "$(add)"
       },
       {
         "command": "forest.newTree",
-        "title": "New Tree",
+        "title": "New Branch + Tree",
         "category": "Forest",
         "icon": "$(git-branch)"
       },
@@ -134,7 +134,7 @@
       },
       {
         "command": "forest.newTreeFromBranch",
-        "title": "From Existing Branch",
+        "title": "New Tree from Existing Branch",
         "category": "Forest",
         "icon": "$(git-pull-request)"
       },

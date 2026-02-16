@@ -122,13 +122,13 @@ export async function activate(context: vscode.ExtensionContext) {
   reg('forest.newTreePicker', async () => {
     const items = config.linear.enabled
       ? [
-          { label: '$(add) New Linear Issue + Tree', id: 'issue' },
-          { label: '$(git-branch) New Tree', id: 'tree' },
-          { label: '$(git-pull-request) From Existing Branch', id: 'branch' },
+          { label: '$(add) New Linear Issue + Branch + Tree', id: 'issue' },
+          { label: '$(git-branch) New Branch + Tree', id: 'tree' },
+          { label: '$(git-pull-request) New Tree from Existing Branch', id: 'branch' },
         ]
       : [
-          { label: '$(git-branch) New Tree', id: 'tree' },
-          { label: '$(git-pull-request) From Existing Branch', id: 'branch' },
+          { label: '$(git-branch) New Branch + Tree', id: 'tree' },
+          { label: '$(git-pull-request) New Tree from Existing Branch', id: 'branch' },
         ];
     const pick = await vscode.window.showQuickPick(items, { placeHolder: 'Create a new tree' });
     if (pick?.id === 'issue') newIssueTree(ctx);
