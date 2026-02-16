@@ -15,7 +15,7 @@ import { newTree } from './commands/newTree';
 import { switchTree } from './commands/switch';
 import { ship } from './commands/ship';
 import { cleanup, cancel, cleanupMerged } from './commands/cleanup';
-import { update } from './commands/update';
+import { update, rebase } from './commands/update';
 import { list } from './commands/list';
 import { warmTemplate, workspaceFilePath } from './commands/shared';
 import * as git from './cli/git';
@@ -132,6 +132,7 @@ export async function activate(context: vscode.ExtensionContext) {
   reg('forest.cleanup', (arg?: string | TreeItemView) => cleanup(ctx, arg instanceof TreeItemView ? arg.tree.ticketId : arg));
   reg('forest.cancel', (arg?: string | TreeItemView) => cancel(ctx, arg instanceof TreeItemView ? arg.tree.ticketId : arg));
   reg('forest.update', (arg?: TreeItemView) => andRefresh(() => update(ctx, arg instanceof TreeItemView ? arg.tree : undefined))());
+  reg('forest.rebase', (arg?: TreeItemView) => andRefresh(() => rebase(ctx, arg instanceof TreeItemView ? arg.tree : undefined))());
   reg('forest.list', () => list(ctx));
   reg('forest.warmTemplate', () => warmTemplate());
   reg('forest.refreshIssues', () => issuesProvider.refresh());

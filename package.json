@@ -140,25 +140,25 @@
       },
       {
         "command": "forest.ship",
-        "title": "Ship — Push + PR",
+        "title": "Ship — Push & Create PR",
         "category": "Forest",
         "icon": "$(rocket)"
       },
       {
         "command": "forest.cleanup",
-        "title": "Cleanup — Merge + Remove",
+        "title": "Finish — Merge PR & Delete",
         "category": "Forest",
         "icon": "$(check-all)"
       },
       {
         "command": "forest.cancel",
-        "title": "Cancel — Remove Without Merging",
+        "title": "Delete — Remove Without Merging",
         "category": "Forest",
         "icon": "$(trash)"
       },
       {
         "command": "forest.update",
-        "title": "Update — Pull + Refresh",
+        "title": "Update — Merge from Main",
         "category": "Forest",
         "icon": "$(refresh)"
       },
@@ -205,8 +205,14 @@
         "icon": "$(debug-restart)"
       },
       {
+        "command": "forest.rebase",
+        "title": "Rebase — Rebase onto Main",
+        "category": "Forest",
+        "icon": "$(git-merge)"
+      },
+      {
         "command": "forest.openPR",
-        "title": "Open PR",
+        "title": "Open — View Pull Request",
         "category": "Forest",
         "icon": "$(link-external)"
       },
@@ -248,32 +254,37 @@
         },
         {
           "command": "forest.copyBranch",
-          "when": "viewItem == tree",
-          "group": "1_navigation"
-        },
-        {
-          "command": "forest.openPR",
-          "when": "viewItem == tree",
+          "when": "viewItem =~ /^tree/",
           "group": "1_navigation"
         },
         {
           "command": "forest.ship",
           "when": "viewItem == tree",
-          "group": "3_lifecycle"
+          "group": "2_ship"
+        },
+        {
+          "command": "forest.openPR",
+          "when": "viewItem == tree-shipped",
+          "group": "2_ship"
         },
         {
           "command": "forest.update",
-          "when": "viewItem == tree",
+          "when": "viewItem =~ /^tree/",
+          "group": "3_lifecycle"
+        },
+        {
+          "command": "forest.rebase",
+          "when": "viewItem =~ /^tree/",
           "group": "3_lifecycle"
         },
         {
           "command": "forest.cleanup",
-          "when": "viewItem == tree",
+          "when": "viewItem == tree-shipped",
           "group": "4_danger"
         },
         {
           "command": "forest.cancel",
-          "when": "viewItem == tree",
+          "when": "viewItem =~ /^tree/",
           "group": "4_danger"
         },
         {

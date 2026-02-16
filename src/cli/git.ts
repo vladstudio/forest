@@ -25,6 +25,11 @@ export async function pullMerge(worktreePath: string, baseRef: string): Promise<
   await exec('git', ['merge', baseRef], { cwd: worktreePath, timeout: 60_000 });
 }
 
+export async function pullRebase(worktreePath: string, baseRef: string): Promise<void> {
+  await exec('git', ['fetch', 'origin'], { cwd: worktreePath });
+  await exec('git', ['rebase', baseRef], { cwd: worktreePath, timeout: 60_000 });
+}
+
 export async function hasUncommittedChanges(worktreePath: string): Promise<boolean> {
   const { stdout } = await exec('git', ['status', '--porcelain'], { cwd: worktreePath });
   return stdout.length > 0;

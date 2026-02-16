@@ -72,7 +72,6 @@ function abbreviateAge(age: string): string {
 }
 
 export class TreeItemView extends vscode.TreeItem {
-  contextValue = 'tree';
   constructor(public readonly tree: TreeState, isCurrent: boolean, health?: TreeHealth) {
     const label = tree.ticketId === tree.title ? tree.ticketId : `${tree.ticketId}  ${tree.title}`;
     super(label, vscode.TreeItemCollapsibleState.None);
@@ -98,6 +97,7 @@ export class TreeItemView extends vscode.TreeItem {
       `Ports: ${tree.portBase}`,
       tree.prUrl ? `PR: ${tree.prUrl}` : 'PR: none',
     ].join('\n');
+    this.contextValue = tree.prUrl ? 'tree-shipped' : 'tree';
     if (!isCurrent) {
       this.command = { command: 'forest.switch', title: 'Switch', arguments: [tree.ticketId] };
     }
