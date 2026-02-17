@@ -66,6 +66,12 @@
           "when": "forest.active && !forest.ghAvailable"
         },
         {
+          "id": "forest.filter",
+          "type": "webview",
+          "name": "Filter",
+          "when": "forest.active && forest.ghAvailable"
+        },
+        {
           "id": "forest.trees",
           "name": "Forest",
           "when": "forest.active && forest.ghAvailable"
