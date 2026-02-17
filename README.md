@@ -61,7 +61,8 @@ Per-developer overrides go in `.forest/local.json` (should be gitignored):
 {
   "linear": {
     "apiKey": "lin_api_YOUR_KEY"
-  }
+  },
+  "browser": "external"
 }
 ```
 
@@ -87,8 +88,9 @@ To set up Forest, ask Claude (or any AI) to read this README and generate `.fore
 | `branchFormat` | no       | `${ticketId}-${slug}` | Branch naming. Supports `${ticketId}`, `${slug}`                                                                                                                                                                                                                                                                          |
 | `baseBranch`   | no       | `origin/main`         | Branch to rebase on                                                                                                                                                                                                                                                                                                       |
 | `maxTrees`     | no       | `10`                  | Max concurrent worktrees                                                                                                                                                                                                                                                                                                  |
+| `browser`      | no       | `simple`              | Default browser for `browser` shortcuts: `simple` (VS Code Simple Browser), `external` (system default), or an app name (e.g. `"Firefox"`)                                                                                                                                                                               |
 
-**Shortcut types:** `terminal` (with optional `command`, `env`, `mode`), `browser` (with `url`), `file` (with `path`). All support `openOnLaunch: N` (priority order, `false` to disable). Terminal `mode`: `single-tree` (default, one instance per tree), `single-repo` (kills previous on reopen), `multiple` (new instance each click, no stop/restart buttons).
+**Shortcut types:** `terminal` (with optional `command`, `env`, `mode`), `browser` (with `url`, optional `browser`), `file` (with `path`). All support `openOnLaunch: N` (priority order, `false` to disable). Terminal `mode`: `single-tree` (default, one instance per tree), `single-repo` (kills previous on reopen), `multiple` (new instance each click, no stop/restart buttons). Browser shortcuts accept a per-shortcut `browser` override (same values as the top-level `browser` setting).
 
 **Variable expansion in shortcuts:** `${ticketId}`, `${branch}`, `${slug}`, `${repo}`, `${treePath}`, `${prNumber}`, `${prUrl}`.
 

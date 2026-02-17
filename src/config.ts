@@ -6,7 +6,7 @@ import { resolveMainRepo } from './context';
 
 interface ShortcutBase { name: string; openOnLaunch?: number | false; mode?: 'single-repo' | 'single-tree' | 'multiple'; }
 interface TerminalShortcut extends ShortcutBase { type: 'terminal'; command?: string; env?: Record<string, string>; }
-interface BrowserShortcut extends ShortcutBase { type: 'browser'; url: string; }
+interface BrowserShortcut extends ShortcutBase { type: 'browser'; url: string; browser?: 'simple' | 'external' | string; }
 interface FileShortcut extends ShortcutBase { type: 'file'; path: string; }
 export type ShortcutConfig = TerminalShortcut | BrowserShortcut | FileShortcut;
 
@@ -20,6 +20,7 @@ export interface ForestConfig {
   branchFormat: string;
   baseBranch: string;
   maxTrees: number;
+  browser: 'simple' | 'external' | string;
 }
 
 const DEFAULTS: Partial<ForestConfig> = {
@@ -30,6 +31,7 @@ const DEFAULTS: Partial<ForestConfig> = {
   branchFormat: '${ticketId}-${slug}',
   baseBranch: 'origin/main',
   maxTrees: 10,
+  browser: 'simple',
 };
 
 export async function loadConfig(): Promise<ForestConfig | null> {

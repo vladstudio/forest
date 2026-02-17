@@ -22,7 +22,7 @@ Output: `dist/extension.js` (single bundle, `vscode` marked as external).
 **Key flow**: Config → StateManager → Managers → TreeDataProviders → VS Code UI.
 
 ### Config (`src/config.ts`)
-Three-tier merge: defaults → `.forest/config.json` (repo) → `.forest/local.json` (gitignored per-dev). Shortcuts merge by `name` field. Supports `${repo}`, `~`, `${ticketId}`, `${branch}`, `${slug}`, `${treePath}`, `${prNumber}`, `${prUrl}` variable expansion.
+Three-tier merge: defaults → `.forest/config.json` (repo) → `.forest/local.json` (gitignored per-dev). Shortcuts merge by `name` field. Supports `${repo}`, `~`, `${ticketId}`, `${branch}`, `${slug}`, `${treePath}`, `${prNumber}`, `${prUrl}` variable expansion. Top-level `browser` setting (`simple` | `external` | app name) controls where browser shortcuts open; per-shortcut `browser` field overrides it.
 
 ### State (`src/state.ts`)
 Global state at `~/.forest/state.json`. Trees keyed as `repoPath:ticketId`. File-watch-based cross-window coordination with debounced events. Atomic writes via temp+rename. Write-locked to prevent races.

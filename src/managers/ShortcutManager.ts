@@ -1,4 +1,5 @@
 import * as net from 'net';
+import * as cp from 'child_process';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import type { ForestConfig, ShortcutConfig } from '../config';
@@ -124,18 +125,19 @@ export class ShortcutManager {
 
   private async openBrowser(sc: ShortcutConfig & { type: 'browser' }, viewColumn?: vscode.ViewColumn): Promise<void> {
     const url = this.resolveVars(sc.url);
+    const browser = sc.browser ?? this.config.browser;
     const port = this.extractPort(url);
     const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)/.test(url);
 
     if (port && isLocalhost) {
-      await this.waitAndOpenBrowser(port, url, viewColumn);
+      await this.waitAndOpenBrowser(port, url, browser, viewColumn);
     } else {
-      this.openSimpleBrowser(url, viewColumn);
+      this.openUrl(url, browser, viewColumn);
     }
   }
 
-  private async waitAndOpenBrowser(port: number, url: string, viewColumn?: vscode.ViewColumn): Promise<void> {
-    if (await isPortOpen(port)) { this.openSimpleBrowser(url, viewColumn); return; }
+  private async waitAndOpenBrowser(port: number, url: string, browser: string, viewColumn?: vscode.ViewColumn): Promise<void> {
+    if (await isPortOpen(port)) { this.openUrl(url, browser, viewColumn); return; }
 
     const timeout = 120_000;
     const start = Date.now();
@@ -147,10 +149,10 @@ export class ShortcutManager {
           if (Date.now() - start > timeout) {
             resolve();
             const c = await vscode.window.showWarningMessage(`Timed out waiting for port ${port}.`, 'Open Anyway');
-            if (c) this.openSimpleBrowser(url, viewColumn);
+            if (c) this.openUrl(url, browser, viewColumn);
             return;
           }
-          if (await isPortOpen(port)) { resolve(); this.openSimpleBrowser(url, viewColumn); return; }
+          if (await isPortOpen(port)) { resolve(); this.openUrl(url, browser, viewColumn); return; }
           const timer = setTimeout(() => { this.pendingTimers.delete(timer); check(); }, 2000);
           this.pendingTimers.add(timer);
         };
@@ -159,13 +161,22 @@ export class ShortcutManager {
     );
   }
 
-  private async openSimpleBrowser(url: string, viewColumn?: vscode.ViewColumn): Promise<void> {
-    try {
-      await vscode.commands.executeCommand('simpleBrowser.api.open', vscode.Uri.parse(url), {
-        viewColumn: viewColumn ?? vscode.ViewColumn.Beside, preserveFocus: true,
-      });
-    } catch {
+  private async openUrl(url: string, browser: string, viewColumn?: vscode.ViewColumn): Promise<void> {
+    if (browser === 'external') {
       vscode.env.openExternal(vscode.Uri.parse(url));
+    } else if (browser === 'simple') {
+      try {
+        await vscode.commands.executeCommand('simpleBrowser.api.open', vscode.Uri.parse(url), {
+          viewColumn: viewColumn ?? vscode.ViewColumn.Beside, preserveFocus: true,
+        });
+      } catch {
+        vscode.env.openExternal(vscode.Uri.parse(url));
+      }
+    } else {
+      // Custom browser command (e.g. "firefox", "/Applications/Firefox.app")
+      const args = process.platform === 'darwin' ? ['-a', browser, url] : [url];
+      const cmd = process.platform === 'darwin' ? 'open' : browser;
+      cp.spawn(cmd, args, { detached: true, stdio: 'ignore' }).unref();
     }
   }
 
