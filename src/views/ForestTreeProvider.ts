@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import type { ForestConfig } from '../config';
 import type { StateManager, TreeState } from '../state';
-import { StageGroupItem, IssueItem, TreeItemView } from './items';
+import { MainRepoItem, StageGroupItem, IssueItem, TreeItemView } from './items';
 import type { TreeContext } from './items';
 import { getRepoPath } from '../context';
 import * as git from '../cli/git';
@@ -14,7 +14,7 @@ export interface TreeHealth {
   pr: { state: string; reviewDecision: string | null; number?: number } | null;
 }
 
-type ForestElement = StageGroupItem | IssueItem | TreeItemView;
+type ForestElement = MainRepoItem | StageGroupItem | IssueItem | TreeItemView;
 
 export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement> {
   private _onDidChange = new vscode.EventEmitter<ForestElement | undefined>();
@@ -83,7 +83,7 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
   }
 
   async getChildren(element?: ForestElement): Promise<ForestElement[]> {
-    if (element instanceof TreeItemView || element instanceof IssueItem) return [];
+    if (element instanceof MainRepoItem || element instanceof TreeItemView || element instanceof IssueItem) return [];
     if (element instanceof StageGroupItem) return element.children as ForestElement[];
 
     const repoPath = getRepoPath();
@@ -140,7 +140,7 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
     if (inProgress.length) groups.push(new StageGroupItem('In Progress', inProgress.length, 'code', inProgress));
     if (inReview.length) groups.push(new StageGroupItem('In Review', inReview.length, 'git-pull-request', inReview));
     if (done.length) groups.push(new StageGroupItem('Done', done.length, 'check', done));
-    return groups;
+    return [new MainRepoItem(repoPath, this.config.baseBranch), ...groups];
   }
 
   getTreeItem(el: ForestElement): vscode.TreeItem { return el; }

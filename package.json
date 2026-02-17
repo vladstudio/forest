@@ -171,6 +171,12 @@
         "icon": "$(copy)"
       },
       {
+        "command": "forest.openMain",
+        "title": "Open Main Repo",
+        "category": "Forest",
+        "icon": "$(home)"
+      },
+      {
         "command": "forest.refresh",
         "title": "Refresh",
         "category": "Forest",

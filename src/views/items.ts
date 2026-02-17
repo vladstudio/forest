@@ -1,9 +1,21 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 import type { LinearIssue } from '../cli/linear';
 import type { TreeState } from '../state';
 import type { ShortcutConfig } from '../config';
 import { displayName } from '../state';
 import type { TreeHealth } from './ForestTreeProvider';
+
+export class MainRepoItem extends vscode.TreeItem {
+  contextValue = 'mainRepo';
+  constructor(repoPath: string, baseBranch: string) {
+    const branch = baseBranch.replace(/^origin\//, '');
+    super(branch, vscode.TreeItemCollapsibleState.None);
+    this.description = path.basename(repoPath);
+    this.iconPath = new vscode.ThemeIcon('home');
+    this.command = { command: 'forest.openMain', title: 'Open Main Repo' };
+  }
+}
 
 export class StageGroupItem extends vscode.TreeItem {
   contextValue = 'stageGroup';

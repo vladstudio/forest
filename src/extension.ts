@@ -142,6 +142,7 @@ export async function activate(context: vscode.ExtensionContext) {
   reg('forest.rebase', (arg?: TreeItemView) => andRefresh(() => rebase(ctx, arg instanceof TreeItemView ? arg.tree : undefined))());
   reg('forest.list', () => list(ctx));
   reg('forest.warmTemplate', () => warmTemplate());
+  reg('forest.openMain', () => vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(getRepoPath()), { forceNewWindow: true }));
   reg('forest.refresh', () => forestProvider.refresh());
   reg('forest.copyBranch', (arg?: TreeItemView) => {
     const tree = arg instanceof TreeItemView ? arg.tree : ctx.currentTree;
