@@ -43,5 +43,7 @@ export async function prIsMerged(repoPath: string, branch: string): Promise<bool
 export async function createPR(worktreePath: string, baseBranch: string, title: string): Promise<string | null> {
   const base = baseBranch.replace(/^origin\//, '');
   const { stdout } = await exec('gh', ['pr', 'create', '--base', base, '--title', title, '--fill'], { cwd: worktreePath, timeout: 30_000 });
-  return stdout || null;
+  // gh pr create prints the URL on the last line (may have preamble text)
+  const url = stdout.trim().split('\n').pop()?.trim();
+  return url || null;
 }

@@ -28,7 +28,7 @@ export async function ship(ctx: ForestContext, treeArg?: import('../state').Tree
   }
 
   const name = displayName(tree);
-  await vscode.window.withProgress(
+  const prUrl = await vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: `Shipping ${name}...` },
     async (progress) => {
       // Push
@@ -36,13 +36,13 @@ export async function ship(ctx: ForestContext, treeArg?: import('../state').Tree
       await git.pushBranch(tree.path!, tree.branch);
 
       // Create PR via gh CLI
-      let prUrl: string | null = null;
+      let url: string | null = null;
       if (config.github.enabled && await gh.isAvailable()) {
         progress.report({ message: 'Creating PR...' });
         const prTitle = tree.ticketId && tree.title
           ? `${tree.ticketId}: ${tree.title}`
           : name;
-        prUrl = await gh.createPR(tree.path!, config.baseBranch, prTitle);
+        url = await gh.createPR(tree.path!, config.baseBranch, prTitle);
       }
 
       // Update Linear status
@@ -52,16 +52,18 @@ export async function ship(ctx: ForestContext, treeArg?: import('../state').Tree
       }
 
       // Update state
-      if (prUrl) {
-        await ctx.stateManager.updateTree(tree.repoPath, tree.branch, { prUrl });
+      if (url) {
+        await ctx.stateManager.updateTree(tree.repoPath, tree.branch, { prUrl: url });
       }
 
-      const action = prUrl
-        ? await vscode.window.showInformationMessage(`Shipped! PR: ${prUrl}`, 'Open PR')
-        : await vscode.window.showInformationMessage('Shipped!');
-      if (action === 'Open PR' && prUrl) {
-        vscode.env.openExternal(vscode.Uri.parse(prUrl));
-      }
+      return url;
     },
   );
+
+  const action = prUrl
+    ? await vscode.window.showInformationMessage(`Shipped! PR: ${prUrl}`, 'Open PR')
+    : await vscode.window.showInformationMessage('Shipped!');
+  if (action === 'Open PR' && prUrl) {
+    vscode.env.openExternal(vscode.Uri.parse(prUrl));
+  }
 }
