@@ -74,13 +74,12 @@ export async function create(ctx: ForestContext): Promise<void> {
   const config = ctx.config;
   const linearEnabled = config.linear.enabled && linear.isAvailable();
 
-  const items: { label: string; id: string }[] = [
-    { label: '$(git-branch) New branch', id: 'new' },
-    { label: '$(list-tree) Existing branch', id: 'existing' },
-  ];
+  const items: { label: string; id: string }[] = []
   if (linearEnabled) {
     items.push({ label: '$(add) New Linear issue + branch', id: 'issue' });
   }
+  items.push({ label: '$(add) New branch', id: 'new' });
+  items.push({ label: '$(git-branch) Existing branch', id: 'existing' });
 
   const choice = await vscode.window.showQuickPick(items, { placeHolder: 'Create a new tree' });
   if (!choice) return;
