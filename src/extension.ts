@@ -9,7 +9,6 @@ import { ShortcutManager } from './managers/ShortcutManager';
 import { StatusBarManager } from './managers/StatusBarManager';
 import { ForestTreeProvider } from './views/ForestTreeProvider';
 import { ShortcutsTreeProvider } from './views/ShortcutsTreeProvider';
-import { FilterViewProvider } from './views/FilterViewProvider';
 import { create, start } from './commands/create';
 import { switchTree } from './commands/switch';
 import { ship } from './commands/ship';
@@ -110,12 +109,9 @@ export async function activate(context: vscode.ExtensionContext) {
   const statusBarManager = new StatusBarManager(currentTree);
   const forestProvider = new ForestTreeProvider(stateManager, config);
   const shortcutsProvider = new ShortcutsTreeProvider(config, shortcutManager);
-  const filterProvider = new FilterViewProvider();
-  filterProvider.onDidChangeFilter(text => forestProvider.setFilter(text));
   const forestView = vscode.window.createTreeView('forest.trees', { treeDataProvider: forestProvider });
   context.subscriptions.push(
     forestView,
-    vscode.window.registerWebviewViewProvider(FilterViewProvider.viewType, filterProvider),
     vscode.window.registerTreeDataProvider('forest.shortcuts', shortcutsProvider),
   );
 

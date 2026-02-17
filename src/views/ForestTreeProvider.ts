@@ -4,7 +4,6 @@ import type { StateManager, TreeState } from '../state';
 import { MainRepoItem, StageGroupItem, IssueItem, TreeItemView } from './items';
 import type { TreeContext } from './items';
 import { getRepoPath } from '../context';
-import { displayName } from '../state';
 import * as git from '../cli/git';
 import * as gh from '../cli/gh';
 import * as linear from '../cli/linear';
@@ -25,14 +24,7 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
   private readonly HEALTH_TTL = 30_000;
   private readonly ISSUE_TTL = 60_000;
 
-  private filterText = '';
-
   constructor(private stateManager: StateManager, private config: ForestConfig) {}
-
-  setFilter(text: string): void {
-    this.filterText = text.toLowerCase();
-    this._onDidChange.fire(undefined);
-  }
 
   refresh(): void {
     this.healthCache.clear();
@@ -135,29 +127,19 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
       else inProgress.push(item); // includes shelved
     });
 
-    const f = this.filterText;
-    const matchTree = (t: TreeItemView) => !f ||
-      displayName(t.tree).toLowerCase().includes(f) ||
-      t.tree.branch.toLowerCase().includes(f) ||
-      t.tree.ticketId?.toLowerCase().includes(f);
-
     const groups: StageGroupItem[] = [];
 
     // Inbox (Linear issues without branches)
     if (this.config.linear.enabled) {
-      let issues = await this.getInboxIssues();
-      if (f) issues = issues.filter(i => i.id.toLowerCase().includes(f) || i.title.toLowerCase().includes(f));
+      const issues = await this.getInboxIssues();
       if (issues.length) {
         groups.push(new StageGroupItem('Inbox', issues.length, 'inbox', issues.map(i => new IssueItem(i))));
       }
     }
 
-    const fp = f ? inProgress.filter(matchTree) : inProgress;
-    const fr = f ? inReview.filter(matchTree) : inReview;
-    const fd = f ? done.filter(matchTree) : done;
-    if (fp.length) groups.push(new StageGroupItem('In Progress', fp.length, 'code', fp));
-    if (fr.length) groups.push(new StageGroupItem('In Review', fr.length, 'git-pull-request', fr));
-    if (fd.length) groups.push(new StageGroupItem('Done', fd.length, 'check', fd));
+    if (inProgress.length) groups.push(new StageGroupItem('In Progress', inProgress.length, 'code', inProgress));
+    if (inReview.length) groups.push(new StageGroupItem('In Review', inReview.length, 'git-pull-request', inReview));
+    if (done.length) groups.push(new StageGroupItem('Done', done.length, 'check', done));
     return [new MainRepoItem(repoPath, this.config.baseBranch), ...groups];
   }
 
