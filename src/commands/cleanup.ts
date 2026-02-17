@@ -6,7 +6,7 @@ import { displayName } from '../state';
 import * as git from '../cli/git';
 import * as gh from '../cli/gh';
 import { getRepoPath } from '../context';
-import { runStep, updateLinear, workspaceFilePath } from './shared';
+import { runStep, updateLinear, workspaceFilePath, resumeTree } from './shared';
 
 function resolveTree(ctx: ForestContext, branchArg?: string): TreeState | undefined {
   return branchArg
@@ -159,7 +159,6 @@ export async function resume(ctx: ForestContext, branchArg?: string): Promise<vo
     return;
   }
 
-  const { resumeTree } = await import('./shared');
   try {
     await resumeTree({ tree, config: ctx.config, stateManager: ctx.stateManager });
   } catch (e: any) {

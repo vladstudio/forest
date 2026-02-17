@@ -79,9 +79,9 @@ export async function runSetupCommands(config: ForestConfig, treePath: string, c
   }
 }
 
-/** Sanitize branch name for use as filename (replace / with --). */
+/** Sanitize branch name for use as filename (replace / with --, strip path traversal). */
 function sanitizeBranch(branch: string): string {
-  return branch.replace(/\//g, '--');
+  return branch.replace(/\.\./g, '').replace(/\//g, '--');
 }
 
 /** Shared tree creation logic. */
@@ -257,12 +257,12 @@ export async function warmTemplate(): Promise<void> {
 }
 
 export function workspaceFilePath(repoPath: string, branch: string): string {
-  const dir = path.join(os.homedir(), '.forest', 'workspaces');
-  fs.mkdirSync(dir, { recursive: true });
-  return path.join(dir, `${sanitizeBranch(branch)}.code-workspace`);
+  return path.join(os.homedir(), '.forest', 'workspaces', `${sanitizeBranch(branch)}.code-workspace`);
 }
 
 function generateWorkspaceFile(repoPath: string, treePath: string, tree: TreeState): void {
+  const wsPath = workspaceFilePath(repoPath, tree.branch);
+  fs.mkdirSync(path.dirname(wsPath), { recursive: true });
   const name = displayName(tree);
   const workspace = {
     folders: [{ path: treePath }],
@@ -271,5 +271,5 @@ function generateWorkspaceFile(repoPath: string, treePath: string, tree: TreeSta
       'terminal.integrated.enablePersistentSessions': false,
     },
   };
-  fs.writeFileSync(workspaceFilePath(repoPath, tree.branch), JSON.stringify(workspace, null, 2));
+  fs.writeFileSync(wsPath, JSON.stringify(workspace, null, 2));
 }

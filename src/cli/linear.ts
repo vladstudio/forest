@@ -161,13 +161,3 @@ export async function updateIssueState(issueId: string, state: string, team?: st
     { id: issueId, input: { stateId } },
   );
 }
-
-export async function getIssueUrl(issueId: string): Promise<string | null> {
-  try {
-    const data = await gql<{ issue: { url: string } }>(
-      `query($id: String!) { issue(id: $id) { url } }`,
-      { id: issueId },
-    );
-    return data.issue.url;
-  } catch { return null; }
-}

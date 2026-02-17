@@ -16,6 +16,7 @@ function isPortOpen(port: number): Promise<boolean> {
 export class ShortcutManager {
   private terminals = new Map<string, vscode.Terminal[]>();
   private pendingTimers = new Set<ReturnType<typeof setTimeout>>();
+  private pendingRestart?: vscode.Disposable;
   private disposed = false;
   private disposables: vscode.Disposable[] = [];
 
@@ -51,13 +52,15 @@ export class ShortcutManager {
 
   restart(sc: ShortcutConfig): void {
     if (sc.type !== 'terminal') return;
+    this.pendingRestart?.dispose();
     const sub = vscode.window.onDidCloseTerminal(t => {
       if (t.name === sc.name) {
         sub.dispose();
+        this.pendingRestart = undefined;
         this.open(sc);
       }
     });
-    this.disposables.push(sub);
+    this.pendingRestart = sub;
     this.stop(sc);
   }
 
@@ -216,6 +219,7 @@ export class ShortcutManager {
     this.disposed = true;
     this.pendingTimers.forEach(t => clearTimeout(t));
     this.pendingTimers.clear();
+    this.pendingRestart?.dispose();
     this.disposables.forEach(d => d.dispose());
   }
 }

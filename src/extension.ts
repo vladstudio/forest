@@ -20,13 +20,14 @@ import * as git from './cli/git';
 import * as gh from './cli/gh';
 import * as linear from './cli/linear';
 
+const emptyProvider: vscode.TreeDataProvider<never> = {
+  getTreeItem: () => { throw new Error('no items'); },
+  getChildren: () => [],
+};
+
 export async function activate(context: vscode.ExtensionContext) {
   const config = await loadConfig();
   if (!config) {
-    const emptyProvider: vscode.TreeDataProvider<never> = {
-      getTreeItem: () => { throw new Error('no items'); },
-      getChildren: () => [],
-    };
     context.subscriptions.push(
       vscode.window.registerTreeDataProvider('forest.setup', emptyProvider),
       vscode.commands.registerCommand('forest.copySetupPrompt', () => {
@@ -44,10 +45,6 @@ export async function activate(context: vscode.ExtensionContext) {
   const ghAvailable = await gh.isAvailable();
   vscode.commands.executeCommand('setContext', 'forest.ghAvailable', ghAvailable);
   if (!ghAvailable) {
-    const emptyProvider: vscode.TreeDataProvider<never> = {
-      getTreeItem: () => { throw new Error('no items'); },
-      getChildren: () => [],
-    };
     context.subscriptions.push(
       vscode.window.registerTreeDataProvider('forest.ghMissing', emptyProvider),
     );
@@ -76,28 +73,35 @@ export async function activate(context: vscode.ExtensionContext) {
   configWatcher.onDidChange(onConfigChange);
   configWatcher.onDidCreate(onConfigChange);
   configWatcher.onDidDelete(onConfigChange);
-  context.subscriptions.push(configWatcher);
+  context.subscriptions.push(configWatcher, { dispose: () => clearTimeout(configDebounce) });
 
   const stateManager = new StateManager();
   await stateManager.initialize();
 
-  // Prune orphaned trees (folder deleted from disk but state/branch still exist)
   const outputChannel = vscode.window.createOutputChannel('Forest');
-  const preState = stateManager.loadSync();
-  const orphans = stateManager.getTreesForRepo(preState, repoPath).filter(t => t.path && !fs.existsSync(t.path));
-  for (const tree of orphans) {
-    outputChannel.appendLine(`[Forest] Pruning orphan: ${tree.branch} (${tree.path} missing)`);
-    await stateManager.removeTree(tree.repoPath, tree.branch);
-    try { fs.unlinkSync(workspaceFilePath(tree.repoPath, tree.branch)); } catch {}
-    git.deleteBranch(tree.repoPath, tree.branch)
-      .then(() => outputChannel.appendLine(`[Forest] Pruned branch: ${tree.branch}`))
-      .catch(() => {});
-  }
 
-  // Detect if current workspace is a tree
+  /** Prune trees whose worktree folders no longer exist on disk. Returns true if any were pruned. */
+  const pruneOrphans = async (): Promise<boolean> => {
+    const s = await stateManager.load();
+    const trees = stateManager.getTreesForRepo(s, repoPath);
+    let pruned = false;
+    for (const tree of trees) {
+      if (tree.path && !fs.existsSync(tree.path)) {
+        outputChannel.appendLine(`[Forest] Pruning orphan: ${tree.branch} (${tree.path} missing)`);
+        await stateManager.removeTree(tree.repoPath, tree.branch);
+        try { fs.unlinkSync(workspaceFilePath(tree.repoPath, tree.branch)); } catch {}
+        git.deleteBranch(tree.repoPath, tree.branch).catch(() => {});
+        pruned = true;
+      }
+    }
+    return pruned;
+  };
+
+  await pruneOrphans();
+
+  // Detect if current workspace is a tree (reuse state after pruning)
   const curPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  const state = stateManager.loadSync();
-  const currentTree = curPath ? Object.values(state.trees).find(t => t.path === curPath) : undefined;
+  const currentTree = curPath ? Object.values(stateManager.loadSync().trees).find(t => t.path === curPath) : undefined;
 
   vscode.commands.executeCommand('setContext', 'forest.isTree', !!currentTree);
 
@@ -198,19 +202,7 @@ export async function activate(context: vscode.ExtensionContext) {
     if (orphanCheckRunning) return;
     orphanCheckRunning = true;
     try {
-      const s = await stateManager.load();
-      const trees = stateManager.getTreesForRepo(s, repoPath);
-      let pruned = false;
-      for (const tree of trees) {
-        if (tree.path && !fs.existsSync(tree.path)) {
-          outputChannel.appendLine(`[Forest] Detected missing worktree: ${tree.branch} (${tree.path})`);
-          await stateManager.removeTree(tree.repoPath, tree.branch);
-          try { fs.unlinkSync(workspaceFilePath(tree.repoPath, tree.branch)); } catch {}
-          git.deleteBranch(tree.repoPath, tree.branch).catch(() => {});
-          pruned = true;
-        }
-      }
-      if (pruned) forestProvider.refresh();
+      if (await pruneOrphans()) forestProvider.refresh();
     } finally {
       orphanCheckRunning = false;
     }
@@ -232,7 +224,7 @@ export async function activate(context: vscode.ExtensionContext) {
     const currentTrees = stateManager.getTreesForRepo(newState, getRepoPath());
     const currentBranches = new Set(currentTrees.map(t => t.branch));
     for (const prev of previousTrees) {
-      if (prev.branch === currentTree?.branch) continue;
+      if (prev.branch === ctx.currentTree?.branch) continue;
       if (!currentBranches.has(prev.branch)) {
         try { fs.unlinkSync(workspaceFilePath(prev.repoPath, prev.branch)); } catch {}
         if (prev.path) {

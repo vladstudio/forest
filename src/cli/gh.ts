@@ -19,11 +19,11 @@ export async function mergePR(
   await exec('gh', ['pr', 'merge', ...flags], { cwd: worktreePath, timeout: 30_000 });
 }
 
-export async function prStatus(worktreePath: string): Promise<{ state: string; reviewDecision: string | null } | null> {
+export async function prStatus(worktreePath: string): Promise<{ state: string; reviewDecision: string | null; number?: number } | null> {
   try {
-    const { stdout } = await exec('gh', ['pr', 'view', '--json', 'state,reviewDecision'], { cwd: worktreePath, timeout: 10_000 });
+    const { stdout } = await exec('gh', ['pr', 'view', '--json', 'state,reviewDecision,number'], { cwd: worktreePath, timeout: 10_000 });
     const data = JSON.parse(stdout);
-    return { state: data.state || 'OPEN', reviewDecision: data.reviewDecision || null };
+    return { state: data.state || 'OPEN', reviewDecision: data.reviewDecision || null, number: data.number };
   } catch (e: any) {
     if (!_authWarned && (e.stderr || e.message || '').includes('auth login')) {
       _authWarned = true;
@@ -44,11 +44,4 @@ export async function createPR(worktreePath: string, baseBranch: string, title: 
   const base = baseBranch.replace(/^origin\//, '');
   const { stdout } = await exec('gh', ['pr', 'create', '--base', base, '--title', title, '--fill', '--json', 'url', '--jq', '.url'], { cwd: worktreePath, timeout: 30_000 });
   return stdout || null;
-}
-
-export async function getPRUrl(worktreePath: string): Promise<string | null> {
-  try {
-    const { stdout } = await exec('gh', ['pr', 'view', '--json', 'url', '--jq', '.url'], { cwd: worktreePath, timeout: 10_000 });
-    return stdout || null;
-  } catch { return null; }
 }
