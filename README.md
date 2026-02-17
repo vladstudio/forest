@@ -76,17 +76,17 @@ To set up Forest, ask Claude (or any AI) to read this README and generate `.fore
 
 ### Config reference
 
-| Field             | Required | Default               | Description                                                                                                                                                                                                                                                                                                                |
-| ----------------- | -------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `version`         | yes      | —                     | Always `1`                                                                                                                                                                                                                                                                                                                 |
-| `setup`           | no       | —                     | Command(s) to run after creating a tree                                                                                                                                                                                                                                                                                    |
-| `copy`            | no       | `[]`                  | Files to copy from repo root into each tree                                                                                                                                                                                                                                                                                |
-| `shortcuts`       | no       | `[]`                  | Terminals, browsers, files to open per tree                                                                                                                                                                                                                                                                                |
-| `linear`          | no       | `{ enabled: false }`  | Linear integration. Auto-enabled when `apiKey` is set. `teams` is an array of team **keys** (e.g. `["ENG"]` or `["ENG", "UX"]`). `statuses` controls issue list and lifecycle transitions including `onCancel` (**must use lowercase** state names: `triage`, `backlog`, `unstarted`, `started`, `completed`, `canceled`) |
-| `github`          | no       | `{ enabled: true }`   | GitHub integration toggle                                                                                                                                                                                                                                                                                                  |
-| `branchFormat`    | no       | `${ticketId}-${slug}` | Branch naming. Supports `${ticketId}`, `${slug}`                                                                                                                                                                                                                                                                           |
-| `baseBranch`      | no       | `origin/main`         | Branch to rebase on                                                                                                                                                                                                                                                                                                        |
-| `maxTrees`        | no       | `10`                  | Max concurrent worktrees                                                                                                                                                                                                                                                                                                   |
+| Field          | Required | Default               | Description                                                                                                                                                                                                                                                                                                               |
+| -------------- | -------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `version`      | yes      | —                     | Always `1`                                                                                                                                                                                                                                                                                                                |
+| `setup`        | no       | —                     | Command(s) to run after creating a tree                                                                                                                                                                                                                                                                                   |
+| `copy`         | no       | `[]`                  | Files to copy from repo root into each tree                                                                                                                                                                                                                                                                               |
+| `shortcuts`    | no       | `[]`                  | Terminals, browsers, files to open per tree                                                                                                                                                                                                                                                                               |
+| `linear`       | no       | `{ enabled: false }`  | Linear integration. Auto-enabled when `apiKey` is set. `teams` is an array of team **keys** (e.g. `["ENG"]` or `["ENG", "UX"]`). `statuses` controls issue list and lifecycle transitions including `onCancel` (**must use lowercase** state names: `triage`, `backlog`, `unstarted`, `started`, `completed`, `canceled`) |
+| `github`       | no       | `{ enabled: true }`   | GitHub integration toggle                                                                                                                                                                                                                                                                                                 |
+| `branchFormat` | no       | `${ticketId}-${slug}` | Branch naming. Supports `${ticketId}`, `${slug}`                                                                                                                                                                                                                                                                          |
+| `baseBranch`   | no       | `origin/main`         | Branch to rebase on                                                                                                                                                                                                                                                                                                       |
+| `maxTrees`     | no       | `10`                  | Max concurrent worktrees                                                                                                                                                                                                                                                                                                  |
 
 **Shortcut types:** `terminal` (with optional `command`, `env`, `mode`), `browser` (with `url`), `file` (with `path`). All support `openOnLaunch: N` (priority order, `false` to disable). Terminal `mode`: `single-tree` (default, one instance per tree), `single-repo` (kills previous on reopen), `multiple` (new instance each click, no stop/restart buttons).
 
@@ -213,20 +213,20 @@ Switch between trees from the sidebar. All processes keep running in background 
 
 ## Commands
 
-| Command                           | Description                          |
-| --------------------------------- | ------------------------------------ |
-| `Forest: New Linear Issue + Tree` | Create new ticket + tree             |
-| `Forest: New Tree`                | Tree from existing ticket            |
-| `Forest: Switch Tree`             | Open another tree's window           |
-| `Forest: Ship`                    | Push + create PR                     |
-| `Forest: Cleanup`                 | Merge PR + remove tree               |
-| `Forest: Cancel`                  | Remove tree without merging          |
-| `Forest: Update`                  | Rebase + refresh deps                |
-| `Forest: List`                    | List all trees                       |
+| Command                           | Description                             |
+| --------------------------------- | --------------------------------------- |
+| `Forest: New Linear Issue + Tree` | Create new ticket + tree                |
+| `Forest: New Tree`                | Tree from existing ticket               |
+| `Forest: Switch Tree`             | Open another tree's window              |
+| `Forest: Ship`                    | Push + create PR                        |
+| `Forest: Cleanup`                 | Merge PR + remove tree                  |
+| `Forest: Cancel`                  | Remove tree without merging             |
+| `Forest: Update`                  | Rebase + refresh deps                   |
+| `Forest: List`                    | List all trees                          |
 | `Forest: Copy Branch Name`        | Copy current tree's branch to clipboard |
-| `Forest: Open PR`                 | Open PR in browser                   |
-| `Forest: Copy Setup Prompt`       | Copy AI setup prompt to clipboard    |
-| `Forest: Warm Template`           | Rebuild node_modules template        |
+| `Forest: Open PR`                 | Open PR in browser                      |
+| `Forest: Copy Setup Prompt`       | Copy AI setup prompt to clipboard       |
+| `Forest: Warm Template`           | Rebuild node_modules template           |
 
 ## Install locally
 
