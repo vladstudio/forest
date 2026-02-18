@@ -29,14 +29,15 @@ async function gql<T>(query: string, variables?: Record<string, unknown>): Promi
     body: JSON.stringify({ query, variables }),
   });
   if (!res.ok) {
+    const body = await res.text().catch(() => '');
     if ((res.status === 401 || res.status === 403) && !_authWarned) {
       _authWarned = true;
       vscode.window.showWarningMessage('Forest: Linear API key is invalid or expired. Update linear.apiKey in .forest/local.json.');
     }
-    throw new Error(`Linear API ${res.status}: ${res.statusText}`);
+    throw new Error(`Linear API ${res.status}: ${res.statusText}${body ? ` — ${body}` : ''}`);
   }
   const json = await res.json() as { data?: T; errors?: { message: string }[] };
-  if (json.errors?.length) throw new Error(json.errors[0].message);
+  if (json.errors?.length) throw new Error(`Linear GraphQL error: ${json.errors.map(e => e.message).join('; ')}${variables ? ` (vars: ${JSON.stringify(variables)})` : ''}`);
   return json.data as T;
 }
 
