@@ -13,6 +13,10 @@ function validateBranch(value: string): string | undefined {
   return undefined;
 }
 
+async function revertLinear(ctx: ForestContext, ticketId: string): Promise<void> {
+  await updateLinear(ctx, ticketId, 'unstarted');
+}
+
 /** Try to extract a ticketId from a branch name using the configured branchFormat. */
 function parseTicketId(branch: string, branchFormat: string): string | undefined {
   let pattern = branchFormat.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -225,15 +229,16 @@ async function createFromNewIssue(ctx: ForestContext): Promise<void> {
     value: defaultBranch,
     validateInput: validateBranch,
   });
-  if (!branch) return;
+  if (!branch) { await revertLinear(ctx, ticketId); return; }
 
   const stashed = await promptUncommittedChanges(getRepoPath());
-  if (stashed === undefined) return;
+  if (stashed === undefined) { await revertLinear(ctx, ticketId); return; }
 
   try {
     await createTree({ branch, config, stateManager: ctx.stateManager, ticketId, title, carryChanges: stashed });
     await updateLinear(ctx, ticketId, config.linear.statuses.onNew);
   } catch (e: any) {
+    await revertLinear(ctx, ticketId);
     vscode.window.showErrorMessage(e.message);
   }
 }
