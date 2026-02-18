@@ -4,6 +4,7 @@ export async function createWorktree(
   repoPath: string, worktreePath: string, branch: string, baseRef: string,
 ): Promise<void> {
   await exec('git', ['fetch', 'origin'], { cwd: repoPath });
+  await exec('git', ['worktree', 'prune'], { cwd: repoPath });
   await exec('git', ['worktree', 'add', worktreePath, '-b', branch, baseRef], { cwd: repoPath });
 }
 
@@ -67,6 +68,7 @@ export async function checkoutWorktree(
   if (stdout.trim() === branch) {
     await exec('git', ['checkout', '--detach'], { cwd: repoPath });
   }
+  await exec('git', ['worktree', 'prune'], { cwd: repoPath });
   await exec('git', ['worktree', 'add', worktreePath, branch], { cwd: repoPath });
 }
 
