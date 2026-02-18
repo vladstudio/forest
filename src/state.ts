@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import * as vscode from 'vscode';
+import { log } from './logger';
 
 export interface TreeState {
   branch: string;
@@ -55,9 +56,10 @@ export class StateManager {
         const content = fs.readFileSync(this.statePath, 'utf8');
         if (content !== lastContent) {
           lastContent = content;
+          log.info('State file changed externally');
           this._onDidChange.fire(JSON.parse(content));
         }
-      } catch {}
+      } catch (e: any) { log.error(`State watch read failed: ${e.message}`); }
     });
   }
 
@@ -80,6 +82,8 @@ export class StateManager {
   }
 
   async save(state: ForestState): Promise<void> {
+    const keys = Object.keys(state.trees);
+    log.info(`State save: ${keys.length} trees [${keys.join(', ')}]`);
     const tmp = this.statePath + '.tmp';
     fs.writeFileSync(tmp, JSON.stringify(state, null, 2), 'utf8');
     fs.renameSync(tmp, this.statePath);
@@ -110,8 +114,14 @@ export class StateManager {
     for (let i = 0; ; i++) {
       try { fs.mkdirSync(this.lockPath); break; } catch (e: any) {
         if (e.code !== 'EEXIST') throw e;
-        try { if (Date.now() - fs.statSync(this.lockPath).mtimeMs > 10_000) { fs.rmdirSync(this.lockPath); continue; } } catch {}
-        if (i >= 29) throw new Error('Could not acquire state lock');
+        try {
+          if (Date.now() - fs.statSync(this.lockPath).mtimeMs > 10_000) {
+            log.warn('Removing stale state lock');
+            fs.rmdirSync(this.lockPath); continue;
+          }
+        } catch {}
+        if (i >= 29) { log.error('Could not acquire state lock after 30 retries'); throw new Error('Could not acquire state lock'); }
+        if (i > 0 && i % 10 === 0) log.warn(`State lock contention: retry ${i}`);
         await new Promise(r => setTimeout(r, 100));
       }
     }
@@ -119,17 +129,21 @@ export class StateManager {
   }
 
   async addTree(repoPath: string, tree: TreeState): Promise<void> {
+    log.info(`addTree: ${tree.branch} (${tree.ticketId ?? 'no ticket'})`);
     await this.modify(state => { state.trees[this.key(repoPath, tree.branch)] = tree; });
   }
 
   async removeTree(repoPath: string, branch: string): Promise<void> {
+    log.info(`removeTree: ${branch}`);
     await this.modify(state => { delete state.trees[this.key(repoPath, branch)]; });
   }
 
   async updateTree(repoPath: string, branch: string, updates: Partial<TreeState>): Promise<void> {
+    log.info(`updateTree: ${branch} ${JSON.stringify(updates)}`);
     await this.modify(state => {
       const k = this.key(repoPath, branch);
       if (state.trees[k]) state.trees[k] = { ...state.trees[k], ...updates };
+      else log.warn(`updateTree: key ${k} not found in state`);
     });
   }
 

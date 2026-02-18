@@ -7,6 +7,7 @@ import * as git from '../cli/git';
 import * as gh from '../cli/gh';
 import { getRepoPath } from '../context';
 import { runStep, updateLinear, workspaceFilePath, resumeTree } from './shared';
+import { log } from '../logger';
 
 function resolveTree(ctx: ForestContext, branchArg?: string): TreeState | undefined {
   return branchArg
@@ -18,7 +19,8 @@ const teardownInProgress = new Set<string>();
 
 async function teardownTree(ctx: ForestContext, tree: TreeState): Promise<void> {
   const key = `${tree.repoPath}:${tree.branch}`;
-  if (teardownInProgress.has(key)) return;
+  if (teardownInProgress.has(key)) { log.warn(`teardownTree already in progress: ${tree.branch}`); return; }
+  log.info(`teardownTree: ${tree.branch}`);
   teardownInProgress.add(key);
   try {
     const shouldClose = ctx.currentTree?.branch === tree.branch;

@@ -29,6 +29,7 @@ export interface ForestConfig {
   baseBranch: string;
   maxTrees: number;
   browser: 'simple' | 'external' | string;
+  logging: boolean;
 }
 
 const DEFAULTS: Partial<ForestConfig> = {
@@ -40,6 +41,7 @@ const DEFAULTS: Partial<ForestConfig> = {
   baseBranch: 'main',
   maxTrees: 10,
   browser: 'simple',
+  logging: true,
 };
 
 export async function loadConfig(): Promise<ForestConfig | null> {

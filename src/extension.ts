@@ -19,6 +19,7 @@ import { warmTemplate, workspaceFilePath } from './commands/shared';
 import * as git from './cli/git';
 import * as gh from './cli/gh';
 import * as linear from './cli/linear';
+import { initLogger, log } from './logger';
 
 const emptyProvider: vscode.TreeDataProvider<never> = {
   getTreeItem: () => { throw new Error('no items'); },
@@ -78,6 +79,9 @@ export async function activate(context: vscode.ExtensionContext) {
   const stateManager = new StateManager();
   await stateManager.initialize();
 
+  const logger = config.logging ? initLogger() : undefined;
+  log.info(`Activated — repo: ${repoPath}, linear: ${config.linear.enabled}, gh: ${ghAvailable}`);
+
   const outputChannel = vscode.window.createOutputChannel('Forest');
 
   /** Prune trees whose worktree folders no longer exist on disk. Returns true if any were pruned. */
@@ -87,6 +91,7 @@ export async function activate(context: vscode.ExtensionContext) {
     let pruned = false;
     for (const tree of trees) {
       if (tree.path && !fs.existsSync(tree.path)) {
+        log.warn(`Pruning orphan: ${tree.branch} (${tree.path} missing)`);
         outputChannel.appendLine(`[Forest] Pruning orphan: ${tree.branch} (${tree.path} missing)`);
         await stateManager.removeTree(tree.repoPath, tree.branch);
         try { fs.unlinkSync(workspaceFilePath(tree.repoPath, tree.branch)); } catch {}
@@ -102,6 +107,7 @@ export async function activate(context: vscode.ExtensionContext) {
   // Detect if current workspace is a tree (reuse state after pruning)
   const curPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   const currentTree = curPath ? Object.values(stateManager.loadSync().trees).find(t => t.path === curPath) : undefined;
+  log.info(`Window: ${curPath ?? '(none)'}, tree: ${currentTree?.branch ?? '(main)'}`);
 
   vscode.commands.executeCommand('setContext', 'forest.isTree', !!currentTree);
 
@@ -139,6 +145,7 @@ export async function activate(context: vscode.ExtensionContext) {
   const reg = (id: string, fn: (...args: any[]) => any) =>
     context.subscriptions.push(vscode.commands.registerCommand(id, async (...args: any[]) => {
       try { return await fn(...args); } catch (e: any) {
+        log.error(`Command ${id} failed: ${e.stack ?? e.message}`);
         outputChannel.appendLine(`[Forest] Command ${id} failed: ${e.stack ?? e.message}`);
         outputChannel.show(true);
         vscode.window.showErrorMessage(`Forest: ${e.message}`);
@@ -196,6 +203,7 @@ export async function activate(context: vscode.ExtensionContext) {
         const isMainWindow = !ctx.currentTree;
         if (!isOwnWindow && !isMainWindow) continue;
         if (await gh.prIsMerged(tree.repoPath, tree.branch)) {
+          log.info(`PR merged detected: ${tree.branch}`);
           await stateManager.updateTree(tree.repoPath, tree.branch, { mergeNotified: true });
           const name = tree.ticketId ?? tree.branch;
           const action = await vscode.window.showInformationMessage(
@@ -245,6 +253,7 @@ export async function activate(context: vscode.ExtensionContext) {
     for (const prev of previousTrees) {
       if (prev.branch === ctx.currentTree?.branch) continue;
       if (!currentBranches.has(prev.branch)) {
+        log.info(`Tree removed by other window: ${prev.branch}`);
         try { fs.unlinkSync(workspaceFilePath(prev.repoPath, prev.branch)); } catch {}
         if (prev.path) {
           git.removeWorktree(prev.repoPath, prev.path)
@@ -263,6 +272,7 @@ export async function activate(context: vscode.ExtensionContext) {
   });
 
   context.subscriptions.push(outputChannel, shortcutManager, statusBarManager, stateManager);
+  if (logger) context.subscriptions.push(logger);
 }
 
 export function deactivate() {}

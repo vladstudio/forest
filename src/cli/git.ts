@@ -1,23 +1,30 @@
 import { exec } from '../utils/exec';
+import { log } from '../logger';
 
 export async function createWorktree(
   repoPath: string, worktreePath: string, branch: string, baseRef: string,
 ): Promise<void> {
+  log.info(`createWorktree: ${branch} at ${worktreePath} (base: ${baseRef})`);
   await exec('git', ['fetch', 'origin'], { cwd: repoPath });
   await exec('git', ['worktree', 'prune'], { cwd: repoPath });
   await exec('git', ['worktree', 'add', worktreePath, '-b', branch, baseRef], { cwd: repoPath });
 }
 
 export async function removeWorktree(repoPath: string, worktreePath: string): Promise<void> {
+  log.info(`removeWorktree: ${worktreePath}`);
   await exec('git', ['worktree', 'remove', worktreePath, '--force'], { cwd: repoPath });
 }
 
 export async function deleteBranch(repoPath: string, branch: string): Promise<void> {
+  log.info(`deleteBranch: ${branch}`);
   await exec('git', ['branch', '-D', branch], { cwd: repoPath });
-  await exec('git', ['push', 'origin', '--delete', branch], { cwd: repoPath }).catch(() => {});
+  await exec('git', ['push', 'origin', '--delete', branch], { cwd: repoPath }).catch((e: any) => {
+    log.warn(`deleteBranch remote delete failed for ${branch}: ${e.message}`);
+  });
 }
 
 export async function pushBranch(worktreePath: string, branch: string): Promise<void> {
+  log.info(`pushBranch: ${branch}`);
   await exec('git', ['push', '-u', 'origin', branch], { cwd: worktreePath });
 }
 

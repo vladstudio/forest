@@ -11,14 +11,17 @@ import * as git from '../cli/git';
 import * as linear from '../cli/linear';
 import { exec as execUtil, execShell, execStream } from '../utils/exec';
 import { getRepoPath } from '../context';
+import { log } from '../logger';
 
 /** Run an async step, log to output channel, show error notification on failure. */
 export async function runStep(ctx: ForestContext, label: string, fn: () => Promise<void>): Promise<boolean> {
   try {
     await fn();
+    log.info(`Step "${label}": done`);
     ctx.outputChannel.appendLine(`[Forest] ${label}: done`);
     return true;
   } catch (e: any) {
+    log.error(`Step "${label}": FAILED — ${e.stack ?? e.message}`);
     ctx.outputChannel.appendLine(`[Forest] ${label}: FAILED — ${e.message}`);
     ctx.outputChannel.show(true);
     vscode.window.showErrorMessage(`${label}: ${e.message}`);
@@ -41,9 +44,9 @@ export async function pickTeam(teams?: string[]): Promise<string | undefined> {
 }
 
 export async function updateLinear(ctx: ForestContext, ticketId: string, status: string): Promise<void> {
-  if (ctx.config.linear.enabled && linear.isAvailable()) {
-    await runStep(ctx, `Linear ${ticketId} → ${status}`, () => linear.updateIssueState(ticketId, status));
-  }
+  if (!ctx.config.linear.enabled) { log.info(`updateLinear skipped: linear not enabled (${ticketId} → ${status})`); return; }
+  if (!linear.isAvailable()) { log.warn(`updateLinear skipped: linear not available/no API key (${ticketId} → ${status})`); return; }
+  await runStep(ctx, `Linear ${ticketId} → ${status}`, () => linear.updateIssueState(ticketId, status));
 }
 
 export function copyConfigFiles(config: ForestConfig, repoPath: string, treePath: string): void {
@@ -139,6 +142,7 @@ export async function createTree(opts: {
     ...(title ? { title } : {}),
   };
 
+  log.info(`createTree: ${branch} ticket=${ticketId ?? '(none)'} existing=${!!existingBranch} carry=${!!carryChanges}`);
   // Save state early to prevent duplicates across windows.
   await stateManager.addTree(repoPath, tree);
 
@@ -186,7 +190,8 @@ export async function createTree(opts: {
         return tree;
       },
     );
-  } catch (e) {
+  } catch (e: any) {
+    log.error(`createTree failed: ${branch} — ${e.message}`);
     await stateManager.removeTree(repoPath, branch);
     await git.removeWorktree(repoPath, treePath).catch(() => {});
     if (!existingBranch) await git.deleteBranch(repoPath, branch).catch(() => {});
@@ -216,6 +221,7 @@ export async function resumeTree(opts: {
   const dirName = tree.ticketId ?? sanitizeBranch(tree.branch);
   const treePath = path.join(treesDir, dirName);
 
+  log.info(`resumeTree: ${tree.branch}`);
   return await vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: `Resuming ${displayName(tree)}...`, cancellable: false },
     async (progress) => {

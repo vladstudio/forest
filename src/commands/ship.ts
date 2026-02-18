@@ -5,10 +5,12 @@ import * as git from '../cli/git';
 import * as gh from '../cli/gh';
 import * as linear from '../cli/linear';
 import { updateLinear } from './shared';
+import { log } from '../logger';
 
 
 export async function ship(ctx: ForestContext, treeArg?: import('../state').TreeState): Promise<void> {
   const tree = treeArg || ctx.currentTree;
+  log.info(`ship: ${tree?.branch ?? '(no tree)'} ticket=${tree?.ticketId ?? '(none)'}`);
   if (!tree) {
     vscode.window.showErrorMessage('Ship must be run from a tree window.');
     return;

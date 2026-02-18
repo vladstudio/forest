@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { exec, commandExists } from '../utils/exec';
+import { log } from '../logger';
 
 let _available: boolean | null = null;
 let _authWarned = false;
@@ -25,6 +26,7 @@ export async function prStatus(worktreePath: string): Promise<{ state: string; r
     const data = JSON.parse(stdout);
     return { state: data.state || 'OPEN', reviewDecision: data.reviewDecision || null, number: data.number };
   } catch (e: any) {
+    log.error(`prStatus failed: ${e.message}`);
     if (!_authWarned && (e.stderr || e.message || '').includes('auth login')) {
       _authWarned = true;
       vscode.window.showWarningMessage('Forest: GitHub CLI auth expired. Run "gh auth login" in your terminal.');
@@ -37,13 +39,15 @@ export async function prIsMerged(repoPath: string, branch: string): Promise<bool
   try {
     const { stdout } = await exec('gh', ['pr', 'view', branch, '--json', 'state'], { cwd: repoPath, timeout: 10_000 });
     return JSON.parse(stdout).state === 'MERGED';
-  } catch { return false; }
+  } catch (e: any) { log.error(`prIsMerged(${branch}) failed: ${e.message}`); return false; }
 }
 
 export async function createPR(worktreePath: string, baseBranch: string, title: string): Promise<string | null> {
+  log.info(`createPR: "${title}" → ${baseBranch}`);
   const base = baseBranch.replace(/^origin\//, '');
   const { stdout } = await exec('gh', ['pr', 'create', '--base', base, '--title', title, '--fill'], { cwd: worktreePath, timeout: 30_000 });
   // gh pr create prints the URL on the last line (may have preamble text)
   const url = stdout.trim().split('\n').pop()?.trim();
+  log.info(`createPR result: ${url ?? '(no url)'}`);
   return url || null;
 }
