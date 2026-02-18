@@ -264,7 +264,7 @@ async function pickIssue(ctx: ForestContext): Promise<{ ticketId: string; title:
 
 async function createIssue(ctx: ForestContext): Promise<{ ticketId: string; title: string } | null> {
   const config = ctx.config;
-  const issueTitle = await vscode.window.showInputBox({ prompt: 'Issue title', placeHolder: 'Fix team invite email validation' });
+  const issueTitle = await vscode.window.showInputBox({ prompt: 'Issue title', placeHolder: '' });
   if (!issueTitle) return null;
 
   const priority = await vscode.window.showQuickPick(
