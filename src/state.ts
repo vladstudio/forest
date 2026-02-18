@@ -15,7 +15,7 @@ export interface TreeState {
 }
 
 export interface ForestState {
-  version: number;
+  version: 1;
   trees: Record<string, TreeState>;
 }
 
@@ -40,7 +40,7 @@ export class StateManager {
   async initialize(): Promise<void> {
     const dir = path.dirname(this.statePath);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    if (!fs.existsSync(this.statePath)) await this.save({ version: 2, trees: {} });
+    if (!fs.existsSync(this.statePath)) await this.save({ version: 1, trees: {} });
     this.startWatching();
   }
 
@@ -63,11 +63,9 @@ export class StateManager {
 
   async load(): Promise<ForestState> {
     try {
-      const state = JSON.parse(fs.readFileSync(this.statePath, 'utf8')) as ForestState;
-      if (state.version === 1) return await this.migrate(state);
-      return state;
+      return JSON.parse(fs.readFileSync(this.statePath, 'utf8')) as ForestState;
     } catch {
-      const empty: ForestState = { version: 2, trees: {} };
+      const empty: ForestState = { version: 1, trees: {} };
       await this.save(empty);
       return empty;
     }
@@ -75,47 +73,10 @@ export class StateManager {
 
   loadSync(): ForestState {
     try {
-      const state = JSON.parse(fs.readFileSync(this.statePath, 'utf8')) as ForestState;
-      if (state.version === 1) {
-        // Synchronous best-effort: return migrated shape, async save happens next load
-        return this.migrateSync(state);
-      }
-      return state;
+      return JSON.parse(fs.readFileSync(this.statePath, 'utf8')) as ForestState;
     } catch {
-      return { version: 2, trees: {} };
+      return { version: 1, trees: {} };
     }
-  }
-
-  private async migrate(v1: ForestState): Promise<ForestState> {
-    const migrated = this.migrateSync(v1);
-    await this.save(migrated);
-    return migrated;
-  }
-
-  private migrateSync(v1: ForestState): ForestState {
-    const v2: ForestState = { version: 2, trees: {} };
-    for (const [, tree] of Object.entries(v1.trees)) {
-      const old = tree as any;
-      const newTree: TreeState = {
-        branch: old.branch,
-        repoPath: old.repoPath,
-        createdAt: old.createdAt,
-        path: old.path,
-        prUrl: old.prUrl,
-      };
-      // In v1, ticketId was always present. If it differs from branch, it's a real ticket ID.
-      if (old.ticketId && old.ticketId !== old.branch) {
-        newTree.ticketId = old.ticketId;
-      }
-      // In v1, title was always present. Keep it if meaningful.
-      if (old.title && old.title !== old.branch && old.title !== old.ticketId) {
-        newTree.title = old.title;
-      } else if (old.title && old.ticketId && old.ticketId !== old.branch) {
-        newTree.title = old.title;
-      }
-      v2.trees[this.key(old.repoPath, old.branch)] = newTree;
-    }
-    return v2;
   }
 
   async save(state: ForestState): Promise<void> {
