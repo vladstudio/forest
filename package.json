@@ -130,7 +130,7 @@
       },
       {
         "command": "forest.cleanup",
-        "title": "Finish — Merge PR & Delete",
+        "title": "Cleanup — Delete Branch & Worktree",
         "category": "Forest",
         "icon": "$(check-all)"
       },

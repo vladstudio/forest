@@ -221,6 +221,10 @@ export async function activate(context: vscode.ExtensionContext) {
   }, 60_000);
   context.subscriptions.push({ dispose: () => clearInterval(orphanCheckInterval) });
 
+  // Auto-refresh tree health every 3 minutes (PR status, commits behind, age)
+  const healthRefreshInterval = setInterval(() => forestProvider.refreshTrees(), 3 * 60 * 1000);
+  context.subscriptions.push({ dispose: () => clearInterval(healthRefreshInterval) });
+
   // Watch state for changes from other windows
   let previousTrees = stateManager.getTreesForRepo(stateManager.loadSync(), getRepoPath());
   stateManager.onDidChange((newState) => {
