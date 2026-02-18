@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { loadConfig } from './config';
-import { ShortcutItem, TreeItemView } from './views/items';
+import { ShortcutItem, StageGroupItem, TreeItemView } from './views/items';
 import { StateManager } from './state';
 import { ForestContext, getRepoPath } from './context';
 import { ShortcutManager } from './managers/ShortcutManager';
@@ -107,9 +107,15 @@ export async function activate(context: vscode.ExtensionContext) {
 
   const shortcutManager = new ShortcutManager(config, currentTree);
   const statusBarManager = new StatusBarManager(currentTree);
-  const forestProvider = new ForestTreeProvider(stateManager, config);
+  const forestProvider = new ForestTreeProvider(stateManager, config, context.globalState);
   const shortcutsProvider = new ShortcutsTreeProvider(config, shortcutManager);
   const forestView = vscode.window.createTreeView('forest.trees', { treeDataProvider: forestProvider });
+  forestView.onDidCollapseElement(e => {
+    if (e.element instanceof StageGroupItem) forestProvider.setCollapsed(e.element.label as string, true);
+  });
+  forestView.onDidExpandElement(e => {
+    if (e.element instanceof StageGroupItem) forestProvider.setCollapsed(e.element.label as string, false);
+  });
   context.subscriptions.push(
     forestView,
     vscode.window.registerTreeDataProvider('forest.shortcuts', shortcutsProvider),

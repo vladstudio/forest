@@ -23,8 +23,18 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
   private issueCache: { issues: linear.LinearIssue[]; time: number } = { issues: [], time: 0 };
   private readonly HEALTH_TTL = 30_000;
   private readonly ISSUE_TTL = 60_000;
+  private collapsedGroups: Record<string, boolean>;
+  private static readonly COLLAPSED_KEY = 'forest.collapsedGroups';
+  private static readonly DEFAULT_COLLAPSED: Record<string, boolean> = { Inbox: true };
 
-  constructor(private stateManager: StateManager, private config: ForestConfig) {}
+  constructor(private stateManager: StateManager, private config: ForestConfig, private globalState: vscode.Memento) {
+    this.collapsedGroups = { ...ForestTreeProvider.DEFAULT_COLLAPSED, ...globalState.get<Record<string, boolean>>(ForestTreeProvider.COLLAPSED_KEY, {}) };
+  }
+
+  setCollapsed(label: string, collapsed: boolean): void {
+    this.collapsedGroups[label] = collapsed;
+    this.globalState.update(ForestTreeProvider.COLLAPSED_KEY, this.collapsedGroups);
+  }
 
   refresh(): void {
     this.healthCache.clear();
@@ -128,18 +138,19 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
     });
 
     const groups: StageGroupItem[] = [];
+    const isCollapsed = (label: string) => this.collapsedGroups[label] ?? false;
 
     // Inbox (Linear issues without branches)
     if (this.config.linear.enabled) {
       const issues = await this.getInboxIssues();
       if (issues.length) {
-        groups.push(new StageGroupItem('Inbox', issues.length, 'inbox', issues.map(i => new IssueItem(i))));
+        groups.push(new StageGroupItem('Inbox', issues.length, 'inbox', issues.map(i => new IssueItem(i)), isCollapsed('Inbox')));
       }
     }
 
-    if (inProgress.length) groups.push(new StageGroupItem('In Progress', inProgress.length, 'code', inProgress));
-    if (inReview.length) groups.push(new StageGroupItem('In Review', inReview.length, 'git-pull-request', inReview));
-    if (done.length) groups.push(new StageGroupItem('Done', done.length, 'check', done));
+    if (inProgress.length) groups.push(new StageGroupItem('In Progress', inProgress.length, 'code', inProgress, isCollapsed('In Progress')));
+    if (inReview.length) groups.push(new StageGroupItem('In Review', inReview.length, 'git-pull-request', inReview, isCollapsed('In Review')));
+    if (done.length) groups.push(new StageGroupItem('Done', done.length, 'check', done, isCollapsed('Done')));
     return [new MainRepoItem(repoPath, this.config.baseBranch), ...groups];
   }
 
