@@ -85,7 +85,7 @@ export async function cancel(ctx: ForestContext, branchArg?: string): Promise<vo
   }
 
   const confirm = await vscode.window.showWarningMessage(
-    `Cancel ${displayName(tree)}?\n\nThis will remove the worktree and branch without merging.`,
+    `Cancel ${displayName(tree)}?\n\nThis will remove the worktree and branch without merging.${tree.ticketId && ctx.config.linear.enabled ? ' The Linear ticket will be set to ' + ctx.config.linear.statuses.onCancel + '.' : ''}`,
     { modal: true }, 'Cancel Tree',
   );
   if (confirm !== 'Cancel Tree') return;
