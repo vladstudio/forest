@@ -28,7 +28,7 @@ export class StageGroupItem extends vscode.TreeItem {
 }
 
 export class IssueItem extends vscode.TreeItem {
-  contextValue = 'inbox-issue';
+  contextValue = 'todo-issue';
   constructor(public readonly issue: LinearIssue) {
     super(`${issue.id}  ${issue.title}`, vscode.TreeItemCollapsibleState.None);
     this.tooltip = `${issue.id}: ${issue.title}\nState: ${issue.state}`;

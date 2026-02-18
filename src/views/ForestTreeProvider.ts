@@ -25,7 +25,7 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
   private readonly ISSUE_TTL = 60_000;
   private collapsedGroups: Record<string, boolean>;
   private static readonly COLLAPSED_KEY = 'forest.collapsedGroups';
-  private static readonly DEFAULT_COLLAPSED: Record<string, boolean> = { Inbox: true };
+  private static readonly DEFAULT_COLLAPSED: Record<string, boolean> = { Todo: true };
 
   constructor(private stateManager: StateManager, private config: ForestConfig, private globalState: vscode.Memento) {
     this.collapsedGroups = { ...ForestTreeProvider.DEFAULT_COLLAPSED, ...globalState.get<Record<string, boolean>>(ForestTreeProvider.COLLAPSED_KEY, {}) };
@@ -74,7 +74,7 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
     return { behind, age, pr };
   }
 
-  private async getInboxIssues(): Promise<linear.LinearIssue[]> {
+  private async getTodoIssues(): Promise<linear.LinearIssue[]> {
     if (!this.config.linear.enabled || !linear.isAvailable()) return [];
 
     if (Date.now() - this.issueCache.time > this.ISSUE_TTL) {
@@ -140,11 +140,11 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
     const groups: StageGroupItem[] = [];
     const isCollapsed = (label: string) => this.collapsedGroups[label] ?? false;
 
-    // Inbox (Linear issues without branches)
+    // Todo (Linear issues without branches)
     if (this.config.linear.enabled) {
-      const issues = await this.getInboxIssues();
+      const issues = await this.getTodoIssues();
       if (issues.length) {
-        groups.push(new StageGroupItem('Inbox', issues.length, 'inbox', issues.map(i => new IssueItem(i)), isCollapsed('Inbox')));
+        groups.push(new StageGroupItem('Todo', issues.length, 'inbox', issues.map(i => new IssueItem(i)), isCollapsed('Todo')));
       }
     }
 

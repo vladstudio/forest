@@ -14,8 +14,10 @@ VSCode extension for parallel feature development using git worktrees. One Linea
 | **New Linear Issue + Tree** | Create a new Linear ticket + worktree in one step                   |
 | **Ship**                    | Push branch + create PR + move ticket to configured status          |
 | **Cleanup**                 | Merge PR + delete worktree + move ticket to configured status       |
-| **Cancel**                  | Remove worktree + branch without merging + move ticket to canceled  |
-| **Update**                  | Rebase on latest + re-run setup (reinstall deps, re-copy env files) |
+| **Delete**                  | Remove worktree + branch without merging + move ticket to canceled  |
+| **Shelve**                  | Remove worktree but keep branch for later                           |
+| **Resume**                  | Recreate worktree for a shelved tree                                |
+| **Update**                  | Merge from main + re-run setup (reinstall deps, re-copy env files)  |
 | **List**                    | Quick-pick list of all active trees                                 |
 
 ## Prerequisites
@@ -71,9 +73,9 @@ Per-developer overrides go in `.forest/local.json` (should be gitignored):
 To set up Forest, ask Claude (or any AI) to read this README and generate `.forest/config.json`. The AI should inspect the repo and ask you:
 
 1. **Setup command?** → detect from lockfile: `bun install`, `npm install`, `yarn`, `pnpm install`
-3. **Files to copy into trees?** → check which of `.env`, `.env.local`, `.envrc` exist
-4. **Shortcuts?** → what terminals to open (dev server, claude, shell), any browser URLs
-5. **Linear integration?** → yes/no, and team key(s) (e.g. `["ENG"]` or `["ENG", "UX"]`)
+2. **Files to copy into trees?** → check which of `.env`, `.env.local`, `.envrc` exist
+3. **Shortcuts?** → what terminals to open (dev server, claude, shell), any browser URLs
+4. **Linear integration?** → yes/no, and team key(s) (e.g. `["ENG", "UX"]`)
 
 ### Config reference
 
@@ -100,15 +102,12 @@ To set up Forest, ask Claude (or any AI) to read this README and generate `.fore
 
 ### Tree Grouping
 
-The Trees sidebar groups trees by status:
-
+- **Todo** — Linear issues without a branch yet
 - **In Progress** — no PR created yet
 - **In Review** — PR is open
 - **Done** — PR has been merged
 
 ### Tree Health Indicators
-
-Each tree shows live health info:
 
 ```
 ENG-1234  Fix login bug   3↓ · 2h
@@ -121,7 +120,7 @@ ENG-5678  Add dark mode   PR approved · 1d
 
 ### Auto-Cleanup on Merged PRs
 
-Trees with a PR are polled every 5 minutes. When a PR is merged, you get a notification: *"ENG-1234 PR was merged. Clean up?"* → click Cleanup to remove the worktree automatically.
+When a PR is merged, you get a notification: *"ENG-1234 PR was merged. Clean up?"* → click Cleanup to remove the worktree automatically.
 
 ### Update (Rebase + Refresh)
 
@@ -189,7 +188,7 @@ Status names in `issueList` use Linear's built-in types: `triage`, `backlog`, `u
   "enabled": true,
   "teams": ["ENG"],
   "statuses": {
-    "issueList": ["triage", "backlog", "unstarted"],
+    "issueList": ["backlog", "unstarted"],
     "onNew": "started",
     "onShip": "in review",
     "onCleanup": "completed",
@@ -209,7 +208,7 @@ All commands are available from the Forest sidebar (tree icon in activity bar) o
 3. Code, test, iterate — each tree is fully isolated
 4. **Ship** when ready — pushes and creates a PR
 5. **Cleanup** after merge — removes worktree, branch, and ticket
-6. **Cancel** to discard a tree without merging
+6. **Delete** to discard a tree without merging
 
 Switch between trees from the sidebar. All processes keep running in background windows.
 
@@ -217,16 +216,19 @@ Switch between trees from the sidebar. All processes keep running in background 
 
 | Command                           | Description                             |
 | --------------------------------- | --------------------------------------- |
-| `Forest: New Linear Issue + Tree` | Create new ticket + tree                |
-| `Forest: New Tree`                | Tree from existing ticket               |
+| `Forest: New Tree`                | Create tree (unified wizard)            |
 | `Forest: Switch Tree`             | Open another tree's window              |
 | `Forest: Ship`                    | Push + create PR                        |
 | `Forest: Cleanup`                 | Merge PR + remove tree                  |
-| `Forest: Cancel`                  | Remove tree without merging             |
-| `Forest: Update`                  | Rebase + refresh deps                   |
+| `Forest: Delete`                  | Remove tree without merging             |
+| `Forest: Shelve`                  | Remove worktree, keep branch            |
+| `Forest: Resume`                  | Recreate worktree for shelved tree      |
+| `Forest: Update`                  | Merge from main + refresh deps          |
+| `Forest: Rebase`                  | Rebase onto main                        |
 | `Forest: List`                    | List all trees                          |
-| `Forest: Copy Branch Name`        | Copy current tree's branch to clipboard |
+| `Forest: Open Main`              | Open main repo window                   |
 | `Forest: Open PR`                 | Open PR in browser                      |
+| `Forest: Copy Branch Name`        | Copy current tree's branch to clipboard |
 | `Forest: Copy Setup Prompt`       | Copy AI setup prompt to clipboard       |
 | `Forest: Warm Template`           | Rebuild node_modules template           |
 

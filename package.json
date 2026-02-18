@@ -235,7 +235,7 @@
       "view/item/context": [
         {
           "command": "forest.start",
-          "when": "view == forest.trees && viewItem == inbox-issue",
+          "when": "view == forest.trees && viewItem == todo-issue",
           "group": "inline"
         },
         {

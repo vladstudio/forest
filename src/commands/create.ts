@@ -24,7 +24,7 @@ function parseTicketId(branch: string, branchFormat: string): string | undefined
   } catch { return undefined; }
 }
 
-/** Start working on an inbox issue — creates branch + worktree. */
+/** Start working on a todo issue — creates branch + worktree. */
 export async function start(ctx: ForestContext, arg: { ticketId: string; title: string }): Promise<void> {
   const config = ctx.config;
   const { ticketId, title } = arg;
