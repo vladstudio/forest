@@ -37,7 +37,7 @@ async function gql<T>(query: string, variables?: Record<string, unknown>): Promi
     throw new Error(`Linear API ${res.status}: ${res.statusText}${body ? ` — ${body}` : ''}`);
   }
   const json = await res.json() as { data?: T; errors?: { message: string }[] };
-  if (json.errors?.length) throw new Error(`Linear GraphQL error: ${json.errors.map(e => e.message).join('; ')}${variables ? ` (vars: ${JSON.stringify(variables)})` : ''}`);
+  if (json.errors?.length && !json.data) throw new Error(`Linear GraphQL error: ${json.errors.map(e => e.message).join('; ')}${variables ? ` (vars: ${JSON.stringify(variables)})` : ''}`);
   return json.data as T;
 }
 
