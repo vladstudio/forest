@@ -49,7 +49,7 @@ export async function cleanup(ctx: ForestContext, branchArg?: string): Promise<v
   const config = ctx.config;
 
   const confirm = await vscode.window.showWarningMessage(
-    `Cleanup ${displayName(tree)}?\n\nThis will merge PR, remove worktree, and clean up.`,
+    `Cleanup ${displayName(tree)}?\n\nThis will remove the worktree, branch, and clean up.`,
     { modal: true }, 'Cleanup',
   );
   if (confirm !== 'Cleanup') return;
@@ -62,7 +62,7 @@ export async function cleanup(ctx: ForestContext, branchArg?: string): Promise<v
   await vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: `Cleaning up ${displayName(tree)}...` },
     async (progress) => {
-      if (config.github.enabled && await gh.isAvailable()) {
+      if (config.github.enabled && tree.path && await gh.isAvailable() && !await gh.prIsMerged(tree.repoPath, tree.branch)) {
         progress.report({ message: 'Merging PR...' });
         if (!await runStep(ctx, 'Merge PR', () => gh.mergePR(tree.path!))) return;
       }
@@ -150,12 +150,12 @@ export async function resume(ctx: ForestContext, branchArg?: string): Promise<vo
   const tree = resolveTree(ctx, branchArg);
 
   if (!tree) {
-    vscode.window.showErrorMessage('No tree to resume.');
+    vscode.window.showErrorMessage('No tree to resume. Run from a tree window or select from sidebar.');
     return;
   }
 
   if (tree.path) {
-    vscode.window.showInformationMessage('Tree already has a worktree. Use Switch instead.');
+    vscode.window.showInformationMessage('This tree is not shelved. Use Switch to open it instead.');
     return;
   }
 

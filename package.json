@@ -202,13 +202,13 @@
       },
       {
         "command": "forest.rebase",
-        "title": "Rebase — Rebase onto Main",
+        "title": "Rebase onto Main",
         "category": "Forest",
         "icon": "$(git-merge)"
       },
       {
         "command": "forest.openPR",
-        "title": "Open — View Pull Request",
+        "title": "View Pull Request",
         "category": "Forest",
         "icon": "$(link-external)"
       },
