@@ -280,7 +280,7 @@
         },
         {
           "command": "forest.cancel",
-          "when": "viewItem =~ /^tree-/",
+          "when": "viewItem =~ /^tree-/ && viewItem != tree-done",
           "group": "4_danger"
         },
         {
