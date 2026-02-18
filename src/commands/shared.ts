@@ -87,6 +87,19 @@ function sanitizeBranch(branch: string): string {
     .replace(/[<>:"|?*\x00-\x1f]/g, '-');
 }
 
+/** If there are uncommitted changes, ask what to do. Returns true if stashed, false if clean/discarded, undefined if cancelled. */
+export async function promptUncommittedChanges(repoPath: string): Promise<boolean | undefined> {
+  if (!await git.hasUncommittedChanges(repoPath)) return false;
+  const pick = await vscode.window.showQuickPick([
+    { label: '$(arrow-right) Carry to new tree', id: 'carry' },
+    { label: '$(trash) Discard changes', id: 'discard' },
+  ], { placeHolder: 'You have uncommitted changes' });
+  if (!pick) return undefined;
+  if (pick.id === 'carry') { await git.stash(repoPath); return true; }
+  await git.discardChanges(repoPath);
+  return false;
+}
+
 /** Shared tree creation logic. */
 export async function createTree(opts: {
   branch: string;
@@ -95,8 +108,9 @@ export async function createTree(opts: {
   ticketId?: string;
   title?: string;
   existingBranch?: boolean;
+  carryChanges?: boolean;
 }): Promise<TreeState> {
-  const { branch, config, stateManager, ticketId, title, existingBranch } = opts;
+  const { branch, config, stateManager, ticketId, title, existingBranch, carryChanges } = opts;
   const repoPath = getRepoPath();
 
   // Check existing
@@ -137,6 +151,13 @@ export async function createTree(opts: {
           await git.checkoutWorktree(repoPath, treePath, branch);
         } else {
           await git.createWorktree(repoPath, treePath, branch, config.baseBranch);
+        }
+        if (carryChanges) {
+          try { await git.stashPop(treePath); } catch {
+            // Conflict — unstash back to main repo so changes aren't lost
+            await git.stashPop(repoPath).catch(() => {});
+            throw new Error('Could not apply uncommitted changes to new tree (conflict). Changes restored to main repo.');
+          }
         }
 
         progress.report({ message: 'Copying files...' });

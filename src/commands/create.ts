@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import type { ForestContext } from '../context';
 import * as git from '../cli/git';
 import * as linear from '../cli/linear';
-import { createTree, updateLinear, pickTeam } from './shared';
+import { createTree, updateLinear, pickTeam, promptUncommittedChanges } from './shared';
 import { slugify } from '../utils/slug';
 import { getRepoPath } from '../context';
 
@@ -69,8 +69,11 @@ export async function start(ctx: ForestContext, arg: { ticketId: string; title: 
     branch = edited;
   }
 
+  const stashed = await promptUncommittedChanges(getRepoPath());
+  if (stashed === undefined) return;
+
   try {
-    await createTree({ branch, config, stateManager: ctx.stateManager, ticketId, title, existingBranch });
+    await createTree({ branch, config, stateManager: ctx.stateManager, ticketId, title, existingBranch, carryChanges: stashed });
     await updateLinear(ctx, ticketId, config.linear.statuses.onNew);
   } catch (e: any) {
     vscode.window.showErrorMessage(e.message);
@@ -126,8 +129,11 @@ async function createFromNewBranch(ctx: ForestContext): Promise<void> {
     }
   }
 
+  const stashed = await promptUncommittedChanges(getRepoPath());
+  if (stashed === undefined) return;
+
   try {
-    await createTree({ branch: branchName, config, stateManager: ctx.stateManager, ticketId, title });
+    await createTree({ branch: branchName, config, stateManager: ctx.stateManager, ticketId, title, carryChanges: stashed });
     if (ticketId) await updateLinear(ctx, ticketId, config.linear.statuses.onNew);
   } catch (e: any) {
     vscode.window.showErrorMessage(e.message);
@@ -193,8 +199,11 @@ async function createFromExistingBranch(ctx: ForestContext): Promise<void> {
     }
   }
 
+  const stashed = await promptUncommittedChanges(repoPath);
+  if (stashed === undefined) return;
+
   try {
-    await createTree({ branch, config, stateManager: ctx.stateManager, ticketId, title, existingBranch: true });
+    await createTree({ branch, config, stateManager: ctx.stateManager, ticketId, title, existingBranch: true, carryChanges: stashed });
     if (linkedLinear && ticketId) await updateLinear(ctx, ticketId, config.linear.statuses.onNew);
   } catch (e: any) {
     vscode.window.showErrorMessage(e.message);
@@ -218,8 +227,11 @@ async function createFromNewIssue(ctx: ForestContext): Promise<void> {
   });
   if (!branch) return;
 
+  const stashed = await promptUncommittedChanges(getRepoPath());
+  if (stashed === undefined) return;
+
   try {
-    await createTree({ branch, config, stateManager: ctx.stateManager, ticketId, title });
+    await createTree({ branch, config, stateManager: ctx.stateManager, ticketId, title, carryChanges: stashed });
     await updateLinear(ctx, ticketId, config.linear.statuses.onNew);
   } catch (e: any) {
     vscode.window.showErrorMessage(e.message);

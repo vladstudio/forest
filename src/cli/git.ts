@@ -31,6 +31,19 @@ export async function pullRebase(worktreePath: string, baseRef: string): Promise
   await exec('git', ['rebase', baseRef], { cwd: worktreePath, timeout: 60_000 });
 }
 
+export async function stash(repoPath: string): Promise<void> {
+  await exec('git', ['stash', '-u'], { cwd: repoPath });
+}
+
+export async function stashPop(worktreePath: string): Promise<void> {
+  await exec('git', ['stash', 'pop'], { cwd: worktreePath });
+}
+
+export async function discardChanges(repoPath: string): Promise<void> {
+  await exec('git', ['checkout', '.'], { cwd: repoPath });
+  await exec('git', ['clean', '-fd'], { cwd: repoPath });
+}
+
 export async function hasUncommittedChanges(worktreePath: string): Promise<boolean> {
   const { stdout } = await exec('git', ['status', '--porcelain'], { cwd: worktreePath });
   return stdout.length > 0;
