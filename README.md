@@ -35,13 +35,12 @@ Add `.forest/config.json` to your repo root (tip: ask Claude to generate one for
   "copy": [".env", ".env.local"],
   "setup": "bun install --frozen-lockfile",
   "shortcuts": [
-    { "name": "dev", "type": "terminal", "command": "bunx turbo dev", "openOnLaunch": 1 },
-    { "name": "claude", "type": "terminal", "command": "claude", "openOnLaunch": 1, "mode": "multiple" },
-    { "name": "shell", "type": "terminal", "mode": "multiple" },
-    { "name": "App", "type": "browser", "url": "http://localhost:3000", "openOnLaunch": 2 }
+    { "name": "dev", "command": "bunx turbo dev", "openOnLaunch": 1 },
+    { "name": "claude", "command": "claude", "openOnLaunch": 1, "mode": "multiple" },
+    { "name": "shell", "mode": "multiple" },
+    { "name": "App", "url": "http://localhost:3000", "openOnLaunch": 2 }
   ],
   "linear": {
-    "enabled": true,
     "teams": ["ENG"],
     "statuses": {
       "issueList": ["triage", "backlog", "unstarted"],
@@ -49,11 +48,7 @@ Add `.forest/config.json` to your repo root (tip: ask Claude to generate one for
       "onShip": "in review",
       "onCleanup": "completed"
     }
-  },
-  "github": { "enabled": true },
-  "branchFormat": "${ticketId}-${slug}",
-  "baseBranch": "origin/main",
-  "maxTrees": 10
+  }
 }
 ```
 
@@ -85,14 +80,14 @@ To set up Forest, ask Claude (or any AI) to read this README and generate `.fore
 | `setup`        | no       | —                     | Command(s) to run after creating a tree                                                                                                                                                                                                                                                                                   |
 | `copy`         | no       | `[]`                  | Files to copy from repo root into each tree                                                                                                                                                                                                                                                                               |
 | `shortcuts`    | no       | `[]`                  | Terminals, browsers, files to open per tree                                                                                                                                                                                                                                                                               |
-| `linear`       | no       | `{ enabled: false }`  | Linear integration. Auto-enabled when `apiKey` is set. `teams` is an array of team **keys** (e.g. `["ENG"]` or `["ENG", "UX"]`). `statuses` controls issue list and lifecycle transitions including `onCancel` (**must use lowercase** state names: `triage`, `backlog`, `unstarted`, `started`, `completed`, `canceled`) |
-| `github`       | no       | `{ enabled: true }`   | GitHub integration toggle                                                                                                                                                                                                                                                                                                 |
+| `linear`       | no       | disabled              | Linear integration. Auto-enabled when `teams` or `apiKey` is set. `teams` is an array of team **keys** (e.g. `["ENG"]` or `["ENG", "UX"]`). `statuses` controls issue list and lifecycle transitions including `onCancel` (**must use lowercase** state names: `triage`, `backlog`, `unstarted`, `started`, `completed`, `canceled`) |
+| `github`       | no       | `true`                | GitHub integration toggle. Set `false` to disable                                                                                                                                                                                                                                                                         |
 | `branchFormat` | no       | `${ticketId}-${slug}` | Branch naming. Supports `${ticketId}`, `${slug}`                                                                                                                                                                                                                                                                          |
-| `baseBranch`   | no       | `origin/main`         | Branch to rebase on                                                                                                                                                                                                                                                                                                       |
+| `baseBranch`   | no       | `main`                | Base branch name (`origin/` prefix is added automatically)                                                                                                                                                                                                                                                                |
 | `maxTrees`     | no       | `10`                  | Max concurrent worktrees                                                                                                                                                                                                                                                                                                  |
 | `browser`      | no       | `simple`              | Default browser for `browser` shortcuts: `simple` (VS Code Simple Browser), `external` (system default), or an app name (e.g. `"Firefox"`)                                                                                                                                                                               |
 
-**Shortcut types:** `terminal` (with optional `command`, `env`, `mode`), `browser` (with `url`, optional `browser`), `file` (with `path`). All support `openOnLaunch: N` (priority order, `false` to disable). Terminal `mode`: `single-tree` (default, one instance per tree), `single-repo` (kills previous on reopen), `multiple` (new instance each click, no stop/restart buttons). Browser shortcuts accept a per-shortcut `browser` override (same values as the top-level `browser` setting).
+**Shortcut types** are inferred from fields: `url` → browser, `path` → file, otherwise → terminal (explicit `type` still accepted). All support `openOnLaunch: N` (VS Code ViewColumn for placement, `false` to disable). Terminal `mode`: `single-tree` (default, one instance per tree), `single-repo` (kills previous on reopen), `multiple` (new instance each click, no stop/restart buttons). Terminals also accept `command` and `env`. Browser shortcuts accept a per-shortcut `browser` override (same values as the top-level `browser` setting).
 
 **Variable expansion in shortcuts:** `${ticketId}`, `${branch}`, `${slug}`, `${repo}`, `${treePath}`, `${prNumber}`, `${prUrl}`.
 
@@ -141,9 +136,9 @@ Shortcuts support these variables in commands, URLs, and file paths:
 | `${prUrl}`    | PR URL (after ship)               | `https://github.com/org/repo/pull/42`     |
 
 ```json
-{ "name": "Linear", "type": "browser", "url": "https://linear.app/team/issue/${ticketId}" },
-{ "name": "PR", "type": "browser", "url": "${prUrl}" },
-{ "name": "logs", "type": "terminal", "command": "tail -f ${treePath}/logs/dev.log" }
+{ "name": "Linear", "url": "https://linear.app/team/issue/${ticketId}" },
+{ "name": "PR", "url": "${prUrl}" },
+{ "name": "logs", "command": "tail -f ${treePath}/logs/dev.log" }
 ```
 
 ### Streaming Setup Output
@@ -185,7 +180,6 @@ Status names in `issueList` use Linear's built-in types: `triage`, `backlog`, `u
 
 ```json
 "linear": {
-  "enabled": true,
   "teams": ["ENG"],
   "statuses": {
     "issueList": ["backlog", "unstarted"],

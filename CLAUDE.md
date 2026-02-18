@@ -22,7 +22,7 @@ Output: `dist/extension.js` (single bundle, `vscode` marked as external).
 **Key flow**: Config → StateManager → Managers → TreeDataProviders → VS Code UI.
 
 ### Config (`src/config.ts`)
-Three-tier merge: defaults → `.forest/config.json` (repo) → `.forest/local.json` (gitignored per-dev). Shortcuts merge by `name` field. Supports `${repo}`, `~`, `${ticketId}`, `${branch}`, `${slug}`, `${treePath}`, `${prNumber}`, `${prUrl}` variable expansion. Top-level `browser` setting (`simple` | `external` | app name) controls where browser shortcuts open; per-shortcut `browser` field overrides it.
+Three-tier merge: defaults → `.forest/config.json` (repo) → `.forest/local.json` (gitignored per-dev). Shortcuts merge by `name` field; type is inferred from fields (`url` → browser, `path` → file, else terminal). `baseBranch` stored without `origin/` prefix (auto-prepended). `linear` auto-enabled when `teams` or `apiKey` present. `github` accepts boolean shorthand. Supports `${repo}`, `${ticketId}`, `${branch}`, `${slug}`, `${treePath}`, `${prNumber}`, `${prUrl}` variable expansion. Top-level `browser` setting (`simple` | `external` | app name) controls where browser shortcuts open; per-shortcut `browser` field overrides it.
 
 ### State (`src/state.ts`)
 Global state at `~/.forest/state.json`. Trees keyed as `repoPath:ticketId`. File-watch-based cross-window coordination with debounced events. Atomic writes via temp+rename. Write-locked to prevent races.
@@ -50,4 +50,4 @@ Three patterns: `exec()` (safe execFile), `execShell()` (user commands), `execSt
 
 - Package.json `contributes.menus` uses `contextValue` from TreeItems for `when` clauses — keep these in sync when adding menu items.
 - Linear CLI states must be **lowercase** (`started`, not `Started`).
-- Linear config lives under `linear: { enabled, teams, statuses }`. The `teams` value is an array of team **keys** (e.g. `["ENG"]` or `["ENG", "UX"]`), not display names.
+- Linear config lives under `linear: { teams, statuses }`. Enabled is inferred from `teams` or `apiKey`. The `teams` value is an array of team **keys** (e.g. `["ENG"]` or `["ENG", "UX"]`), not display names.

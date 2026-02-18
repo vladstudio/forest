@@ -10,6 +10,14 @@ interface BrowserShortcut extends ShortcutBase { type: 'browser'; url: string; b
 interface FileShortcut extends ShortcutBase { type: 'file'; path: string; }
 export type ShortcutConfig = TerminalShortcut | BrowserShortcut | FileShortcut;
 
+/** Infer shortcut type from fields when not explicitly set. */
+function normalizeShortcut(raw: any): any {
+  if (raw.type) return raw;
+  if (raw.url) return { ...raw, type: 'browser' };
+  if (raw.path) return { ...raw, type: 'file' };
+  return { ...raw, type: 'terminal' };
+}
+
 export interface ForestConfig {
   version: number;
   copy: string[];
@@ -29,7 +37,7 @@ const DEFAULTS: Partial<ForestConfig> = {
   linear: { enabled: false, statuses: { issueList: ['triage', 'backlog', 'unstarted'], onNew: 'started', onShip: 'in review', onCleanup: 'completed', onCancel: 'canceled' } },
   github: { enabled: true },
   branchFormat: '${ticketId}-${slug}',
-  baseBranch: 'origin/main',
+  baseBranch: 'main',
   maxTrees: 10,
   browser: 'simple',
 };
@@ -62,9 +70,24 @@ export async function loadConfig(): Promise<ForestConfig | null> {
     }
   }
 
-  // Auto-enable Linear when API key is present
-  if (merged.linear?.apiKey) {
+  // Auto-enable Linear when API key is present or teams are configured
+  if (merged.linear?.apiKey || merged.linear?.teams?.length) {
     merged.linear.enabled = true;
+  }
+
+  // Normalize shortcuts: infer type from fields
+  if (Array.isArray(merged.shortcuts)) {
+    merged.shortcuts = merged.shortcuts.map(normalizeShortcut);
+  }
+
+  // Normalize baseBranch: auto-prepend origin/ if missing
+  if (merged.baseBranch && !merged.baseBranch.includes('/')) {
+    merged.baseBranch = `origin/${merged.baseBranch}`;
+  }
+
+  // Normalize github: accept boolean shorthand
+  if (typeof merged.github === 'boolean') {
+    merged.github = { enabled: merged.github };
   }
 
   return merged as ForestConfig;
