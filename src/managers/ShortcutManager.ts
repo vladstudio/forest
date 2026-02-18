@@ -4,6 +4,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import type { ForestConfig, ShortcutConfig } from '../config';
 import type { TreeState } from '../state';
+import { shellEscape } from '../utils/slug';
 
 function isPortOpen(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -117,7 +118,7 @@ export class ShortcutManager {
       ...(location ? { location: { viewColumn: location } } : {}),
     });
     terminal.show(false);
-    if (sc.command) terminal.sendText(this.resolveVars(sc.command));
+    if (sc.command) terminal.sendText(this.resolveVars(sc.command, true));
     list.push(terminal);
     this.terminals.set(sc.name, list);
     this._onDidChange.fire();
@@ -199,7 +200,7 @@ export class ShortcutManager {
     }
   }
 
-  private resolveVars(value: string): string {
+  private resolveVars(value: string, forShell = false): string {
     if (!this.currentTree) return value;
     const tree = this.currentTree;
     const ticketId = tree.ticketId ?? '';
@@ -207,14 +208,15 @@ export class ShortcutManager {
       ? tree.branch.slice(ticketId.length).replace(/^-/, '')
       : tree.branch;
     const prNumber = tree.prUrl?.match(/\/pull\/(\d+)/)?.[1] ?? '';
+    const esc = forShell ? shellEscape : (v: string) => v;
     return value
-      .replace(/\$\{ticketId\}/g, ticketId)
-      .replace(/\$\{branch\}/g, tree.branch)
-      .replace(/\$\{repo\}/g, path.basename(tree.repoPath))
-      .replace(/\$\{treePath\}/g, tree.path ?? '')
-      .replace(/\$\{slug\}/g, slug)
-      .replace(/\$\{prNumber\}/g, prNumber)
-      .replace(/\$\{prUrl\}/g, tree.prUrl ?? '');
+      .replace(/\$\{ticketId\}/g, esc(ticketId))
+      .replace(/\$\{branch\}/g, esc(tree.branch))
+      .replace(/\$\{repo\}/g, esc(path.basename(tree.repoPath)))
+      .replace(/\$\{treePath\}/g, esc(tree.path ?? ''))
+      .replace(/\$\{slug\}/g, esc(slug))
+      .replace(/\$\{prNumber\}/g, esc(prNumber))
+      .replace(/\$\{prUrl\}/g, esc(tree.prUrl ?? ''));
   }
 
   private extractPort(url: string): number | null {

@@ -79,9 +79,12 @@ export async function runSetupCommands(config: ForestConfig, treePath: string, c
   }
 }
 
-/** Sanitize branch name for use as filename (replace / with --, strip path traversal). */
+/** Sanitize branch name for use as filename. */
 function sanitizeBranch(branch: string): string {
-  return branch.replace(/\.\./g, '').replace(/\//g, '--');
+  return branch
+    .replace(/\.\./g, '')
+    .replace(/\//g, '--')
+    .replace(/[<>:"|?*\x00-\x1f]/g, '-');
 }
 
 /** Shared tree creation logic. */

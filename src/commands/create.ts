@@ -6,6 +6,13 @@ import { createTree, updateLinear, pickTeam } from './shared';
 import { slugify } from '../utils/slug';
 import { getRepoPath } from '../context';
 
+const BAD_BRANCH_CHARS = /[<>:"|?*\x00-\x1f\s~^\\]/;
+function validateBranch(value: string): string | undefined {
+  if (!value) return 'Branch name is required';
+  if (BAD_BRANCH_CHARS.test(value)) return 'Branch name contains invalid characters';
+  return undefined;
+}
+
 /** Try to extract a ticketId from a branch name using the configured branchFormat. */
 function parseTicketId(branch: string, branchFormat: string): string | undefined {
   let pattern = branchFormat.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -56,6 +63,7 @@ export async function start(ctx: ForestContext, arg: { ticketId: string; title: 
     const edited = await vscode.window.showInputBox({
       prompt: 'Branch name',
       value: defaultBranch,
+      validateInput: validateBranch,
     });
     if (!edited) return;
     branch = edited;
@@ -97,7 +105,7 @@ async function createFromNewBranch(ctx: ForestContext): Promise<void> {
   const config = ctx.config;
   const linearEnabled = config.linear.enabled && linear.isAvailable();
 
-  const branchName = await vscode.window.showInputBox({ prompt: 'Branch name', placeHolder: 'my-feature' });
+  const branchName = await vscode.window.showInputBox({ prompt: 'Branch name', placeHolder: 'my-feature', validateInput: validateBranch });
   if (!branchName) return;
 
   // Optional: link a Linear ticket
@@ -206,6 +214,7 @@ async function createFromNewIssue(ctx: ForestContext): Promise<void> {
   const branch = await vscode.window.showInputBox({
     prompt: 'Branch name',
     value: defaultBranch,
+    validateInput: validateBranch,
   });
   if (!branch) return;
 

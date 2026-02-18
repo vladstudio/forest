@@ -129,9 +129,15 @@ export async function activate(context: vscode.ExtensionContext) {
     statusBarManager, forestProvider, outputChannel, currentTree,
   };
 
-  // Register commands
+  // Register commands — wrap all handlers so unhandled errors become visible
   const reg = (id: string, fn: (...args: any[]) => any) =>
-    context.subscriptions.push(vscode.commands.registerCommand(id, fn));
+    context.subscriptions.push(vscode.commands.registerCommand(id, async (...args: any[]) => {
+      try { return await fn(...args); } catch (e: any) {
+        outputChannel.appendLine(`[Forest] Command ${id} failed: ${e.stack ?? e.message}`);
+        outputChannel.show(true);
+        vscode.window.showErrorMessage(`Forest: ${e.message}`);
+      }
+    }));
 
   reg('forest.create', () => create(ctx));
   reg('forest.start', (arg: { ticketId: string; title: string }) => start(ctx, arg));
