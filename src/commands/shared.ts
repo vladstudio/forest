@@ -176,6 +176,9 @@ export async function createTree(opts: {
 
         if (!hadTemplate) await saveTemplate(repoPath, treePath);
 
+        progress.report({ message: 'Publishing branch...' });
+        await git.pushBranch(treePath, branch).catch(() => {});
+
         progress.report({ message: 'Opening window...' });
         const wsFile = workspaceFilePath(repoPath, branch);
         await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(wsFile), { forceNewWindow: true });
