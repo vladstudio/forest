@@ -181,8 +181,8 @@ export async function activate(context: vscode.ExtensionContext) {
   }
 
   // Auto-cleanup polling: check merged PRs every 5 minutes
+  // Only notify in the tree's own window or the main (non-tree) window.
   let autoCleanupRunning = false;
-  const dismissedPRs = new Set<string>();
   const autoCleanupInterval = setInterval(async () => {
     if (autoCleanupRunning) return;
     autoCleanupRunning = true;
@@ -191,15 +191,18 @@ export async function activate(context: vscode.ExtensionContext) {
       const s = await stateManager.load();
       const trees = stateManager.getTreesForRepo(s, getRepoPath());
       for (const tree of trees) {
-        if (!tree.prUrl || !tree.path || dismissedPRs.has(tree.branch)) continue;
+        if (!tree.prUrl || !tree.path || tree.mergeNotified) continue;
+        const isOwnWindow = ctx.currentTree?.branch === tree.branch;
+        const isMainWindow = !ctx.currentTree;
+        if (!isOwnWindow && !isMainWindow) continue;
         if (await gh.prIsMerged(tree.repoPath, tree.branch)) {
+          await stateManager.updateTree(tree.repoPath, tree.branch, { mergeNotified: true });
           const name = tree.ticketId ?? tree.branch;
           const action = await vscode.window.showInformationMessage(
             `${name} PR was merged. Clean up?`,
             'Cleanup', 'Dismiss',
           );
           if (action === 'Cleanup') await cleanupMerged(ctx, tree);
-          else dismissedPRs.add(tree.branch);
         }
       }
     } finally {

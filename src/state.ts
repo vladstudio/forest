@@ -11,6 +11,7 @@ export interface TreeState {
   ticketId?: string;
   title?: string;
   prUrl?: string;
+  mergeNotified?: boolean;
 }
 
 export interface ForestState {
