@@ -43,7 +43,8 @@ export async function pickTeam(teams?: string[]): Promise<string | undefined> {
   return pick?.label;
 }
 
-export async function updateLinear(ctx: ForestContext, ticketId: string, status: string): Promise<void> {
+export async function updateLinear(ctx: ForestContext, ticketId: string, status: string | undefined): Promise<void> {
+  if (!status) { log.info(`updateLinear skipped: no status configured (${ticketId})`); return; }
   if (!ctx.config.linear.enabled) { log.info(`updateLinear skipped: linear not enabled (${ticketId} → ${status})`); return; }
   if (!linear.isAvailable()) { log.warn(`updateLinear skipped: linear not available/no API key (${ticketId} → ${status})`); return; }
   await runStep(ctx, `Linear ${ticketId} → ${status}`, () => linear.updateIssueState(ticketId, status));

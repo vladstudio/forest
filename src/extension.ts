@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { loadConfig } from './config';
-import { ShortcutItem, StageGroupItem, TreeItemView } from './views/items';
+import { IssueItem, ShortcutItem, StageGroupItem, TreeItemView } from './views/items';
 import { StateManager } from './state';
 import { ForestContext, getRepoPath } from './context';
 import { ShortcutManager } from './managers/ShortcutManager';
@@ -153,7 +153,8 @@ export async function activate(context: vscode.ExtensionContext) {
     }));
 
   reg('forest.create', () => create(ctx));
-  reg('forest.start', (arg: { ticketId: string; title: string }) => start(ctx, arg));
+  reg('forest.start', (arg: IssueItem | { ticketId: string; title: string }) =>
+    start(ctx, arg instanceof IssueItem ? { ticketId: arg.issue.id, title: arg.issue.title } : arg));
   reg('forest.switch', (arg?: string | TreeItemView) => switchTree(ctx, arg instanceof TreeItemView ? arg.tree.branch : arg));
   const andRefresh = <T>(fn: () => Promise<T>) => async () => { await fn(); forestProvider.refreshTrees(); };
   reg('forest.ship', (arg?: TreeItemView) => andRefresh(() => ship(ctx, arg instanceof TreeItemView ? arg.tree : undefined))());
