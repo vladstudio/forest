@@ -41,7 +41,7 @@ Thin wrappers (40-60 lines) around shared logic in `commands/shared.ts`. `create
 Standard `TreeDataProvider` pattern. `items.ts` defines all TreeItem subclasses with `contextValue` for context menus. Health metrics (commits behind, PR status, age) cached 30 seconds in `TreesTreeProvider`.
 
 ### CLI Wrappers (`src/cli/`)
-`git.ts`, `linear.ts`, `gh.ts` — thin exec wrappers. Tool availability cached once per session. All calls wrapped in try/catch for graceful degradation when tools are missing.
+`git.ts`, `linear.ts`, `gh.ts` — thin exec wrappers. Tool availability cached once per session. All calls wrapped in try/catch for graceful degradation when tools are missing. `ai.ts` — raw `fetch` calls to AI providers (anthropic, openai, gemini) for PR body generation; used by `ship` when `config.ai` is set, falls back to `--fill` on failure.
 
 ### Execution (`src/utils/exec.ts`)
 Three patterns: `exec()` (safe execFile), `execShell()` (user commands), `execStream()` (long-running with output channel streaming). All have timeouts and max buffer limits.

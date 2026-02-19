@@ -59,6 +59,11 @@ Per-developer overrides go in `.forest/local.json` (should be gitignored):
   "linear": {
     "apiKey": "lin_api_YOUR_KEY"
   },
+  "ai": {
+    "provider": "gemini",
+    "model": "gemini-2.5-flash",
+    "apiKey": "YOUR_KEY"
+  },
   "browser": "external"
 }
 ```
@@ -85,6 +90,7 @@ To set up Forest, ask Claude (or any AI) to read this README and generate `.fore
 | `branchFormat` | no       | `${ticketId}-${slug}` | Branch naming. Supports `${ticketId}`, `${slug}`                                                                                                                                                                                                                                                                          |
 | `baseBranch`   | no       | `main`                | Base branch name (`origin/` prefix is added automatically)                                                                                                                                                                                                                                                                |
 | `maxTrees`     | no       | `10`                  | Max concurrent worktrees                                                                                                                                                                                                                                                                                                  |
+| `ai`           | no       | disabled              | AI-generated PR descriptions. Set `provider` (`anthropic`, `openai`, `gemini`), `model`, and `apiKey`. Best placed in `local.json`                                                                                                                                                                                       |
 | `browser`      | no       | `simple`              | Default browser for `browser` shortcuts: `simple` (VS Code Simple Browser), `external` (system default), or an app name (e.g. `"Firefox"`)                                                                                                                                                                               |
 
 **Shortcut types** are inferred from fields: `url` → browser, `path` → file, otherwise → terminal (explicit `type` still accepted). All support `openOnLaunch: N` (VS Code ViewColumn for placement, `false` to disable). Terminal `mode`: `single-tree` (default, one instance per tree), `single-repo` (kills previous on reopen), `multiple` (new instance each click, no stop/restart buttons). Terminals also accept `command` and `env`. Browser shortcuts accept a per-shortcut `browser` override (same values as the top-level `browser` setting).

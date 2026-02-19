@@ -18,6 +18,12 @@ function normalizeShortcut(raw: any): any {
   return { ...raw, type: 'terminal' };
 }
 
+export interface AIConfig {
+  provider: 'anthropic' | 'openai' | 'gemini';
+  model: string;
+  apiKey: string;
+}
+
 export interface ForestConfig {
   version: number;
   copy: string[];
@@ -25,6 +31,7 @@ export interface ForestConfig {
   shortcuts: ShortcutConfig[];
   linear: { enabled: boolean; apiKey?: string; teams?: string[]; statuses: { issueList: string[]; onNew: string; onShip: string; onCleanup: string; onCancel: string } };
   github: { enabled: boolean };
+  ai?: AIConfig;
   branchFormat: string;
   baseBranch: string;
   maxTrees: number;

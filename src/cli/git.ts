@@ -70,6 +70,11 @@ export async function commitsAhead(worktreePath: string, baseRef: string): Promi
   } catch { return 0; }
 }
 
+export async function diffFromBase(worktreePath: string, baseRef: string): Promise<string> {
+  const { stdout } = await exec('git', ['diff', baseRef + '...HEAD'], { cwd: worktreePath, timeout: 30_000 });
+  return stdout;
+}
+
 export async function lastCommitAge(worktreePath: string): Promise<string> {
   try {
     const { stdout } = await exec('git', ['log', '-1', '--format=%cr'], { cwd: worktreePath, timeout: 5_000 });

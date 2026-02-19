@@ -42,10 +42,16 @@ export async function prIsMerged(repoPath: string, branch: string): Promise<bool
   } catch (e: any) { log.error(`prIsMerged(${branch}) failed: ${e.message}`); return false; }
 }
 
-export async function createPR(worktreePath: string, baseBranch: string, title: string): Promise<string | null> {
+export async function createPR(worktreePath: string, baseBranch: string, title: string, body?: string): Promise<string | null> {
   log.info(`createPR: "${title}" → ${baseBranch}`);
   const base = baseBranch.replace(/^origin\//, '');
-  const { stdout } = await exec('gh', ['pr', 'create', '--base', base, '--title', title, '--fill'], { cwd: worktreePath, timeout: 30_000 });
+  const args = ['pr', 'create', '--base', base, '--title', title];
+  if (body) {
+    args.push('--body', body);
+  } else {
+    args.push('--fill');
+  }
+  const { stdout } = await exec('gh', args, { cwd: worktreePath, timeout: 30_000 });
   // gh pr create prints the URL on the last line (may have preamble text)
   const url = stdout.trim().split('\n').pop()?.trim();
   log.info(`createPR result: ${url ?? '(no url)'}`);

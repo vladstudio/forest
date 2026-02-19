@@ -4,6 +4,7 @@ import { displayName } from '../state';
 import * as git from '../cli/git';
 import * as gh from '../cli/gh';
 import * as linear from '../cli/linear';
+import { generatePRBody } from '../cli/ai';
 import { updateLinear } from './shared';
 import { log } from '../logger';
 
@@ -40,11 +41,24 @@ export async function ship(ctx: ForestContext, treeArg?: import('../state').Tree
       // Create PR via gh CLI
       let url: string | null = null;
       if (config.github.enabled && await gh.isAvailable()) {
-        progress.report({ message: 'Creating PR...' });
         const prTitle = tree.ticketId && tree.title
           ? `${tree.ticketId}: ${tree.title}`
           : name;
-        url = await gh.createPR(tree.path!, config.baseBranch, prTitle);
+
+        let prBody: string | undefined;
+        if (config.ai) {
+          try {
+            progress.report({ message: 'Generating PR description...' });
+            const diff = await git.diffFromBase(tree.path!, config.baseBranch);
+            prBody = await generatePRBody(config.ai, diff, prTitle);
+          } catch (e: any) {
+            log.error(`AI PR body generation failed: ${e.message}`);
+            vscode.window.showWarningMessage(`AI description failed, using commits. ${e.message}`);
+          }
+        }
+
+        progress.report({ message: 'Creating PR...' });
+        url = await gh.createPR(tree.path!, config.baseBranch, prTitle, prBody);
       }
 
       // Update Linear status
