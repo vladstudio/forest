@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
 import type { ForestConfig } from '../config';
 import type { StateManager, TreeState } from '../state';
 import { MainRepoItem, StageGroupItem, IssueItem, TreeItemView } from './items';
@@ -62,8 +63,8 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
   }
 
   private async fetchHealth(tree: TreeState): Promise<TreeHealth> {
-    // Shelved trees have no worktree path — can't query git
-    if (!tree.path) return { behind: 0, age: null, pr: null };
+    // No path (shelved) or path doesn't exist yet (being created in another window)
+    if (!tree.path || !fs.existsSync(tree.path)) return { behind: 0, age: null, pr: null };
 
     const [behind, ahead, pr] = await Promise.all([
       git.commitsBehind(tree.path, this.config.baseBranch),
