@@ -141,16 +141,19 @@ export class ShortcutManager {
     const cwd = this.currentTree?.path ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!cwd) return;
     const cmd = sc.command ? this.resolveVars(sc.command, true) : undefined;
-    const script = cmd ? `cd ${shellEscape(cwd)} && ${cmd}` : `cd ${shellEscape(cwd)}`;
     const lowerApp = app.toLowerCase();
 
     if (lowerApp === 'iterm' || lowerApp === 'iterm2') {
+      const script = cmd ? `cd ${shellEscape(cwd)} && ${cmd}` : `cd ${shellEscape(cwd)}`;
       cp.execFile('osascript', ['-e', `tell application "iTerm" to create window with default profile command ${JSON.stringify(script)}`], { timeout: 5000 }).unref();
     } else if (lowerApp === 'terminal' || lowerApp === 'terminal.app') {
+      const script = cmd ? `cd ${shellEscape(cwd)} && ${cmd}` : `cd ${shellEscape(cwd)}`;
       cp.execFile('osascript', ['-e', `tell application "Terminal" to do script ${JSON.stringify(script)}`], { timeout: 5000 }).unref();
     } else if (lowerApp === 'ghostty') {
       cp.spawn('ghostty', ['--working-directory', cwd, ...(cmd ? ['-e', cmd] : [])], { detached: true, stdio: 'ignore' }).unref();
     } else {
+      // Unsupported terminal — open app at cwd, command cannot be sent
+      vscode.window.showWarningMessage(`Terminal "${app}" is not supported for command sending. Use iTerm, Terminal, or Ghostty.`);
       cp.spawn('open', ['-a', app, cwd], { detached: true, stdio: 'ignore' }).unref();
     }
   }
