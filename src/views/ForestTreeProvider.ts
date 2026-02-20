@@ -26,7 +26,7 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
   private readonly ISSUE_TTL = 60_000;
   private collapsedGroups: Record<string, boolean>;
   private static readonly COLLAPSED_KEY = 'forest.collapsedGroups';
-  private static readonly DEFAULT_COLLAPSED: Record<string, boolean> = { Todo: true };
+  private static readonly DEFAULT_COLLAPSED: Record<string, boolean> = { 'Tickets: Todo': true };
 
   constructor(private stateManager: StateManager, private config: ForestConfig, private globalState: vscode.Memento) {
     this.collapsedGroups = { ...ForestTreeProvider.DEFAULT_COLLAPSED, ...globalState.get<Record<string, boolean>>(ForestTreeProvider.COLLAPSED_KEY, {}) };
@@ -145,13 +145,13 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
     if (this.config.linear.enabled) {
       const issues = await this.getTodoIssues();
       if (issues.length) {
-        groups.push(new StageGroupItem('Todo', issues.length, 'inbox', issues.map(i => new IssueItem(i)), isCollapsed('Todo')));
+        groups.push(new StageGroupItem('Tickets: Todo', issues.length, 'inbox', issues.map(i => new IssueItem(i)), isCollapsed('Tickets: Todo')));
       }
     }
 
-    if (inProgress.length) groups.push(new StageGroupItem('In Progress', inProgress.length, 'code', inProgress, isCollapsed('In Progress')));
-    if (inReview.length) groups.push(new StageGroupItem('In Review', inReview.length, 'git-pull-request', inReview, isCollapsed('In Review')));
-    if (done.length) groups.push(new StageGroupItem('Done', done.length, 'check', done, isCollapsed('Done')));
+    if (inProgress.length) groups.push(new StageGroupItem('Trees: In progress', inProgress.length, 'code', inProgress, isCollapsed('Trees: In progress')));
+    if (inReview.length) groups.push(new StageGroupItem('Trees: In review', inReview.length, 'git-pull-request', inReview, isCollapsed('Trees: In review')));
+    if (done.length) groups.push(new StageGroupItem('Trees: Done', done.length, 'check', done, isCollapsed('Trees: Done')));
     return [new MainRepoItem(repoPath, this.config.baseBranch), ...groups];
   }
 
