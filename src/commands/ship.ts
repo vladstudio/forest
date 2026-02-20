@@ -76,10 +76,10 @@ export async function ship(ctx: ForestContext, treeArg?: import('../state').Tree
     },
   );
 
-  const action = prUrl
-    ? await vscode.window.showInformationMessage(`Shipped! PR: ${prUrl}`, 'Open PR')
-    : await vscode.window.showInformationMessage('Shipped!');
-  if (action === 'Open PR' && prUrl) {
+  if (prUrl) {
+    vscode.window.showInformationMessage(`Shipped! PR: ${prUrl}`);
     vscode.env.openExternal(vscode.Uri.parse(prUrl));
+  } else {
+    vscode.window.showInformationMessage('Shipped!');
   }
 }
