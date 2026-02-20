@@ -52,6 +52,8 @@ export async function activate(context: vscode.ExtensionContext) {
     return;
   }
   vscode.commands.executeCommand('setContext', 'forest.linearEnabled', config.linear.enabled);
+  vscode.commands.executeCommand('setContext', 'forest.multipleBrowsers', config.browser.length > 1);
+  vscode.commands.executeCommand('setContext', 'forest.multipleTerminals', config.terminal.length > 1);
   linear.configure(config.linear.apiKey);
 
   // Watch config files for external edits
@@ -178,6 +180,7 @@ export async function activate(context: vscode.ExtensionContext) {
   });
   const unwrap = (arg: any) => arg instanceof ShortcutItem ? arg.shortcut : arg;
   reg('forest.openShortcut', (arg: any) => shortcutManager.open(unwrap(arg)));
+  reg('forest.openShortcutWith', (arg: any) => shortcutManager.openWith(unwrap(arg)));
   reg('forest.stopShortcut', (arg: any) => shortcutManager.stop(unwrap(arg)));
   reg('forest.restartShortcut', (arg: any) => shortcutManager.restart(unwrap(arg)));
 

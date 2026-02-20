@@ -35,7 +35,8 @@ export interface ForestConfig {
   branchFormat: string;
   baseBranch: string;
   maxTrees: number;
-  browser: 'simple' | 'external' | string;
+  browser: string[];
+  terminal: string[];
   logging: boolean;
 }
 
@@ -47,7 +48,8 @@ const DEFAULTS: Partial<ForestConfig> = {
   branchFormat: '${ticketId}-${slug}',
   baseBranch: 'main',
   maxTrees: 10,
-  browser: 'simple',
+  browser: ['simple'],
+  terminal: ['integrated'],
   logging: true,
 };
 
@@ -83,6 +85,10 @@ export async function loadConfig(): Promise<ForestConfig | null> {
   if (merged.linear?.apiKey || merged.linear?.teams?.length) {
     merged.linear.enabled = true;
   }
+
+  // Normalize browser/terminal to arrays
+  if (typeof merged.browser === 'string') merged.browser = [merged.browser];
+  if (typeof merged.terminal === 'string') merged.terminal = [merged.terminal];
 
   // Normalize shortcuts: infer type from fields
   if (Array.isArray(merged.shortcuts)) {

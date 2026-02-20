@@ -189,6 +189,12 @@
         "icon": "$(play)"
       },
       {
+        "command": "forest.openShortcutWith",
+        "title": "Open With…",
+        "category": "Forest",
+        "icon": "$(list-selection)"
+      },
+      {
         "command": "forest.stopShortcut",
         "title": "Stop Terminal",
         "category": "Forest",
@@ -284,6 +290,16 @@
           "group": "4_danger"
         },
         {
+          "command": "forest.openShortcutWith",
+          "when": "viewItem == shortcut-browser && forest.multipleBrowsers",
+          "group": "1_actions"
+        },
+        {
+          "command": "forest.openShortcutWith",
+          "when": "viewItem =~ /^shortcut-terminal/ && forest.multipleTerminals",
+          "group": "1_actions"
+        },
+        {
           "command": "forest.stopShortcut",
           "when": "viewItem == shortcut-terminal-running",
           "group": "inline"
@@ -291,17 +307,21 @@
         {
           "command": "forest.stopShortcut",
           "when": "viewItem == shortcut-terminal-running",
-          "group": "1_actions"
+          "group": "2_actions"
         },
         {
           "command": "forest.restartShortcut",
           "when": "viewItem == shortcut-terminal-running",
-          "group": "1_actions"
+          "group": "2_actions"
         }
       ],
       "commandPalette": [
         {
           "command": "forest.openShortcut",
+          "when": "false"
+        },
+        {
+          "command": "forest.openShortcutWith",
           "when": "false"
         },
         {

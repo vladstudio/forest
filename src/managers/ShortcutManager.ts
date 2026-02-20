@@ -46,6 +46,15 @@ export class ShortcutManager {
     }
   }
 
+  async openWith(sc: ShortcutConfig): Promise<void> {
+    const items = sc.type === 'terminal' ? this.config.terminal : sc.type === 'browser' ? this.config.browser : [];
+    if (items.length === 0) return;
+    const picked = items.length === 1 ? items[0] : await vscode.window.showQuickPick(items, { placeHolder: `Open "${sc.name}" with…` });
+    if (!picked) return;
+    if (sc.type === 'browser') this.openBrowser(sc, undefined, picked);
+    else if (sc.type === 'terminal') this.openTerminal(sc, undefined, picked);
+  }
+
   stop(sc: ShortcutConfig): void {
     if (sc.type !== 'terminal') return;
     const list = this.terminals.get(sc.name);
@@ -93,17 +102,21 @@ export class ShortcutManager {
     this._onDidChange.fire();
   }
 
-  private openTerminal(sc: ShortcutConfig & { type: 'terminal' }, location?: vscode.ViewColumn): void {
+  private openTerminal(sc: ShortcutConfig & { type: 'terminal' }, location?: vscode.ViewColumn, terminalApp?: string): void {
+    terminalApp ??= this.config.terminal[0];
+    if (terminalApp !== 'integrated') {
+      this.openExternalTerminal(sc, terminalApp);
+      return;
+    }
+
     const list = this.terminals.get(sc.name) ?? [];
     const mode = sc.mode ?? 'single-tree';
 
     if (mode === 'single-tree' && list.length > 0) { list[0].show(); return; }
     if (mode === 'single-repo') {
-      // Kill any existing instances in this window, then start fresh
       for (const t of [...list]) t.dispose();
       list.length = 0;
     }
-    // 'multiple' and 'single-repo' (after kill): fall through to create
 
     const env: Record<string, string> = {};
     if (sc.env) {
@@ -124,9 +137,27 @@ export class ShortcutManager {
     this._onDidChange.fire();
   }
 
-  private async openBrowser(sc: ShortcutConfig & { type: 'browser' }, viewColumn?: vscode.ViewColumn): Promise<void> {
+  private openExternalTerminal(sc: ShortcutConfig & { type: 'terminal' }, app: string): void {
+    const cwd = this.currentTree?.path ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!cwd) return;
+    const cmd = sc.command ? this.resolveVars(sc.command, true) : undefined;
+    const script = cmd ? `cd ${shellEscape(cwd)} && ${cmd}` : `cd ${shellEscape(cwd)}`;
+    const lowerApp = app.toLowerCase();
+
+    if (lowerApp === 'iterm' || lowerApp === 'iterm2') {
+      cp.execFile('osascript', ['-e', `tell application "iTerm" to create window with default profile command ${JSON.stringify(script)}`], { timeout: 5000 }).unref();
+    } else if (lowerApp === 'terminal' || lowerApp === 'terminal.app') {
+      cp.execFile('osascript', ['-e', `tell application "Terminal" to do script ${JSON.stringify(script)}`], { timeout: 5000 }).unref();
+    } else if (lowerApp === 'ghostty') {
+      cp.spawn('ghostty', ['--working-directory', cwd, ...(cmd ? ['-e', cmd] : [])], { detached: true, stdio: 'ignore' }).unref();
+    } else {
+      cp.spawn('open', ['-a', app, cwd], { detached: true, stdio: 'ignore' }).unref();
+    }
+  }
+
+  private async openBrowser(sc: ShortcutConfig & { type: 'browser' }, viewColumn?: vscode.ViewColumn, browser?: string): Promise<void> {
     const url = this.resolveVars(sc.url);
-    const browser = sc.browser ?? this.config.browser;
+    browser ??= sc.browser ?? this.config.browser[0];
     const port = this.extractPort(url);
     const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)/.test(url);
 
