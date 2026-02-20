@@ -278,13 +278,9 @@ async function createIssue(ctx: ForestContext): Promise<{ ticketId: string; titl
   try {
     const ticketId = await vscode.window.withProgress(
       { location: vscode.ProgressLocation.Notification, title: 'Creating Linear issue...', cancellable: false },
-      async () => {
-        const id = await linear.createIssue({ title: issueTitle, priority: priority?.value, team });
-        return id;
-      },
+      () => linear.createIssue({ title: issueTitle, priority: priority?.value, team }),
     );
-    const issue = await linear.getIssue(ticketId);
-    return { ticketId, title: issue?.title ?? issueTitle };
+    return { ticketId, title: issueTitle };
   } catch (e: any) {
     vscode.window.showErrorMessage(`Failed to create Linear issue: ${e.message}`);
     return null;

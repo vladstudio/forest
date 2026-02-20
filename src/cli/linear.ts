@@ -136,21 +136,24 @@ export async function createIssue(opts: {
   const teamKey = opts.team;
   if (!teamKey) throw new Error('Team key required to create issue');
 
-  const teamData = await gql<{ teams: { nodes: { id: string }[] } }>(
-    `query($key: String!) { teams(filter: { key: { eq: $key } }) { nodes { id } } }`,
-    { key: teamKey },
-  );
+  // Run all lookups in parallel
+  const [teamData, states, viewerData] = await Promise.all([
+    gql<{ teams: { nodes: { id: string }[] } }>(
+      `query($key: String!) { teams(filter: { key: { eq: $key } }) { nodes { id } } }`,
+      { key: teamKey },
+    ),
+    getWorkflowStates(teamKey),
+    gql<{ viewer: { id: string } }>('query { viewer { id } }'),
+  ]);
   const teamId = teamData.teams.nodes[0]?.id;
   if (!teamId) throw new Error(`Team "${teamKey}" not found`);
 
-  // Get the first "started" state for auto-start (lowest position in workflow)
-  const states = await getWorkflowStates(teamKey);
   const startedState = states.filter(s => s.type === 'started').sort((a, b) => a.position - b.position)[0];
 
   const input: Record<string, unknown> = {
     title: opts.title,
     teamId,
-    assigneeId: (await gql<{ viewer: { id: string } }>('query { viewer { id } }')).viewer.id,
+    assigneeId: viewerData.viewer.id,
   };
   if (startedState) input.stateId = startedState.id;
   if (opts.priority) input.priority = opts.priority;
