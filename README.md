@@ -12,7 +12,7 @@ VSCode extension for parallel feature development using git worktrees. One Linea
 | --------------------------- | ------------------------------------------------------------------- |
 | **New Tree**                | Create a worktree from an existing Linear ticket                    |
 | **New Linear Issue + Tree** | Create a new Linear ticket + worktree in one step                   |
-| **Ship**                    | Push branch + create PR + move ticket to configured status          |
+| **Ship**                    | Push branch + create PR (with optional automerge) + move ticket to configured status |
 | **Cleanup**                 | Merge PR + delete worktree + move ticket to configured status       |
 | **Delete**                  | Remove worktree + branch without merging + move ticket to canceled  |
 | **Shelve**                  | Remove worktree but keep branch for later                           |
@@ -64,7 +64,8 @@ Per-developer overrides go in `.forest/local.json` (should be gitignored):
     "model": "gemini-2.5-flash",
     "apiKey": "YOUR_KEY"
   },
-  "browser": "external"
+  "browser": ["external", "Firefox"],
+  "terminal": ["iTerm", "integrated"]
 }
 ```
 
@@ -91,9 +92,10 @@ To set up Forest, ask Claude (or any AI) to read this README and generate `.fore
 | `baseBranch`   | no       | `main`                | Base branch name (`origin/` prefix is added automatically)                                                                                                                                                                                                                                                                |
 | `maxTrees`     | no       | `10`                  | Max concurrent worktrees                                                                                                                                                                                                                                                                                                  |
 | `ai`           | no       | disabled              | AI-generated PR descriptions. Set `provider` (`anthropic`, `openai`, `gemini`), `model`, and `apiKey`. Best placed in `local.json`                                                                                                                                                                                       |
-| `browser`      | no       | `simple`              | Default browser for `browser` shortcuts: `simple` (VS Code Simple Browser), `external` (system default), or an app name (e.g. `"Firefox"`)                                                                                                                                                                               |
+| `browser`      | no       | `["simple"]`          | Browser app list. First item is the default; right-click a shortcut to pick another. Values: `simple` (VS Code Simple Browser), `external` (system default), or an app name (e.g. `"Firefox"`)                                                                                                                            |
+| `terminal`     | no       | `["integrated"]`      | Terminal app list. First item is the default; right-click to pick another. Values: `integrated` (VS Code terminal), or an external app (`iTerm`, `Terminal`, `Ghostty`). External terminals receive the shortcut command automatically                                                                                     |
 
-**Shortcut types** are inferred from fields: `url` → browser, `path` → file, otherwise → terminal (explicit `type` still accepted). All support `openOnLaunch: N` (VS Code ViewColumn for placement, `false` to disable). Terminal `mode`: `single-tree` (default, one instance per tree), `single-repo` (kills previous on reopen), `multiple` (new instance each click, no stop/restart buttons). Terminals also accept `command` and `env`. Browser shortcuts accept a per-shortcut `browser` override (same values as the top-level `browser` setting).
+**Shortcut types** are inferred from fields: `url` → browser, `path` → file, otherwise → terminal (explicit `type` still accepted). All support `openOnLaunch: N` (VS Code ViewColumn for placement, `false` to disable). Terminal `mode`: `single-tree` (default, one instance per tree), `single-repo` (kills previous on reopen), `multiple` (new instance each click, no stop/restart buttons). Terminals also accept `command` and `env`. Browser shortcuts accept a per-shortcut `browser` override (same values as the top-level `browser` setting). Both `browser` and `terminal` accept a single string for backward compatibility.
 
 **Variable expansion in shortcuts:** `${ticketId}`, `${branch}`, `${slug}`, `${repo}`, `${treePath}`, `${prNumber}`, `${prUrl}`.
 

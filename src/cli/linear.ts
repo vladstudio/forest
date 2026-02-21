@@ -172,10 +172,13 @@ export async function updateIssueState(issueId: string, state: string, team?: st
   // Extract team key from issue ID (e.g. "KAD-4828" → "KAD")
   const teamKey = team || issueId.replace(/-\d+$/, '');
   const stateId = await resolveStateId(teamKey, state);
-  await gql(
+  const result = await gql<{ issueUpdate: { success: boolean } }>(
     `mutation($id: String!, $input: IssueUpdateInput!) {
       issueUpdate(id: $id, input: $input) { success }
     }`,
     { id: issueId, input: { stateId } },
   );
+  if (!result.issueUpdate.success) {
+    log.error(`updateIssueState: mutation returned success=false for ${issueId} → ${state}`);
+  }
 }
