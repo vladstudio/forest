@@ -30,6 +30,22 @@ export async function ship(ctx: ForestContext, treeArg?: import('../state').Tree
     if (choice !== 'Ship Anyway') return;
   }
 
+  const ghEnabled = config.github.enabled && await gh.isAvailable();
+
+  // Offer automerge if repo supports it
+  let automerge = false;
+  if (ghEnabled) {
+    const hasAutomerge = await gh.repoHasAutomerge(tree.path!);
+    if (hasAutomerge) {
+      const pick = await vscode.window.showQuickPick([
+        { label: 'Create PR', value: false },
+        { label: 'Create PR + Automerge', value: true },
+      ], { placeHolder: 'Ship options' });
+      if (!pick) return;
+      automerge = pick.value;
+    }
+  }
+
   const name = displayName(tree);
   const prUrl = await vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: `Shipping ${name}...` },
@@ -40,7 +56,7 @@ export async function ship(ctx: ForestContext, treeArg?: import('../state').Tree
 
       // Create PR via gh CLI
       let url: string | null = null;
-      if (config.github.enabled && await gh.isAvailable()) {
+      if (ghEnabled) {
         const prTitle = tree.ticketId && tree.title
           ? `${tree.ticketId}: ${tree.title}`
           : name;
@@ -59,6 +75,16 @@ export async function ship(ctx: ForestContext, treeArg?: import('../state').Tree
 
         progress.report({ message: 'Creating PR...' });
         url = await gh.createPR(tree.path!, config.baseBranch, prTitle, prBody);
+
+        if (url && automerge) {
+          progress.report({ message: 'Enabling automerge...' });
+          try {
+            await gh.enableAutomerge(tree.path!);
+          } catch (e: any) {
+            log.error(`enableAutomerge failed: ${e.message}`);
+            vscode.window.showWarningMessage(`Automerge failed: ${e.message}`);
+          }
+        }
       }
 
       // Update Linear status

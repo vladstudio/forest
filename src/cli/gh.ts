@@ -42,6 +42,20 @@ export async function prIsMerged(repoPath: string, branch: string): Promise<bool
   } catch (e: any) { log.error(`prIsMerged(${branch}) failed: ${e.message}`); return false; }
 }
 
+export async function repoHasAutomerge(worktreePath: string): Promise<boolean> {
+  try {
+    const { stdout } = await exec('gh', ['api', 'repos/{owner}/{repo}', '--jq', '.allow_auto_merge'], { cwd: worktreePath, timeout: 10_000 });
+    return stdout.trim() === 'true';
+  } catch (e: any) {
+    log.error(`repoHasAutomerge check failed: ${e.message}`);
+    return false;
+  }
+}
+
+export async function enableAutomerge(worktreePath: string): Promise<void> {
+  await exec('gh', ['pr', 'merge', '--auto', '--squash'], { cwd: worktreePath, timeout: 30_000 });
+}
+
 export async function createPR(worktreePath: string, baseBranch: string, title: string, body?: string): Promise<string | null> {
   log.info(`createPR: "${title}" → ${baseBranch}`);
   const base = baseBranch.replace(/^origin\//, '');
