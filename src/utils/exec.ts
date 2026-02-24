@@ -44,6 +44,8 @@ export async function execShell(
   }
 }
 
+const MAX_STREAM_BUFFER = 10 * 1024 * 1024; // 10MB, same as exec/execShell
+
 /** Shell exec with real-time output streaming via onData callback. */
 export function execStream(
   command: string,
@@ -56,12 +58,12 @@ export function execStream(
     const timer = opts?.timeout ? setTimeout(() => { child.kill(); reject(new Error('Timeout')); }, opts.timeout) : undefined;
     child.stdout?.on('data', (data: Buffer) => {
       const s = data.toString();
-      stdout += s;
+      if (stdout.length < MAX_STREAM_BUFFER) stdout += s;
       opts?.onData?.(s);
     });
     child.stderr?.on('data', (data: Buffer) => {
       const s = data.toString();
-      stderr += s;
+      if (stderr.length < MAX_STREAM_BUFFER) stderr += s;
       opts?.onData?.(s);
     });
     child.on('close', (code) => {

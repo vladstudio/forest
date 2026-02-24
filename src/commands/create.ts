@@ -14,7 +14,8 @@ function validateBranch(value: string): string | undefined {
 }
 
 async function revertLinear(ctx: ForestContext, ticketId: string): Promise<void> {
-  await updateLinear(ctx, ticketId, 'unstarted');
+  const statuses = ctx.config.linear.statuses.issueList;
+  await updateLinear(ctx, ticketId, statuses[statuses.length - 1]);
 }
 
 /** Try to extract a ticketId from a branch name using the configured branchFormat. */
@@ -86,7 +87,7 @@ export async function create(ctx: ForestContext): Promise<void> {
   const config = ctx.config;
   const linearEnabled = config.linear.enabled && linear.isAvailable();
 
-  const items: { label: string; id: string }[] = []
+  const items: { label: string; id: string }[] = [];
   if (linearEnabled) {
     items.push({ label: '$(add) New Linear issue + branch', id: 'issue' });
   }

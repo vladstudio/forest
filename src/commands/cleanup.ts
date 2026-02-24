@@ -27,14 +27,12 @@ async function teardownTree(ctx: ForestContext, tree: TreeState): Promise<void> 
     await ctx.stateManager.removeTree(tree.repoPath, tree.branch);
     try { fs.unlinkSync(workspaceFilePath(tree.repoPath, tree.branch)); } catch {}
     ctx.outputChannel.appendLine('[Forest] State updated');
+    if (tree.path) {
+      await runStep(ctx, 'Remove worktree', () => git.removeWorktree(tree.repoPath, tree.path!));
+    }
+    await runStep(ctx, 'Delete branch', () => git.deleteBranch(tree.repoPath, tree.branch));
     if (shouldClose) {
       await vscode.commands.executeCommand('workbench.action.closeWindow');
-    } else if (tree.path) {
-      await runStep(ctx, 'Remove worktree', () => git.removeWorktree(tree.repoPath, tree.path!));
-      await runStep(ctx, 'Delete branch', () => git.deleteBranch(tree.repoPath, tree.branch));
-    } else {
-      // Shelved — no worktree to remove, just delete branch
-      await runStep(ctx, 'Delete branch', () => git.deleteBranch(tree.repoPath, tree.branch));
     }
   } finally {
     teardownInProgress.delete(key);

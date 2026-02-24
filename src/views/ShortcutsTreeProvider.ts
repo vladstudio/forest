@@ -3,12 +3,13 @@ import type { ForestConfig } from '../config';
 import type { ShortcutManager } from '../managers/ShortcutManager';
 import { ShortcutItem } from './items';
 
-export class ShortcutsTreeProvider implements vscode.TreeDataProvider<ShortcutItem> {
+export class ShortcutsTreeProvider implements vscode.TreeDataProvider<ShortcutItem>, vscode.Disposable {
   private _onDidChange = new vscode.EventEmitter<ShortcutItem | undefined>();
   readonly onDidChangeTreeData = this._onDidChange.event;
+  private subscription: vscode.Disposable;
 
   constructor(private config: ForestConfig, private sm: ShortcutManager) {
-    sm.onDidChange(() => this._onDidChange.fire(undefined));
+    this.subscription = sm.onDidChange(() => this._onDidChange.fire(undefined));
   }
 
   getChildren(): ShortcutItem[] {
@@ -16,4 +17,9 @@ export class ShortcutsTreeProvider implements vscode.TreeDataProvider<ShortcutIt
   }
 
   getTreeItem(el: ShortcutItem): vscode.TreeItem { return el; }
+
+  dispose(): void {
+    this.subscription.dispose();
+    this._onDidChange.dispose();
+  }
 }

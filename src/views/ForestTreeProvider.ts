@@ -66,12 +66,11 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
     // No path (shelved) or path doesn't exist yet (being created in another window)
     if (!tree.path || !fs.existsSync(tree.path)) return { behind: 0, age: null, pr: null };
 
-    const [behind, ahead, pr] = await Promise.all([
+    const [behind, age, pr] = await Promise.all([
       git.commitsBehind(tree.path, this.config.baseBranch),
-      git.commitsAhead(tree.path, this.config.baseBranch),
+      git.lastCommitAge(tree.path),
       gh.prStatus(tree.path),
     ]);
-    const age = ahead > 0 ? await git.lastCommitAge(tree.path) : null;
     return { behind, age, pr };
   }
 

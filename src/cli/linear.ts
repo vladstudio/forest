@@ -31,6 +31,7 @@ async function gql<T>(query: string, variables?: Record<string, unknown>): Promi
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: _apiKey },
     body: JSON.stringify({ query, variables }),
+    signal: AbortSignal.timeout(15_000),
   });
   if (!res.ok) {
     const body = await res.text().catch(() => '');

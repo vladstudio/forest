@@ -86,11 +86,10 @@ export async function activate(context: vscode.ExtensionContext) {
 
   const outputChannel = vscode.window.createOutputChannel('Forest');
 
-  /** Prune trees whose worktree folders no longer exist on disk. Returns true if any were pruned. */
-  const pruneOrphans = async (): Promise<boolean> => {
+  /** Prune trees whose worktree folders no longer exist on disk. Returns latest state. */
+  const pruneOrphans = async (): Promise<import('./state').ForestState> => {
     const s = await stateManager.load();
     const trees = stateManager.getTreesForRepo(s, repoPath);
-    let pruned = false;
     for (const tree of trees) {
       if (tree.path && !fs.existsSync(tree.path)) {
         log.warn(`Pruning orphan: ${tree.branch} (${tree.path} missing)`);
@@ -98,17 +97,16 @@ export async function activate(context: vscode.ExtensionContext) {
         await stateManager.removeTree(tree.repoPath, tree.branch);
         try { fs.unlinkSync(workspaceFilePath(tree.repoPath, tree.branch)); } catch {}
         git.deleteBranch(tree.repoPath, tree.branch).catch(() => {});
-        pruned = true;
       }
     }
-    return pruned;
+    return stateManager.load();
   };
 
-  await pruneOrphans();
+  const postPruneState = await pruneOrphans();
 
   // Detect if current workspace is a tree (reuse state after pruning)
   const curPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  const currentTree = curPath ? Object.values(stateManager.loadSync().trees).find(t => t.path === curPath) : undefined;
+  const currentTree = curPath ? Object.values(postPruneState.trees).find(t => t.path === curPath) : undefined;
   log.info(`Window: ${curPath ?? '(none)'}, tree: ${currentTree?.branch ?? '(main)'}`);
 
   vscode.commands.executeCommand('setContext', 'forest.isTree', !!currentTree);
@@ -229,7 +227,10 @@ export async function activate(context: vscode.ExtensionContext) {
     if (orphanCheckRunning) return;
     orphanCheckRunning = true;
     try {
-      if (await pruneOrphans()) forestProvider.refresh();
+      const before = stateManager.getTreesForRepo(stateManager.loadSync(), repoPath).length;
+      await pruneOrphans();
+      const after = stateManager.getTreesForRepo(stateManager.loadSync(), repoPath).length;
+      if (after < before) forestProvider.refresh();
     } finally {
       orphanCheckRunning = false;
     }
@@ -275,7 +276,7 @@ export async function activate(context: vscode.ExtensionContext) {
     updateNoTrees();
   });
 
-  context.subscriptions.push(outputChannel, shortcutManager, statusBarManager, stateManager);
+  context.subscriptions.push(outputChannel, shortcutManager, shortcutsProvider, statusBarManager, stateManager);
   if (logger) context.subscriptions.push(logger);
 }
 

@@ -1,13 +1,18 @@
 import type { AIConfig } from '../config';
 import { log } from '../logger';
 
+const MAX_DIFF_CHARS = 100_000;
+
 export async function generatePRBody(config: AIConfig, diff: string, title: string): Promise<string> {
+  const trimmedDiff = diff.length > MAX_DIFF_CHARS
+    ? diff.slice(0, MAX_DIFF_CHARS) + '\n\n[diff truncated]'
+    : diff;
   const prompt = `Write a pull request description for the following changes. Be concise. Use markdown. Start with a short summary paragraph, then a bullet list of key changes if needed. Do not include a title.
 
 PR title: ${title}
 
 Diff:
-${diff}`;
+${trimmedDiff}`;
 
   const message = await callProvider(config, prompt);
   return message;
@@ -36,6 +41,7 @@ async function callAnthropic(config: AIConfig, prompt: string): Promise<string> 
       temperature: 0.3,
       messages: [{ role: 'user', content: prompt }],
     }),
+    signal: AbortSignal.timeout(30_000),
   });
   if (!res.ok) {
     const body = await res.text();
@@ -62,6 +68,7 @@ async function callOpenAI(config: AIConfig, prompt: string): Promise<string> {
         { role: 'user', content: prompt },
       ],
     }),
+    signal: AbortSignal.timeout(30_000),
   });
   if (!res.ok) {
     const body = await res.text();
@@ -82,6 +89,7 @@ async function callGemini(config: AIConfig, prompt: string): Promise<string> {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: { temperature: 0.3, maxOutputTokens: 1024 },
       }),
+      signal: AbortSignal.timeout(30_000),
     },
   );
   if (!res.ok) {

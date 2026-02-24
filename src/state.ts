@@ -33,6 +33,7 @@ export class StateManager {
   readonly onDidChange = this._onDidChange.event;
   private watcher?: fs.FSWatcher;
   private writeLock = Promise.resolve();
+  private selfWriting = false;
 
   constructor() {
     this.statePath = path.join(os.homedir(), '.forest', 'state.json');
@@ -51,7 +52,7 @@ export class StateManager {
     const dir = path.dirname(this.statePath);
     const basename = path.basename(this.statePath);
     this.watcher = fs.watch(dir, (_event, filename) => {
-      if (filename !== basename) return;
+      if (filename !== basename || this.selfWriting) return;
       try {
         const content = fs.readFileSync(this.statePath, 'utf8');
         if (content !== lastContent) {
@@ -85,8 +86,10 @@ export class StateManager {
     const keys = Object.keys(state.trees);
     log.info(`State save: ${keys.length} trees [${keys.join(', ')}]`);
     const tmp = this.statePath + '.tmp';
+    this.selfWriting = true;
     fs.writeFileSync(tmp, JSON.stringify(state, null, 2), 'utf8');
     fs.renameSync(tmp, this.statePath);
+    this.selfWriting = false;
   }
 
   private key(repoPath: string, branch: string): string {
