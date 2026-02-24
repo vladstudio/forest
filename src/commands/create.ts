@@ -52,12 +52,9 @@ export async function start(ctx: ForestContext, arg: { ticketId: string; title: 
       { location: vscode.ProgressLocation.Notification, title: 'Loading branches...' },
       () => git.listBranches(getRepoPath(), config.baseBranch),
     );
-    const state = await ctx.stateManager.load();
-    const usedBranches = new Set(ctx.stateManager.getTreesForRepo(state, getRepoPath()).map(t => t.branch));
-    const available = branches.filter(b => !usedBranches.has(b));
-    if (!available.length) { vscode.window.showInformationMessage('No available branches.'); return; }
+    if (!branches.length) { vscode.window.showInformationMessage('No available branches.'); return; }
     const picked = await vscode.window.showQuickPick(
-      available.map(b => ({ label: b })),
+      branches.map(b => ({ label: b })),
       { placeHolder: 'Select a branch' },
     );
     if (!picked) return;
@@ -115,15 +112,15 @@ async function createFromNewBranch(ctx: ForestContext): Promise<void> {
   const branchName = await vscode.window.showInputBox({ prompt: 'Branch name', placeHolder: 'my-feature', validateInput: validateBranch });
   if (!branchName) return;
 
-  // Optional: link a Linear ticket
+  // Optional: link a Linear issue
   let ticketId: string | undefined;
   let title: string | undefined;
 
   if (linearEnabled) {
     const link = await vscode.window.showQuickPick([
-      { label: '$(search) Link to existing issue', id: 'select' },
-      { label: '$(dash) No ticket', id: 'skip' },
-    ], { placeHolder: 'Link a Linear ticket?' });
+      { label: '$(search) Link to existing Linear issue', id: 'select' },
+      { label: '$(dash) No Linear issue', id: 'skip' },
+    ], { placeHolder: 'Link a Linear issue?' });
     if (!link) return;
 
     if (link.id === 'select') {
@@ -154,13 +151,10 @@ async function createFromExistingBranch(ctx: ForestContext): Promise<void> {
     () => git.listBranches(repoPath, config.baseBranch),
   );
 
-  const state = await ctx.stateManager.load();
-  const usedBranches = new Set(ctx.stateManager.getTreesForRepo(state, repoPath).map(t => t.branch));
-  const available = branches.filter(b => !usedBranches.has(b));
-  if (!available.length) { vscode.window.showInformationMessage('No available branches.'); return; }
+  if (!branches.length) { vscode.window.showInformationMessage('No available branches.'); return; }
 
   const picked = await vscode.window.showQuickPick(
-    available.map(b => ({ label: b })),
+    branches.map(b => ({ label: b })),
     { placeHolder: 'Select a branch' },
   );
   if (!picked) return;
@@ -184,10 +178,10 @@ async function createFromExistingBranch(ctx: ForestContext): Promise<void> {
 
   if (!ticketId && linearEnabled) {
     const link = await vscode.window.showQuickPick([
-      { label: '$(search) Link to existing issue', id: 'select' },
-      { label: '$(add) Create new issue', id: 'create' },
-      { label: '$(dash) No ticket', id: 'skip' },
-    ], { placeHolder: 'Link a Linear ticket?' });
+      { label: '$(search) Link to existing Linear issue', id: 'select' },
+      { label: '$(add) Create new Linear issue', id: 'create' },
+      { label: '$(dash) No Linear issue', id: 'skip' },
+    ], { placeHolder: 'Link a Linear issue?' });
     if (!link) return;
 
     if (link.id === 'select') {

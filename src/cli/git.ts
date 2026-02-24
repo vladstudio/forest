@@ -114,16 +114,14 @@ export async function listBranches(repoPath: string, baseBranch: string): Promis
   const { stdout: localOut } = await exec('git', ['branch', '--format=%(refname:short)'], { cwd: repoPath });
   const allBranches = new Set(localOut.split('\n').map(b => b.trim()).filter(Boolean));
 
-  // Remote branches active in last 7 days, not already local
-  const cutoff = Math.floor((Date.now() - 7 * 86_400_000) / 1000);
+  // Remote branches not already local
   const { stdout: remoteOut } = await exec('git', [
-    'for-each-ref', '--format=%(refname:short) %(committerdate:unix)', 'refs/remotes/origin/',
+    'for-each-ref', '--format=%(refname:short)', 'refs/remotes/origin/',
   ], { cwd: repoPath });
   for (const line of remoteOut.split('\n').filter(Boolean)) {
-    const [ref, ts] = line.split(' ');
-    if (ref === 'origin/HEAD') continue;
-    const name = ref.replace('origin/', '');
-    if (!allBranches.has(name) && parseInt(ts) >= cutoff) allBranches.add(name);
+    if (line === 'origin/HEAD') continue;
+    const name = line.replace('origin/', '');
+    if (!allBranches.has(name)) allBranches.add(name);
   }
 
   // Strip "origin/" from baseBranch for comparison
