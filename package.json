@@ -94,8 +94,8 @@
       },
       {
         "view": "forest.trees",
-        "contents": "No trees yet.\n[New Tree](command:forest.create)",
-        "when": "forest.active && forest.noTrees"
+        "contents": "Welcome to Forest!\n[New Tree](command:forest.create)",
+        "when": "!forest.active"
       }
     ],
     "commands": [

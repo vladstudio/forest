@@ -238,7 +238,7 @@ async function createFromNewIssue(ctx: ForestContext): Promise<void> {
 }
 
 async function pickIssue(ctx: ForestContext): Promise<{ ticketId: string; title: string } | null | undefined> {
-  const issues = await linear.listMyIssues(ctx.config.linear.statuses.issueList, ctx.config.linear.teams);
+  const issues = await linear.listMyIssues(['triage', 'backlog', 'unstarted', 'started'], ctx.config.linear.teams);
   const state = await ctx.stateManager.load();
   const existingTickets = new Set(
     ctx.stateManager.getTreesForRepo(state, getRepoPath())

@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import type { ForestConfig } from '../config';
 import type { StateManager, TreeState } from '../state';
-import { MainRepoItem, StageGroupItem, IssueItem, TreeItemView } from './items';
+import { MainRepoItem, NoTreesItem, StageGroupItem, IssueItem, TreeItemView } from './items';
 import type { TreeContext } from './items';
 import { getRepoPath } from '../context';
 import * as git from '../cli/git';
@@ -15,7 +15,7 @@ export interface TreeHealth {
   pr: { state: string; reviewDecision: string | null; number?: number } | null;
 }
 
-type ForestElement = MainRepoItem | StageGroupItem | IssueItem | TreeItemView;
+type ForestElement = MainRepoItem | NoTreesItem | StageGroupItem | IssueItem | TreeItemView;
 
 export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement> {
   private _onDidChange = new vscode.EventEmitter<ForestElement | undefined>();
@@ -94,7 +94,7 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
   }
 
   async getChildren(element?: ForestElement): Promise<ForestElement[]> {
-    if (element instanceof MainRepoItem || element instanceof TreeItemView || element instanceof IssueItem) return [];
+    if (element instanceof MainRepoItem || element instanceof NoTreesItem || element instanceof TreeItemView || element instanceof IssueItem) return [];
     if (element instanceof StageGroupItem) return element.children as ForestElement[];
 
     const repoPath = getRepoPath();
@@ -152,6 +152,7 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
     if (inProgress.length) groups.push(new StageGroupItem('Trees: In progress', inProgress.length, 'code', inProgress, isCollapsed('Trees: In progress')));
     if (inReview.length) groups.push(new StageGroupItem('Trees: In review', inReview.length, 'git-pull-request', inReview, isCollapsed('Trees: In review')));
     if (done.length) groups.push(new StageGroupItem('Trees: Done', done.length, 'check', done, isCollapsed('Trees: Done')));
+    if (!trees.length) groups.push(new StageGroupItem('Trees', 0, 'git-branch', [new NoTreesItem()], false));
     return [new MainRepoItem(repoPath, this.config.baseBranch), ...groups];
   }
 

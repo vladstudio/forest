@@ -6,6 +6,15 @@ import type { ShortcutConfig } from '../config';
 import { displayName } from '../state';
 import type { TreeHealth } from './ForestTreeProvider';
 
+export class NoTreesItem extends vscode.TreeItem {
+  contextValue = 'noTrees';
+  constructor() {
+    super('Create a tree', vscode.TreeItemCollapsibleState.None);
+    this.iconPath = new vscode.ThemeIcon('info');
+    this.command = { command: 'forest.create', title: 'New Tree' };
+  }
+}
+
 export class MainRepoItem extends vscode.TreeItem {
   contextValue = 'mainRepo';
   constructor(repoPath: string, baseBranch: string) {
