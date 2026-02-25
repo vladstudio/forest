@@ -2,7 +2,8 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { loadConfig } from './config';
-import { IssueItem, ShortcutItem, StageGroupItem, StashItem, TreeItemView } from './views/items';
+import { IssueItem, ShortcutItem, StageGroupItem, TreeItemView } from './views/items';
+import type { StashItem } from './views/items';
 import { StateManager } from './state';
 import { ForestContext, getRepoPath } from './context';
 import { ShortcutManager } from './managers/ShortcutManager';
@@ -190,8 +191,17 @@ export async function activate(context: vscode.ExtensionContext) {
   reg('forest.restartShortcut', (arg: any) => shortcutManager.restart(unwrap(arg)));
 
   // Stash commands
+  const getWsPath = () => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const confirmDropStash = async (label: string, index: number) => {
+    const confirm = await vscode.window.showWarningMessage(
+      `Delete stash "${label}"?`, { modal: true }, 'Delete',
+    );
+    if (confirm !== 'Delete') return;
+    await git.stashDrop(repoPath, index);
+    stashesProvider.refresh();
+  };
   reg('forest.stashPush', async () => {
-    const wsPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const wsPath = getWsPath();
     if (!wsPath) return;
     if (!(await git.hasUncommittedChanges(wsPath))) {
       vscode.window.showInformationMessage('No uncommitted changes to stash.');
@@ -203,22 +213,17 @@ export async function activate(context: vscode.ExtensionContext) {
     stashesProvider.refresh();
   });
   reg('forest.stashApply', async (arg: StashItem) => {
-    const wsPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const wsPath = getWsPath();
     if (!wsPath) return;
     await git.stashApply(wsPath, arg.index);
     stashesProvider.refresh();
   });
-  reg('forest.stashDrop', async (arg: StashItem) => {
-    const confirm = await vscode.window.showWarningMessage(
-      `Delete stash "${arg.label}"?`, { modal: true }, 'Delete',
-    );
-    if (confirm !== 'Delete') return;
-    await git.stashDrop(repoPath, arg.index);
-    stashesProvider.refresh();
-  });
+  reg('forest.stashDrop', (arg: StashItem) => confirmDropStash(arg.label as string, arg.index));
   reg('forest.stashAction', async (index: number) => {
-    const wsPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const wsPath = getWsPath();
     if (!wsPath) return;
+    const entries = await git.stashList(repoPath);
+    const label = entries.find(e => e.index === index)?.message ?? `stash@{${index}}`;
     const pick = await vscode.window.showQuickPick(
       [{ label: '$(cloud-download) Apply', id: 'apply' }, { label: '$(trash) Delete', id: 'delete' }],
       { placeHolder: 'Stash action' },
@@ -227,14 +232,16 @@ export async function activate(context: vscode.ExtensionContext) {
       await git.stashApply(wsPath, index);
       stashesProvider.refresh();
     } else if (pick?.id === 'delete') {
-      const confirm = await vscode.window.showWarningMessage(
-        'Delete this stash?', { modal: true }, 'Delete',
-      );
-      if (confirm !== 'Delete') return;
-      await git.stashDrop(wsPath, index);
-      stashesProvider.refresh();
+      await confirmDropStash(label, index);
     }
   });
+
+  // Refresh all sections when window gains focus (cross-window coordination)
+  context.subscriptions.push(
+    vscode.window.onDidChangeWindowState(e => {
+      if (e.focused) { forestProvider.refresh(); stashesProvider.refresh(); }
+    }),
+  );
 
   // If this is a tree window, open launch shortcuts
   if (currentTree) {

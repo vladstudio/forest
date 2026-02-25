@@ -56,7 +56,10 @@ export async function stashList(repoPath: string): Promise<StashEntry[]> {
   try {
     const { stdout } = await exec('git', ['stash', 'list', '--format=%gs'], { cwd: repoPath });
     if (!stdout.trim()) return [];
-    return stdout.trim().split('\n').map((message, index) => ({ index, message }));
+    return stdout.trim().split('\n').map((line, index) => ({
+      index,
+      message: line.replace(/^On [^:]+:\s*/, ''),
+    }));
   } catch { return []; }
 }
 
