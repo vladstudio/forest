@@ -172,6 +172,10 @@ export async function activate(context: vscode.ExtensionContext) {
     const tree = arg instanceof TreeItemView ? arg.tree : ctx.currentTree;
     if (tree) vscode.env.clipboard.writeText(tree.branch);
   });
+  reg('forest.revealInFinder', (arg?: TreeItemView) => {
+    const tree = arg instanceof TreeItemView ? arg.tree : ctx.currentTree;
+    if (tree?.path) vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(tree.path));
+  });
   reg('forest.openPR', (arg?: TreeItemView) => {
     const tree = arg instanceof TreeItemView ? arg.tree : ctx.currentTree;
     if (tree?.prUrl) vscode.env.openExternal(vscode.Uri.parse(tree.prUrl));

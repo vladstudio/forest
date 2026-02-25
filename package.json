@@ -105,6 +105,11 @@
         "category": "Forest"
       },
       {
+        "command": "forest.revealInFinder",
+        "title": "Reveal in Finder",
+        "category": "Forest"
+      },
+      {
         "command": "forest.create",
         "title": "New Tree…",
         "category": "Forest",
@@ -250,6 +255,11 @@
           "group": "1_navigation"
         },
         {
+          "command": "forest.revealInFinder",
+          "when": "viewItem =~ /^tree-/ && viewItem != tree-shelved",
+          "group": "1_navigation"
+        },
+        {
           "command": "forest.ship",
           "when": "viewItem == tree-progress",
           "group": "2_ship"
@@ -261,11 +271,6 @@
         },
         {
           "command": "forest.update",
-          "when": "viewItem == tree-progress || viewItem == tree-review",
-          "group": "3_lifecycle"
-        },
-        {
-          "command": "forest.rebase",
           "when": "viewItem == tree-progress || viewItem == tree-review",
           "group": "3_lifecycle"
         },
@@ -334,6 +339,10 @@
         },
         {
           "command": "forest.start",
+          "when": "false"
+        },
+        {
+          "command": "forest.revealInFinder",
           "when": "false"
         }
       ]
