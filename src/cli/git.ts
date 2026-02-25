@@ -46,6 +46,28 @@ export async function stashPop(worktreePath: string): Promise<void> {
   await exec('git', ['stash', 'pop'], { cwd: worktreePath });
 }
 
+export async function stashPush(repoPath: string, message: string): Promise<void> {
+  await exec('git', ['stash', 'push', '-u', '-m', message], { cwd: repoPath });
+}
+
+export interface StashEntry { index: number; message: string }
+
+export async function stashList(repoPath: string): Promise<StashEntry[]> {
+  try {
+    const { stdout } = await exec('git', ['stash', 'list', '--format=%gs'], { cwd: repoPath });
+    if (!stdout.trim()) return [];
+    return stdout.trim().split('\n').map((message, index) => ({ index, message }));
+  } catch { return []; }
+}
+
+export async function stashApply(repoPath: string, index: number): Promise<void> {
+  await exec('git', ['stash', 'apply', `stash@{${index}}`], { cwd: repoPath });
+}
+
+export async function stashDrop(repoPath: string, index: number): Promise<void> {
+  await exec('git', ['stash', 'drop', `stash@{${index}}`], { cwd: repoPath });
+}
+
 export async function discardChanges(repoPath: string): Promise<void> {
   await exec('git', ['checkout', '.'], { cwd: repoPath });
   await exec('git', ['clean', '-fd'], { cwd: repoPath });

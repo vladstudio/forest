@@ -2,13 +2,14 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { loadConfig } from './config';
-import { IssueItem, ShortcutItem, StageGroupItem, TreeItemView } from './views/items';
+import { IssueItem, ShortcutItem, StageGroupItem, StashItem, TreeItemView } from './views/items';
 import { StateManager } from './state';
 import { ForestContext, getRepoPath } from './context';
 import { ShortcutManager } from './managers/ShortcutManager';
 import { StatusBarManager } from './managers/StatusBarManager';
 import { ForestTreeProvider } from './views/ForestTreeProvider';
 import { ShortcutsTreeProvider } from './views/ShortcutsTreeProvider';
+import { StashesTreeProvider } from './views/StashesTreeProvider';
 import { create, start } from './commands/create';
 import { switchTree } from './commands/switch';
 import { ship } from './commands/ship';
@@ -122,9 +123,11 @@ export async function activate(context: vscode.ExtensionContext) {
   forestView.onDidExpandElement(e => {
     if (e.element instanceof StageGroupItem) forestProvider.setCollapsed(e.element.label as string, false);
   });
+  const stashesProvider = new StashesTreeProvider(repoPath);
   context.subscriptions.push(
     forestView,
     vscode.window.registerTreeDataProvider('forest.shortcuts', shortcutsProvider),
+    vscode.window.registerTreeDataProvider('forest.stashes', stashesProvider),
   );
 
   // Update noTrees context + sidebar badge
@@ -185,6 +188,53 @@ export async function activate(context: vscode.ExtensionContext) {
   reg('forest.openShortcutWith', (arg: any) => shortcutManager.openWith(unwrap(arg)));
   reg('forest.stopShortcut', (arg: any) => shortcutManager.stop(unwrap(arg)));
   reg('forest.restartShortcut', (arg: any) => shortcutManager.restart(unwrap(arg)));
+
+  // Stash commands
+  reg('forest.stashPush', async () => {
+    const wsPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!wsPath) return;
+    if (!(await git.hasUncommittedChanges(wsPath))) {
+      vscode.window.showInformationMessage('No uncommitted changes to stash.');
+      return;
+    }
+    const branch = ctx.currentTree?.branch ?? config.baseBranch.replace(/^origin\//, '');
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+    await git.stashPush(wsPath, `${branch} @ ${time}`);
+    stashesProvider.refresh();
+  });
+  reg('forest.stashApply', async (arg: StashItem) => {
+    const wsPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!wsPath) return;
+    await git.stashApply(wsPath, arg.index);
+    stashesProvider.refresh();
+  });
+  reg('forest.stashDrop', async (arg: StashItem) => {
+    const confirm = await vscode.window.showWarningMessage(
+      `Delete stash "${arg.label}"?`, { modal: true }, 'Delete',
+    );
+    if (confirm !== 'Delete') return;
+    await git.stashDrop(repoPath, arg.index);
+    stashesProvider.refresh();
+  });
+  reg('forest.stashAction', async (index: number) => {
+    const wsPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!wsPath) return;
+    const pick = await vscode.window.showQuickPick(
+      [{ label: '$(cloud-download) Apply', id: 'apply' }, { label: '$(trash) Delete', id: 'delete' }],
+      { placeHolder: 'Stash action' },
+    );
+    if (pick?.id === 'apply') {
+      await git.stashApply(wsPath, index);
+      stashesProvider.refresh();
+    } else if (pick?.id === 'delete') {
+      const confirm = await vscode.window.showWarningMessage(
+        'Delete this stash?', { modal: true }, 'Delete',
+      );
+      if (confirm !== 'Delete') return;
+      await git.stashDrop(wsPath, index);
+      stashesProvider.refresh();
+    }
+  });
 
   // If this is a tree window, open launch shortcuts
   if (currentTree) {

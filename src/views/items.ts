@@ -75,6 +75,15 @@ export class ShortcutItem extends vscode.TreeItem {
   }
 }
 
+export class StashItem extends vscode.TreeItem {
+  contextValue = 'stash';
+  constructor(public readonly index: number, message: string) {
+    super(message, vscode.TreeItemCollapsibleState.None);
+    this.iconPath = new vscode.ThemeIcon('archive');
+    this.command = { command: 'forest.stashAction', title: 'Stash Action', arguments: [index] };
+  }
+}
+
 function abbreviateAge(age: string): string {
   return age
     .replace(/ seconds? ago/, 's')
