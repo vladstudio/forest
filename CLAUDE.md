@@ -34,7 +34,7 @@ Global state at `~/.forest/state.json`. Trees keyed as `repoPath:ticketId`. File
 Thin wrappers (40-60 lines) around shared logic in `commands/shared.ts`. `createTree()` orchestrates: port allocation → worktree creation → file copy → setup → state save → open window.
 
 ### Managers (`src/managers/`)
-- **ShortcutManager**: Terminal/browser/file lifecycle. Tracks terminals in `Map<string, vscode.Terminal[]>`. Emits change events for UI. Supports `mode` (`single-tree`, `single-repo`, `multiple`) for terminal instance control. `openWith()` shows a QuickPick to choose from the configured app list. External terminal support for iTerm, Terminal.app, and Ghostty via AppleScript.
+- **ShortcutManager**: Terminal/browser/file lifecycle. Tracks terminals in `Map<string, vscode.Terminal[]>`. Emits change events for UI. Supports `mode` (`single-tree`, `single-repo`, `multiple`, default: `multiple`) for terminal instance control. `openWith()` shows a QuickPick to choose from the configured app list. External terminal support for iTerm, Terminal.app, and Ghostty via AppleScript.
 - **StatusBarManager**: Shows current tree info in status bar.
 
 ### Views (`src/views/`)

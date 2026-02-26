@@ -110,7 +110,7 @@ export class ShortcutManager {
     }
 
     const list = this.terminals.get(sc.name) ?? [];
-    const mode = sc.mode ?? 'single-tree';
+    const mode = sc.mode ?? 'multiple';
 
     if (mode === 'single-tree' && list.length > 0) { list[0].show(); return; }
     if (mode === 'single-repo') {
