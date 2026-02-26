@@ -4,6 +4,13 @@ import { displayName } from '../state';
 import * as git from '../cli/git';
 import { copyConfigFiles, runSetupCommands } from './shared';
 
+function showTimedNotification(message: string, ms = 2000): void {
+  vscode.window.withProgress(
+    { location: vscode.ProgressLocation.Notification, title: message },
+    () => new Promise((resolve) => setTimeout(resolve, ms)),
+  );
+}
+
 export async function update(ctx: ForestContext, treeArg?: import('../state').TreeState): Promise<void> {
   const tree = treeArg || ctx.currentTree;
   if (!tree) {
@@ -33,7 +40,7 @@ export async function update(ctx: ForestContext, treeArg?: import('../state').Tr
       progress.report({ message: 'Running setup...' });
       await runSetupCommands(config, tree.path!, ctx.outputChannel);
 
-      vscode.window.showInformationMessage('Tree updated. Dependencies refreshed.');
+      showTimedNotification('Tree updated. Dependencies refreshed.');
     },
   );
 }
@@ -67,7 +74,7 @@ export async function rebase(ctx: ForestContext, treeArg?: import('../state').Tr
       progress.report({ message: 'Running setup...' });
       await runSetupCommands(config, tree.path!, ctx.outputChannel);
 
-      vscode.window.showInformationMessage('Tree rebased. Dependencies refreshed.');
+      showTimedNotification('Tree rebased. Dependencies refreshed.');
     },
   );
 }
