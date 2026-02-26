@@ -12,7 +12,7 @@ import * as linear from '../cli/linear';
 export interface TreeHealth {
   behind: number;
   age: string | null;
-  pr: { state: string; reviewDecision: string | null; number?: number } | null;
+  pr: { state: string; reviewDecision: string | null; number?: number; url?: string } | null;
 }
 
 type ForestElement = MainRepoItem | NoTreesItem | StageGroupItem | IssueItem | TreeItemView;
@@ -71,6 +71,10 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
       git.lastCommitAge(tree.path),
       gh.prStatus(tree.path),
     ]);
+    // Backfill prUrl in state when discovered from GitHub
+    if (pr?.url && !tree.prUrl) {
+      this.stateManager.updateTree(tree.repoPath, tree.branch, { prUrl: pr.url }).catch(() => {});
+    }
     return { behind, age, pr };
   }
 

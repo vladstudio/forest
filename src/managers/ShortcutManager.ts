@@ -160,6 +160,7 @@ export class ShortcutManager {
 
   private async openBrowser(sc: ShortcutConfig & { type: 'browser' }, viewColumn?: vscode.ViewColumn, browser?: string): Promise<void> {
     const url = this.resolveVars(sc.url);
+    if (!url) { vscode.window.showWarningMessage(`Cannot open "${sc.name}": URL resolved to empty (variable not set).`); return; }
     browser ??= sc.browser ?? this.config.browser[0];
     const port = this.extractPort(url);
     const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)/.test(url);

@@ -20,11 +20,11 @@ export async function mergePR(
   await exec('gh', ['pr', 'merge', ...flags], { cwd: worktreePath, timeout: 30_000 });
 }
 
-export async function prStatus(worktreePath: string): Promise<{ state: string; reviewDecision: string | null; number?: number } | null> {
+export async function prStatus(worktreePath: string): Promise<{ state: string; reviewDecision: string | null; number?: number; url?: string } | null> {
   try {
-    const { stdout } = await exec('gh', ['pr', 'view', '--json', 'state,reviewDecision,number'], { cwd: worktreePath, timeout: 10_000 });
+    const { stdout } = await exec('gh', ['pr', 'view', '--json', 'state,reviewDecision,number,url'], { cwd: worktreePath, timeout: 10_000 });
     const data = JSON.parse(stdout);
-    return { state: data.state || 'OPEN', reviewDecision: data.reviewDecision || null, number: data.number };
+    return { state: data.state || 'OPEN', reviewDecision: data.reviewDecision || null, number: data.number, url: data.url };
   } catch (e: any) {
     log.error(`prStatus failed: ${e.message}`);
     if (!_authWarned && (e.stderr || e.message || '').includes('auth login')) {
