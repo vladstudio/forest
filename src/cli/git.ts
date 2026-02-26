@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import { exec } from '../utils/exec';
 import { log } from '../logger';
 
@@ -12,15 +13,27 @@ export async function createWorktree(
 
 export async function removeWorktree(repoPath: string, worktreePath: string): Promise<void> {
   log.info(`removeWorktree: ${worktreePath}`);
-  await exec('git', ['worktree', 'remove', worktreePath, '--force'], { cwd: repoPath });
+  // Rename directory (instant O(1) on same filesystem), prune git metadata,
+  // then delete the renamed directory in the background.
+  const pendingPath = worktreePath + '.removing.' + Date.now();
+  try {
+    fs.renameSync(worktreePath, pendingPath);
+  } catch {
+    await exec('git', ['worktree', 'remove', worktreePath, '--force'], { cwd: repoPath });
+    return;
+  }
+  await exec('git', ['worktree', 'prune'], { cwd: repoPath });
+  fs.rm(pendingPath, { recursive: true, force: true }, () => {});
 }
 
-export async function deleteBranch(repoPath: string, branch: string): Promise<void> {
+export async function deleteBranch(repoPath: string, branch: string, opts?: { skipRemote?: boolean }): Promise<void> {
   log.info(`deleteBranch: ${branch}`);
   await exec('git', ['branch', '-D', branch], { cwd: repoPath });
-  await exec('git', ['push', 'origin', '--delete', branch], { cwd: repoPath }).catch((e: any) => {
-    log.warn(`deleteBranch remote delete failed for ${branch}: ${e.message}`);
-  });
+  if (!opts?.skipRemote) {
+    await exec('git', ['push', 'origin', '--delete', branch], { cwd: repoPath }).catch((e: any) => {
+      log.warn(`deleteBranch remote delete failed for ${branch}: ${e.message}`);
+    });
+  }
 }
 
 export async function pushBranch(worktreePath: string, branch: string): Promise<void> {

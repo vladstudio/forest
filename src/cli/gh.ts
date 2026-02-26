@@ -17,7 +17,12 @@ export async function mergePR(
   const flags: string[] = [];
   if (opts?.squash !== false) flags.push('--squash');
   if (opts?.deleteBranch !== false) flags.push('--delete-branch');
-  await exec('gh', ['pr', 'merge', ...flags], { cwd: worktreePath, timeout: 30_000 });
+  try {
+    await exec('gh', ['pr', 'merge', ...flags], { cwd: worktreePath, timeout: 30_000 });
+  } catch (e: any) {
+    if (/already merged/i.test(e.stderr || e.message || '')) return;
+    throw e;
+  }
 }
 
 export async function prStatus(worktreePath: string): Promise<{ state: string; reviewDecision: string | null; number?: number; url?: string } | null> {

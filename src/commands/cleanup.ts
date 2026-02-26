@@ -17,7 +17,7 @@ function resolveTree(ctx: ForestContext, branchArg?: string): TreeState | undefi
 
 const teardownInProgress = new Set<string>();
 
-async function teardownTree(ctx: ForestContext, tree: TreeState): Promise<void> {
+async function teardownTree(ctx: ForestContext, tree: TreeState, opts?: { skipRemoteBranchDelete?: boolean }): Promise<void> {
   const key = `${tree.repoPath}:${tree.branch}`;
   if (teardownInProgress.has(key)) { log.warn(`teardownTree already in progress: ${tree.branch}`); return; }
   log.info(`teardownTree: ${tree.branch}`);
@@ -30,7 +30,7 @@ async function teardownTree(ctx: ForestContext, tree: TreeState): Promise<void> 
     if (tree.path) {
       await runStep(ctx, 'Remove worktree', () => git.removeWorktree(tree.repoPath, tree.path!));
     }
-    await runStep(ctx, 'Delete branch', () => git.deleteBranch(tree.repoPath, tree.branch));
+    await runStep(ctx, 'Delete branch', () => git.deleteBranch(tree.repoPath, tree.branch, { skipRemote: opts?.skipRemoteBranchDelete }));
     if (shouldClose) {
       await vscode.commands.executeCommand('workbench.action.closeWindow');
     }
@@ -62,16 +62,23 @@ export async function cleanup(ctx: ForestContext, branchArg?: string): Promise<v
   await vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: `Cleaning up ${displayName(tree)}...` },
     async (progress) => {
-      if (config.github.enabled && tree.path && await gh.isAvailable() && !await gh.prIsMerged(tree.repoPath, tree.branch)) {
-        progress.report({ message: 'Merging PR...' });
-        if (!await runStep(ctx, 'Merge PR', () => gh.mergePR(tree.path!))) return;
-      }
+      const shouldMerge = config.github.enabled && tree.path && await gh.isAvailable();
+      let mergeFailed = false;
 
-      progress.report({ message: 'Updating ticket...' });
-      if (tree.ticketId) await updateLinear(ctx, tree.ticketId, config.linear.statuses.onCleanup);
+      progress.report({ message: 'Merging & updating...' });
+      await Promise.all([
+        shouldMerge
+          ? runStep(ctx, 'Merge PR', () => gh.mergePR(tree.path!)).then(ok => { if (!ok) mergeFailed = true; })
+          : Promise.resolve(),
+        tree.ticketId
+          ? updateLinear(ctx, tree.ticketId, config.linear.statuses.onCleanup)
+          : Promise.resolve(),
+      ]);
+
+      if (mergeFailed) return;
 
       progress.report({ message: 'Removing worktree...' });
-      await teardownTree(ctx, tree);
+      await teardownTree(ctx, tree, { skipRemoteBranchDelete: !!shouldMerge });
     },
   );
 }
