@@ -156,7 +156,8 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
     if (inReview.length) groups.push(new StageGroupItem('Trees: In review', inReview.length, 'git-pull-request', inReview, isCollapsed('Trees: In review')));
     if (done.length) groups.push(new StageGroupItem('Trees: Done', done.length, 'check', done, isCollapsed('Trees: Done')));
     if (!trees.length) groups.push(new StageGroupItem('Trees', 0, 'git-branch', [new NoTreesItem()], false));
-    return [new MainRepoItem(repoPath, this.config.baseBranch), ...groups];
+    const mainIsCurrent = curPath === repoPath;
+    return [new MainRepoItem(repoPath, this.config.baseBranch, mainIsCurrent), ...groups];
   }
 
   getTreeItem(el: ForestElement): vscode.TreeItem { return el; }

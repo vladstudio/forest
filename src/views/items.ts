@@ -17,11 +17,13 @@ export class NoTreesItem extends vscode.TreeItem {
 
 export class MainRepoItem extends vscode.TreeItem {
   contextValue = 'mainRepo';
-  constructor(repoPath: string, baseBranch: string) {
+  constructor(repoPath: string, baseBranch: string, isCurrent?: boolean) {
     const branch = baseBranch.replace(/^origin\//, '');
     super(branch, vscode.TreeItemCollapsibleState.None);
     this.description = path.basename(repoPath);
-    this.iconPath = new vscode.ThemeIcon('home');
+    this.iconPath = isCurrent
+      ? new vscode.ThemeIcon('arrow-right', new vscode.ThemeColor('charts.green'))
+      : new vscode.ThemeIcon('home');
     this.command = { command: 'forest.openMain', title: 'Open Main Repo' };
   }
 }
