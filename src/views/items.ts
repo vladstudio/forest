@@ -140,7 +140,8 @@ export class TreeItemView extends vscode.TreeItem {
       tree.ticketId ? `Ticket: ${tree.ticketId}` : undefined,
     ].filter(Boolean).join('\n');
 
-    this.contextValue = ctx;
+    // Suffix gates mutating menu items (update/ship/delete) to the owning window only
+    this.contextValue = isCurrent ? `${ctx}-current` : ctx;
 
     if (!isCurrent && tree.path) {
       this.command = { command: 'forest.switch', title: 'Switch', arguments: [tree.branch] };

@@ -294,17 +294,17 @@
         },
         {
           "command": "forest.ship",
-          "when": "viewItem == tree-progress",
+          "when": "viewItem == tree-progress-current",
           "group": "2_ship"
         },
         {
           "command": "forest.openPR",
-          "when": "viewItem == tree-review || viewItem == tree-done",
+          "when": "viewItem =~ /tree-review|tree-done/",
           "group": "2_ship"
         },
         {
           "command": "forest.update",
-          "when": "viewItem == tree-progress || viewItem == tree-review",
+          "when": "viewItem == tree-progress-current || viewItem == tree-review-current",
           "group": "3_lifecycle"
         },
         {
@@ -314,17 +314,17 @@
         },
         {
           "command": "forest.cleanup",
-          "when": "viewItem == tree-done",
+          "when": "viewItem == tree-done-current",
           "group": "4_danger"
         },
         {
           "command": "forest.shelve",
-          "when": "viewItem == tree-progress || viewItem == tree-review",
+          "when": "viewItem == tree-progress-current || viewItem == tree-review-current",
           "group": "4_danger"
         },
         {
           "command": "forest.cancel",
-          "when": "viewItem =~ /^tree-/ && viewItem != tree-done",
+          "when": "viewItem == tree-shelved || viewItem == tree-progress-current || viewItem == tree-review-current",
           "group": "4_danger"
         },
         {
