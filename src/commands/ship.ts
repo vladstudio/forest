@@ -3,7 +3,7 @@ import type { ForestContext } from '../context';
 import { displayName } from '../state';
 import * as git from '../cli/git';
 import * as gh from '../cli/gh';
-import * as linear from '../cli/linear';
+
 import { generatePRBody } from '../cli/ai';
 import { updateLinear } from './shared';
 import { log } from '../logger';
@@ -92,21 +92,19 @@ export async function ship(ctx: ForestContext, treeArg?: import('../state').Tree
   const postShip: Promise<void>[] = [];
 
   if (prUrl && automerge) {
-    postShip.push(
-      gh.enableAutomerge(tree.path!).catch((e: any) => {
-        log.error(`enableAutomerge failed: ${e.message}`);
-        vscode.window.showWarningMessage(`Automerge failed: ${e.message}`);
-      }),
-    );
+    postShip.push(gh.enableAutomerge(tree.path!));
   }
 
-  if (tree.ticketId && config.linear.enabled && linear.isAvailable()) {
+  if (tree.ticketId) {
     postShip.push(updateLinear(ctx, tree.ticketId, config.linear.statuses.onShip));
   }
 
   if (prUrl) {
-    postShip.push(ctx.stateManager.updateTree(tree.repoPath, tree.branch, { prUrl: prUrl }));
+    postShip.push(ctx.stateManager.updateTree(tree.repoPath, tree.branch, { prUrl }));
   }
 
-  await Promise.all(postShip);
+  await Promise.all(postShip).catch((e: any) => {
+    log.error(`Post-ship task failed: ${e.message}`);
+    vscode.window.showWarningMessage(`Post-ship task failed: ${e.message}`);
+  });
 }
