@@ -75,27 +75,6 @@ export async function ship(ctx: ForestContext, treeArg?: import('../state').Tree
 
         progress.report({ message: 'Creating PR...' });
         url = await gh.createPR(tree.path!, config.baseBranch, prTitle, prBody);
-
-        if (url && automerge) {
-          progress.report({ message: 'Enabling automerge...' });
-          try {
-            await gh.enableAutomerge(tree.path!);
-          } catch (e: any) {
-            log.error(`enableAutomerge failed: ${e.message}`);
-            vscode.window.showWarningMessage(`Automerge failed: ${e.message}`);
-          }
-        }
-      }
-
-      // Update Linear status
-      if (tree.ticketId && config.linear.enabled && linear.isAvailable()) {
-        progress.report({ message: 'Updating Linear...' });
-        await updateLinear(ctx, tree.ticketId, config.linear.statuses.onShip);
-      }
-
-      // Update state
-      if (url) {
-        await ctx.stateManager.updateTree(tree.repoPath, tree.branch, { prUrl: url });
       }
 
       return url;
@@ -108,4 +87,26 @@ export async function ship(ctx: ForestContext, treeArg?: import('../state').Tree
   } else {
     vscode.window.showInformationMessage('Shipped!');
   }
+
+  // Post-ship: automerge, Linear update, state save — all independent, run in parallel
+  const postShip: Promise<void>[] = [];
+
+  if (prUrl && automerge) {
+    postShip.push(
+      gh.enableAutomerge(tree.path!).catch((e: any) => {
+        log.error(`enableAutomerge failed: ${e.message}`);
+        vscode.window.showWarningMessage(`Automerge failed: ${e.message}`);
+      }),
+    );
+  }
+
+  if (tree.ticketId && config.linear.enabled && linear.isAvailable()) {
+    postShip.push(updateLinear(ctx, tree.ticketId, config.linear.statuses.onShip));
+  }
+
+  if (prUrl) {
+    postShip.push(ctx.stateManager.updateTree(tree.repoPath, tree.branch, { prUrl: prUrl }));
+  }
+
+  await Promise.all(postShip);
 }
