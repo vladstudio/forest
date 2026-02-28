@@ -58,8 +58,25 @@ export async function activate(context: vscode.ExtensionContext) {
   vscode.commands.executeCommand('setContext', 'forest.multipleTerminals', config.terminal.length > 1);
   linear.configure(config.linear.apiKey);
 
-  // Watch config files for external edits
   const repoPath = getRepoPath();
+
+  // Validate Linear config statuses against actual workflow states
+  if (config.linear.enabled && config.linear.teams?.length) {
+    linear.validateStatuses(config.linear.statuses, config.linear.teams).then(problems => {
+      if (!problems.length) return;
+      vscode.window.showWarningMessage(
+        `Forest config: ${problems.join('. ')}`,
+        'Open Config',
+      ).then(action => {
+        if (action === 'Open Config') {
+          vscode.workspace.openTextDocument(path.join(repoPath, '.forest', 'config.json'))
+            .then(doc => vscode.window.showTextDocument(doc));
+        }
+      });
+    });
+  }
+
+  // Watch config files for external edits
   const configWatcher = vscode.workspace.createFileSystemWatcher(
     new vscode.RelativePattern(path.join(repoPath, '.forest'), '{config,local}.json'),
   );

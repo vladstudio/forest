@@ -168,6 +168,36 @@ export async function createIssue(opts: {
   return data.issueCreate.issue.identifier;
 }
 
+/** Validate configured statuses against actual Linear workflow states. Returns problem descriptions. */
+export async function validateStatuses(
+  statuses: { issueList: string[]; onNew: string; onShip: string; onCleanup: string; onCancel: string },
+  teams: string[],
+): Promise<string[]> {
+  try {
+    const problems: string[] = [];
+    const VALID_TYPES = ['triage', 'backlog', 'unstarted', 'started', 'completed', 'canceled'];
+    for (const team of teams) {
+      const states = await getWorkflowStates(team);
+      if (!states.length) { problems.push(`Team "${team}" has no workflow states (wrong team key?)`); continue; }
+      // Validate transition statuses (onNew, onShip, etc.) — can match name or type
+      for (const [field, value] of Object.entries({ onNew: statuses.onNew, onShip: statuses.onShip, onCleanup: statuses.onCleanup, onCancel: statuses.onCancel })) {
+        const lower = value.toLowerCase();
+        const byName = states.find(s => s.name.toLowerCase() === lower);
+        const byType = states.find(s => s.type === lower);
+        if (!byName && !byType) {
+          const available = [...new Set(states.map(s => s.name))].join(', ');
+          problems.push(`${field}: "${value}" not found for team ${team} (available: ${available})`);
+        }
+      }
+      // Validate issueList — must be valid state types
+      for (const t of statuses.issueList) {
+        if (!VALID_TYPES.includes(t)) problems.push(`issueList: "${t}" is not a valid state type`);
+      }
+    }
+    return problems;
+  } catch { return []; }
+}
+
 export async function updateIssueState(issueId: string, state: string, team?: string): Promise<void> {
   log.info(`updateIssueState: ${issueId} → ${state}${team ? ` (team: ${team})` : ''}`);
   // Extract team key from issue ID (e.g. "KAD-4828" → "KAD")
