@@ -1,4 +1,7 @@
 import * as vscode from 'vscode';
+import { writeFileSync, unlinkSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
 import { exec, commandExists } from '../utils/exec';
 import { log } from '../logger';
 
@@ -67,14 +70,21 @@ export async function createPR(worktreePath: string, baseBranch: string, title: 
   log.info(`createPR: "${title}" → ${baseBranch}`);
   const base = baseBranch.replace(/^origin\//, '');
   const args = ['pr', 'create', '--base', base, '--title', title];
+  let bodyFile: string | undefined;
   if (body) {
-    args.push('--body', body);
+    bodyFile = join(tmpdir(), `forest-pr-body-${Date.now()}.md`);
+    writeFileSync(bodyFile, body, 'utf8');
+    args.push('--body-file', bodyFile);
   } else {
     args.push('--fill');
   }
-  const { stdout } = await exec('gh', args, { cwd: worktreePath, timeout: 30_000 });
-  // gh pr create prints the URL on the last line (may have preamble text)
-  const url = stdout.trim().split('\n').pop()?.trim();
-  log.info(`createPR result: ${url ?? '(no url)'}`);
-  return url || null;
+  try {
+    const { stdout } = await exec('gh', args, { cwd: worktreePath, timeout: 30_000 });
+    // gh pr create prints the URL on the last line (may have preamble text)
+    const url = stdout.trim().split('\n').pop()?.trim();
+    log.info(`createPR result: ${url ?? '(no url)'}`);
+    return url || null;
+  } finally {
+    if (bodyFile) try { unlinkSync(bodyFile); } catch {}
+  }
 }
