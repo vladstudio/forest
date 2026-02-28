@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { loadConfig } from './config';
+import { loadConfig, getTreesDir } from './config';
 import { IssueItem, ShortcutItem, StageGroupItem, TreeItemView } from './views/items';
 import type { StashItem } from './views/items';
 import { StateManager } from './state';
@@ -90,6 +90,16 @@ export async function activate(context: vscode.ExtensionContext) {
 
   /** Prune trees whose worktree folders no longer exist on disk. Returns latest state. */
   const pruneOrphans = async (): Promise<import('./state').ForestState> => {
+    // Clean up stale .removing directories from interrupted deletions
+    const treesDir = getTreesDir(repoPath);
+    if (fs.existsSync(treesDir)) {
+      for (const entry of fs.readdirSync(treesDir)) {
+        if (entry.includes('.removing.')) {
+          log.info(`Cleaning stale .removing dir: ${entry}`);
+          await fs.promises.rm(path.join(treesDir, entry), { recursive: true, force: true }).catch(() => {});
+        }
+      }
+    }
     const s = await stateManager.load();
     const trees = stateManager.getTreesForRepo(s, repoPath);
     for (const tree of trees) {
@@ -323,7 +333,8 @@ export async function activate(context: vscode.ExtensionContext) {
         }
       }
     }
-    // Clean up git artifacts for trees removed by other windows.
+    // Clean up workspace files for trees removed by other windows.
+    // Worktree/branch cleanup is handled by the window that initiated removal.
     const currentTrees = stateManager.getTreesForRepo(newState, getRepoPath());
     const currentBranches = new Set(currentTrees.map(t => t.branch));
     for (const prev of previousTrees) {
@@ -331,15 +342,6 @@ export async function activate(context: vscode.ExtensionContext) {
       if (!currentBranches.has(prev.branch)) {
         log.info(`Tree removed by other window: ${prev.branch}`);
         try { fs.unlinkSync(workspaceFilePath(prev.repoPath, prev.branch)); } catch {}
-        if (prev.path) {
-          git.removeWorktree(prev.repoPath, prev.path)
-            .then(() => {
-              outputChannel.appendLine(`[Forest] Cleaned worktree: ${prev.branch}`);
-              return git.deleteBranch(prev.repoPath, prev.branch);
-            })
-            .then(() => outputChannel.appendLine(`[Forest] Deleted branch: ${prev.branch}`))
-            .catch(e => outputChannel.appendLine(`[Forest] Cleanup failed (${prev.branch}): ${e.message}`));
-        }
       }
     }
     previousTrees = currentTrees;

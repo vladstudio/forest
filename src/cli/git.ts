@@ -1,4 +1,6 @@
 import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
 import { exec } from '../utils/exec';
 import { log } from '../logger';
 
@@ -13,17 +15,20 @@ export async function createWorktree(
 
 export async function removeWorktree(repoPath: string, worktreePath: string): Promise<void> {
   log.info(`removeWorktree: ${worktreePath}`);
-  // Rename directory (instant O(1) on same filesystem), prune git metadata,
-  // then delete the renamed directory in the background.
-  const pendingPath = worktreePath + '.removing.' + Date.now();
-  try {
-    fs.renameSync(worktreePath, pendingPath);
-  } catch {
-    await exec('git', ['worktree', 'remove', worktreePath, '--force'], { cwd: repoPath });
-    return;
+  // Safety: refuse to delete the parent trees directory
+  const treesRoot = path.join(os.homedir(), '.forest', 'trees');
+  const rel = path.relative(treesRoot, worktreePath);
+  if (!rel || rel.startsWith('..') || rel.split(path.sep).length < 2) {
+    log.error(`removeWorktree: refusing dangerous path: ${worktreePath}`);
+    throw new Error(`removeWorktree: refusing dangerous path: ${worktreePath}`);
   }
-  await exec('git', ['worktree', 'prune'], { cwd: repoPath });
-  fs.rm(pendingPath, { recursive: true, force: true }, () => {});
+  try {
+    await exec('git', ['worktree', 'remove', worktreePath, '--force'], { cwd: repoPath });
+  } catch {
+    // Folder may already be gone or not registered — clean up manually
+    await fs.promises.rm(worktreePath, { recursive: true, force: true });
+    await exec('git', ['worktree', 'prune'], { cwd: repoPath }).catch(() => {});
+  }
 }
 
 export async function deleteBranch(repoPath: string, branch: string, opts?: { skipRemote?: boolean }): Promise<void> {

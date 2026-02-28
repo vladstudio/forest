@@ -34,7 +34,7 @@ export class StateManager {
   readonly onDidChange = this._onDidChange.event;
   private watcher?: fs.FSWatcher;
   private writeLock = Promise.resolve();
-  private selfWriting = false;
+  private lastWrittenContent = '';
 
   constructor() {
     this.statePath = path.join(os.homedir(), '.forest', 'state.json');
@@ -53,11 +53,12 @@ export class StateManager {
     const dir = path.dirname(this.statePath);
     const basename = path.basename(this.statePath);
     this.watcher = fs.watch(dir, (_event, filename) => {
-      if (filename !== basename || this.selfWriting) return;
+      if (filename !== basename) return;
       try {
         const content = fs.readFileSync(this.statePath, 'utf8');
         if (content !== lastContent) {
           lastContent = content;
+          if (content === this.lastWrittenContent) return; // self-write
           log.info('State file changed externally');
           this._onDidChange.fire(JSON.parse(content));
         }
@@ -86,11 +87,11 @@ export class StateManager {
   async save(state: ForestState): Promise<void> {
     const keys = Object.keys(state.trees);
     log.info(`State save: ${keys.length} trees [${keys.join(', ')}]`);
+    const data = JSON.stringify(state, null, 2);
+    this.lastWrittenContent = data;
     const tmp = this.statePath + '.tmp';
-    this.selfWriting = true;
-    fs.writeFileSync(tmp, JSON.stringify(state, null, 2), 'utf8');
+    fs.writeFileSync(tmp, data, 'utf8');
     fs.renameSync(tmp, this.statePath);
-    this.selfWriting = false;
   }
 
   private key(repoPath: string, branch: string): string {

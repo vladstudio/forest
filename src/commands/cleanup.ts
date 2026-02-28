@@ -24,13 +24,14 @@ async function teardownTree(ctx: ForestContext, tree: TreeState, opts?: { skipRe
   teardownInProgress.add(key);
   try {
     const shouldClose = ctx.currentTree?.branch === tree.branch;
-    await ctx.stateManager.removeTree(tree.repoPath, tree.branch);
-    try { fs.unlinkSync(workspaceFilePath(tree.repoPath, tree.branch)); } catch {}
-    ctx.outputChannel.appendLine('[Forest] State updated');
+    // Remove worktree & branch BEFORE state so other windows don't race to clean up.
     if (tree.path) {
       await runStep(ctx, 'Remove worktree', () => git.removeWorktree(tree.repoPath, tree.path!));
     }
     await runStep(ctx, 'Delete branch', () => git.deleteBranch(tree.repoPath, tree.branch, { skipRemote: opts?.skipRemoteBranchDelete }));
+    await ctx.stateManager.removeTree(tree.repoPath, tree.branch);
+    try { fs.unlinkSync(workspaceFilePath(tree.repoPath, tree.branch)); } catch {}
+    ctx.outputChannel.appendLine('[Forest] State updated');
     if (shouldClose) {
       await vscode.commands.executeCommand('workbench.action.closeWindow');
     }
