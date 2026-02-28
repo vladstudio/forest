@@ -25,7 +25,7 @@ Output: `dist/extension.js` (single bundle, `vscode` marked as external).
 Three-tier merge: defaults → `.forest/config.json` (repo) → `.forest/local.json` (gitignored per-dev). Shortcuts merge by `name` field; type is inferred from fields (`url` → browser, `path` → file, else terminal). `baseBranch` stored without `origin/` prefix (auto-prepended). `linear` auto-enabled when `teams` or `apiKey` present. `github` accepts boolean shorthand. Supports `${repo}`, `${ticketId}`, `${branch}`, `${slug}`, `${treePath}`, `${prNumber}`, `${prUrl}` variable expansion. Top-level `browser` setting is a `string[]` (first item is default, right-click picks from list); values: `simple` | `external` | app name. Per-shortcut `browser` field overrides it. Top-level `terminal` is also `string[]`; values: `integrated` | app name (`iTerm`, `Terminal`, `Ghostty`). Both accept a single string for backward compatibility.
 
 ### State (`src/state.ts`)
-Global state at `~/.forest/state.json`. Trees keyed as `repoPath:ticketId`. File-watch-based cross-window coordination with debounced events. Atomic writes via temp+rename. Write-locked to prevent races.
+Global state at `~/.forest/state.json`. Trees keyed as `repoPath:ticketId`. Also stores `shortcutClaims` for cross-window `single-repo` terminal coordination. File-watch-based cross-window coordination with debounced events. Atomic writes via temp+rename. Write-locked to prevent races.
 
 ### Context (`src/context.ts`)
 `ForestContext` is a dependency container passed to all commands — no globals. Contains config, all managers, providers, and current tree.
@@ -34,7 +34,7 @@ Global state at `~/.forest/state.json`. Trees keyed as `repoPath:ticketId`. File
 Thin wrappers (40-60 lines) around shared logic in `commands/shared.ts`. `createTree()` orchestrates: port allocation → worktree creation → file copy → setup → state save → open window.
 
 ### Managers (`src/managers/`)
-- **ShortcutManager**: Terminal/browser/file lifecycle. Tracks terminals in `Map<string, vscode.Terminal[]>`. Emits change events for UI. Supports `mode` (`single-tree`, `single-repo`, `multiple`, default: `multiple`) for terminal instance control. `openWith()` shows a QuickPick to choose from the configured app list. External terminal support for iTerm, Terminal.app, and Ghostty via AppleScript.
+- **ShortcutManager**: Terminal/browser/file lifecycle. Tracks terminals in `Map<string, vscode.Terminal[]>`. Emits change events for UI. Supports `mode` (`single-tree`, `single-repo`, `multiple`, default: `multiple`) for terminal instance control. `single-repo` uses cross-window claims via `shortcutClaims` in state.json — opening a terminal writes a claim, other windows react via the state watcher and dispose their terminal; `disposeAndWait()` ensures the old process is dead before creating the new one. `openWith()` shows a QuickPick to choose from the configured app list. External terminal support for iTerm, Terminal.app, and Ghostty via AppleScript.
 - **StatusBarManager**: Shows current tree info in status bar.
 
 ### Views (`src/views/`)

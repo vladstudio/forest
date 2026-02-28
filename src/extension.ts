@@ -113,7 +113,9 @@ export async function activate(context: vscode.ExtensionContext) {
 
   vscode.commands.executeCommand('setContext', 'forest.isTree', !!currentTree);
 
-  const shortcutManager = new ShortcutManager(config, currentTree);
+  const shortcutManager = new ShortcutManager(config, currentTree, (name, branch) =>
+    stateManager.claimShortcut(repoPath, name, branch),
+  );
   const statusBarManager = new StatusBarManager(currentTree);
   const forestProvider = new ForestTreeProvider(stateManager, config, context.globalState);
   const shortcutsProvider = new ShortcutsTreeProvider(config, shortcutManager);
@@ -311,6 +313,14 @@ export async function activate(context: vscode.ExtensionContext) {
         ctx.currentTree = updated;
         statusBarManager.update(updated);
         shortcutManager.updateTree(updated);
+      }
+      // Dispose terminals claimed by another window (single-repo mode)
+      if (newState.shortcutClaims) {
+        for (const sc of config.shortcuts) {
+          if (sc.type !== 'terminal' || (sc.mode ?? 'multiple') !== 'single-repo') continue;
+          const claim = newState.shortcutClaims[`${repoPath}:${sc.name}`];
+          if (claim && claim !== ctx.currentTree.branch) shortcutManager.handleExternalClaim(sc.name);
+        }
       }
     }
     // Clean up git artifacts for trees removed by other windows.

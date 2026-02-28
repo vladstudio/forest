@@ -25,7 +25,7 @@ export class ShortcutManager {
   private _onDidChange = new vscode.EventEmitter<void>();
   readonly onDidChange = this._onDidChange.event;
 
-  constructor(private config: ForestConfig, private currentTree: TreeState | undefined) {
+  constructor(private config: ForestConfig, private currentTree: TreeState | undefined, private onSingleRepoClaim?: (shortcutName: string, branch: string) => Promise<string | undefined>) {
     this.disposables.push(
       vscode.window.onDidCloseTerminal(t => this.handleTerminalClose(t)),
       this._onDidChange,
@@ -38,11 +38,11 @@ export class ShortcutManager {
     return list && list.length > 0 ? 'running' : 'stopped';
   }
 
-  open(sc: ShortcutConfig, viewColumn?: vscode.ViewColumn): void {
+  async open(sc: ShortcutConfig, viewColumn?: vscode.ViewColumn): Promise<void> {
     switch (sc.type) {
       case 'terminal': return this.openTerminal(sc);
-      case 'browser': return void this.openBrowser(sc, viewColumn);
-      case 'file': return void this.openFile(sc);
+      case 'browser': return this.openBrowser(sc, viewColumn);
+      case 'file': return this.openFile(sc);
     }
   }
 
@@ -51,8 +51,8 @@ export class ShortcutManager {
     if (items.length === 0) return;
     const picked = items.length === 1 ? items[0] : await vscode.window.showQuickPick(items, { placeHolder: `Open "${sc.name}" with…` });
     if (!picked) return;
-    if (sc.type === 'browser') this.openBrowser(sc, undefined, picked);
-    else if (sc.type === 'terminal') this.openTerminal(sc, undefined, picked);
+    if (sc.type === 'browser') await this.openBrowser(sc, undefined, picked);
+    else if (sc.type === 'terminal') await this.openTerminal(sc, undefined, picked);
   }
 
   stop(sc: ShortcutConfig): void {
@@ -94,7 +94,7 @@ export class ShortcutManager {
       if (sc.type === 'terminal') {
         const viewCol = typeof sc.openOnLaunch === 'number' && sc.openOnLaunch > 1 ? sc.openOnLaunch as vscode.ViewColumn : undefined;
         const existing = this.terminals.get(sc.name);
-        if (!existing || existing.length === 0) this.openTerminal(sc, viewCol);
+        if (!existing || existing.length === 0) await this.openTerminal(sc, viewCol);
       } else {
         this.open(sc, sc.openOnLaunch as vscode.ViewColumn);
       }
@@ -102,7 +102,7 @@ export class ShortcutManager {
     this._onDidChange.fire();
   }
 
-  private openTerminal(sc: ShortcutConfig & { type: 'terminal' }, location?: vscode.ViewColumn, terminalApp?: string): void {
+  private async openTerminal(sc: ShortcutConfig & { type: 'terminal' }, location?: vscode.ViewColumn, terminalApp?: string): Promise<void> {
     terminalApp ??= this.config.terminal[0];
     if (terminalApp !== 'integrated') {
       this.openExternalTerminal(sc, terminalApp);
@@ -114,8 +114,18 @@ export class ShortcutManager {
 
     if (mode === 'single-tree' && list.length > 0) { list[0].show(); return; }
     if (mode === 'single-repo') {
-      for (const t of [...list]) t.dispose();
-      list.length = 0;
+      // Broadcast claim first so other windows start killing their terminals
+      const prev = this.currentTree
+        ? await this.onSingleRepoClaim?.(sc.name, this.currentTree.branch)
+        : undefined;
+      // Dispose own terminals and wait for them to fully close
+      if (list.length > 0) {
+        await this.disposeAndWait(list);
+        list.length = 0;
+      } else if (prev && prev !== this.currentTree?.branch) {
+        // Another window had this shortcut — wait for cross-window disposal
+        await new Promise(r => setTimeout(r, 500));
+      }
     }
 
     const env: Record<string, string> = {};
@@ -135,6 +145,19 @@ export class ShortcutManager {
     list.push(terminal);
     this.terminals.set(sc.name, list);
     this._onDidChange.fire();
+  }
+
+  private disposeAndWait(terminals: vscode.Terminal[]): Promise<void> {
+    const remaining = new Set(terminals);
+    return new Promise<void>(resolve => {
+      const done = () => { clearTimeout(timer); sub.dispose(); resolve(); };
+      const sub = vscode.window.onDidCloseTerminal(t => {
+        remaining.delete(t);
+        if (remaining.size === 0) done();
+      });
+      const timer = setTimeout(done, 3000);
+      for (const t of terminals) t.dispose();
+    });
   }
 
   private openExternalTerminal(sc: ShortcutConfig & { type: 'terminal' }, app: string): void {
@@ -257,6 +280,13 @@ export class ShortcutManager {
   private extractPort(url: string): number | null {
     const m = url.match(/:(\d+)/);
     return m ? parseInt(m[1], 10) : null;
+  }
+
+  /** Dispose terminals for a shortcut claimed by another window. */
+  handleExternalClaim(shortcutName: string): void {
+    const list = this.terminals.get(shortcutName);
+    if (!list || list.length === 0) return;
+    for (const t of [...list]) t.dispose();
   }
 
   updateTree(tree: TreeState): void {

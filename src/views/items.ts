@@ -56,7 +56,7 @@ export class ShortcutItem extends vscode.TreeItem {
 
     if (shortcut.type === 'terminal') {
       const running = state === 'running';
-      const mode = shortcut.mode ?? 'single-tree';
+      const mode = shortcut.mode ?? 'multiple';
       this.contextValue = running
         ? (mode === 'multiple' ? 'shortcut-terminal-multi' : 'shortcut-terminal-running')
         : 'shortcut-terminal-stopped';

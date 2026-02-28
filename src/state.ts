@@ -18,6 +18,7 @@ export interface TreeState {
 export interface ForestState {
   version: 1;
   trees: Record<string, TreeState>;
+  shortcutClaims?: Record<string, string>;
 }
 
 /** Display name: "TICKET-ID  title" if ticket, else branch name. */
@@ -156,6 +157,17 @@ export class StateManager {
 
   getTree(state: ForestState, repoPath: string, branch: string): TreeState | undefined {
     return state.trees[this.key(repoPath, branch)];
+  }
+
+  async claimShortcut(repoPath: string, name: string, branch: string): Promise<string | undefined> {
+    let previous: string | undefined;
+    await this.modify(state => {
+      state.shortcutClaims ??= {};
+      const key = `${repoPath}:${name}`;
+      previous = state.shortcutClaims[key];
+      state.shortcutClaims[key] = branch;
+    });
+    return previous;
   }
 
   dispose(): void {
