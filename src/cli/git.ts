@@ -113,11 +113,11 @@ export async function diffFromBase(worktreePath: string, baseRef: string): Promi
   return stdout;
 }
 
-export async function lastCommitAge(worktreePath: string): Promise<string> {
+export async function lastCommitAge(worktreePath: string): Promise<string | null> {
   try {
     const { stdout } = await exec('git', ['log', '-1', '--format=%cr'], { cwd: worktreePath, timeout: 5_000 });
-    return stdout || 'unknown';
-  } catch { return 'unknown'; }
+    return stdout || null;
+  } catch { return null; }
 }
 
 /** Check out an existing branch into a new worktree (no -b flag).
