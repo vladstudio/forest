@@ -314,7 +314,7 @@
         },
         {
           "command": "forest.cleanup",
-          "when": "viewItem == tree-done-current",
+          "when": "viewItem =~ /^tree-done/",
           "group": "4_danger"
         },
         {
@@ -324,7 +324,7 @@
         },
         {
           "command": "forest.cancel",
-          "when": "viewItem == tree-shelved || viewItem == tree-progress-current || viewItem == tree-review-current",
+          "when": "viewItem =~ /^tree-(progress|review|done|shelved)/",
           "group": "4_danger"
         },
         {
