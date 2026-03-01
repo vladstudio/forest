@@ -36,12 +36,12 @@
     "lint": "eslint src --ext ts"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "@types/vscode": "^1.85.0",
-    "concurrently": "^9.0.0",
-    "esbuild": "^0.24.0",
+    "@types/node": "^20.19.35",
+    "@types/vscode": "^1.109.0",
+    "concurrently": "^9.2.1",
+    "esbuild": "^0.24.2",
     "eslint": "^9.39.3",
-    "typescript": "^5.7.0"
+    "typescript": "^5.9.3"
   },
   "contributes": {
     "viewsContainers": {
@@ -324,7 +324,7 @@
         },
         {
           "command": "forest.cancel",
-          "when": "viewItem =~ /^tree-(progress|review|done|shelved)/",
+          "when": "viewItem =~ /^tree-(progress|review|shelved)/",
           "group": "4_danger"
         },
         {
