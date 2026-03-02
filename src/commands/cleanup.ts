@@ -22,8 +22,8 @@ async function teardownTree(ctx: ForestContext, tree: TreeState, opts?: { skipRe
   if (teardownInProgress.has(key)) { log.warn(`teardownTree already in progress: ${tree.branch}`); return; }
   log.info(`teardownTree: ${tree.branch}`);
   teardownInProgress.add(key);
-  await ctx.stateManager.updateTree(tree.repoPath, tree.branch, { cleaning: true });
   try {
+    await ctx.stateManager.updateTree(tree.repoPath, tree.branch, { cleaning: true });
     const shouldClose = ctx.currentTree?.branch === tree.branch;
     // Remove worktree & branch BEFORE state so other windows don't race to clean up.
     if (tree.path) {
