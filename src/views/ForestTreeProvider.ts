@@ -112,15 +112,24 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
 
-    const healthResults = await Promise.all(trees.map(t => this.getHealth(t).catch(() => null)));
+    const healthResults = await Promise.all(trees.map(t =>
+      t.cleaning ? Promise.resolve(null) : this.getHealth(t).catch(() => null),
+    ));
 
+    const cleaning: TreeItemView[] = [];
     const inProgress: TreeItemView[] = [];
     const inReview: TreeItemView[] = [];
     const done: TreeItemView[] = [];
 
     trees.forEach((t, i) => {
-      const health = healthResults[i] ?? undefined;
       const isCurrent = t.path === curPath;
+
+      if (t.cleaning) {
+        cleaning.push(new TreeItemView(t, isCurrent, 'tree-cleaning'));
+        return;
+      }
+
+      const health = healthResults[i] ?? undefined;
       const shelved = !t.path;
 
       let ctx: TreeContext;
@@ -152,6 +161,7 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
       }
     }
 
+    if (cleaning.length) groups.push(new StageGroupItem('Trees: Cleaning up', cleaning.length, 'loading~spin', cleaning, false));
     if (inProgress.length) groups.push(new StageGroupItem('Trees: In progress', inProgress.length, 'code', inProgress, isCollapsed('Trees: In progress')));
     if (inReview.length) groups.push(new StageGroupItem('Trees: In review', inReview.length, 'git-pull-request', inReview, isCollapsed('Trees: In review')));
     if (done.length) groups.push(new StageGroupItem('Trees: Done', done.length, 'check', done, isCollapsed('Trees: Done')));

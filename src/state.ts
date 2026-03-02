@@ -13,6 +13,7 @@ export interface TreeState {
   title?: string;
   prUrl?: string;
   mergeNotified?: boolean;
+  cleaning?: boolean;
 }
 
 export interface ForestState {

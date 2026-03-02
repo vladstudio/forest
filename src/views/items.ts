@@ -97,7 +97,7 @@ function abbreviateAge(age: string): string {
     .replace(/ years? ago/, 'y');
 }
 
-export type TreeContext = 'tree-progress' | 'tree-shelved' | 'tree-review' | 'tree-done';
+export type TreeContext = 'tree-progress' | 'tree-shelved' | 'tree-review' | 'tree-done' | 'tree-cleaning';
 
 export class TreeItemView extends vscode.TreeItem {
   constructor(
@@ -124,9 +124,12 @@ export class TreeItemView extends vscode.TreeItem {
       if (health.age) parts.push(abbreviateAge(health.age));
     }
     if (ctx === 'tree-shelved') parts.push('shelved');
+    if (ctx === 'tree-cleaning') parts.push('cleaning up...');
     this.description = parts.join(' \u00b7 ');
 
-    if (ctx === 'tree-shelved') {
+    if (ctx === 'tree-cleaning') {
+      this.iconPath = new vscode.ThemeIcon('loading~spin');
+    } else if (ctx === 'tree-shelved') {
       this.iconPath = new vscode.ThemeIcon('archive', new vscode.ThemeColor('disabledForeground'));
     } else if (isCurrent) {
       this.iconPath = new vscode.ThemeIcon('arrow-right', new vscode.ThemeColor('charts.green'));
@@ -145,7 +148,7 @@ export class TreeItemView extends vscode.TreeItem {
     // Suffix gates mutating menu items (update/ship/delete) to the owning window only
     this.contextValue = isCurrent ? `${ctx}-current` : ctx;
 
-    if (!isCurrent && tree.path) {
+    if (!isCurrent && tree.path && ctx !== 'tree-cleaning') {
       this.command = { command: 'forest.switch', title: 'Switch', arguments: [tree.branch] };
     }
   }

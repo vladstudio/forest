@@ -105,6 +105,19 @@ export async function activate(context: vscode.ExtensionContext) {
 
   const outputChannel = vscode.window.createOutputChannel('Forest');
 
+  // On startup, clear stale cleaning flags from crashed teardowns.
+  // cleaning:true + path exists  → teardown never ran; clear the flag so the user can retry.
+  // cleaning:true + path missing → handled by pruneOrphans below (orphan removal).
+  {
+    const s = await stateManager.load();
+    for (const tree of stateManager.getTreesForRepo(s, repoPath)) {
+      if (tree.cleaning && tree.path && fs.existsSync(tree.path)) {
+        log.info(`Clearing stale cleaning flag: ${tree.branch}`);
+        await stateManager.updateTree(tree.repoPath, tree.branch, { cleaning: undefined });
+      }
+    }
+  }
+
   /** Prune trees whose worktree folders no longer exist on disk. Returns latest state. */
   const pruneOrphans = async (): Promise<import('./state').ForestState> => {
     // Clean up stale .removing directories from interrupted deletions

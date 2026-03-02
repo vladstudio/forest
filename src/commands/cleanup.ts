@@ -22,6 +22,7 @@ async function teardownTree(ctx: ForestContext, tree: TreeState, opts?: { skipRe
   if (teardownInProgress.has(key)) { log.warn(`teardownTree already in progress: ${tree.branch}`); return; }
   log.info(`teardownTree: ${tree.branch}`);
   teardownInProgress.add(key);
+  await ctx.stateManager.updateTree(tree.repoPath, tree.branch, { cleaning: true });
   try {
     const shouldClose = ctx.currentTree?.branch === tree.branch;
     // Remove worktree & branch BEFORE state so other windows don't race to clean up.
@@ -140,8 +141,7 @@ export async function shelve(ctx: ForestContext, branchArg?: string): Promise<vo
     async (progress) => {
       const shouldClose = ctx.currentTree?.branch === tree.branch;
 
-      // Clear path in state (mark as shelved)
-      await ctx.stateManager.updateTree(tree.repoPath, tree.branch, { path: undefined });
+      await ctx.stateManager.removeTree(tree.repoPath, tree.branch);
       try { fs.unlinkSync(workspaceFilePath(tree.repoPath, tree.branch)); } catch {}
 
       progress.report({ message: 'Removing worktree...' });
