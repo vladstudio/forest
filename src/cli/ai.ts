@@ -7,7 +7,7 @@ export async function generatePRBody(config: AIConfig, diff: string, title: stri
   const trimmedDiff = diff.length > MAX_DIFF_CHARS
     ? diff.slice(0, MAX_DIFF_CHARS) + '\n\n[diff truncated]'
     : diff;
-  const prompt = `Write a pull request description for the following changes. Be concise. Use markdown. Start with a short summary paragraph, then a bullet list of key changes if needed. Do not include a title.
+  const prompt = `Write a pull request description for the following changes. Be concise — keep the total response under 500 words. Use markdown. Start with a short summary paragraph, then a bullet list of key changes if needed. Do not include a title.
 
 PR title: ${title}
 
