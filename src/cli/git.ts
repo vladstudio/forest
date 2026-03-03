@@ -25,10 +25,11 @@ export async function removeWorktree(repoPath: string, worktreePath: string): Pr
   try {
     await exec('git', ['worktree', 'remove', worktreePath, '--force'], { cwd: repoPath });
   } catch {
-    // Folder may already be gone or not registered — clean up manually
-    await fs.promises.rm(worktreePath, { recursive: true, force: true });
+    // Not registered — prune stale metadata
     await exec('git', ['worktree', 'prune'], { cwd: repoPath }).catch(() => {});
   }
+  // Always remove the directory — git worktree remove leaves gitignored files behind
+  await fs.promises.rm(worktreePath, { recursive: true, force: true });
 }
 
 export async function deleteBranch(repoPath: string, branch: string, opts?: { skipRemote?: boolean }): Promise<void> {
