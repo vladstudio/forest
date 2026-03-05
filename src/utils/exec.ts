@@ -55,7 +55,7 @@ export function execStream(
     const child = spawn(command, { shell: true, cwd: opts?.cwd });
     let stdout = '';
     let stderr = '';
-    const timer = opts?.timeout ? setTimeout(() => { child.kill(); reject(new Error('Timeout')); }, opts.timeout) : undefined;
+    const timer = opts?.timeout ? setTimeout(() => { child.kill('SIGKILL'); reject(new Error('Timeout')); }, opts.timeout) : undefined;
     child.stdout?.on('data', (data: Buffer) => {
       const s = data.toString();
       if (stdout.length < MAX_STREAM_BUFFER) stdout += s;

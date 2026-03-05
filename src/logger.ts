@@ -34,10 +34,10 @@ export class Logger {
     try {
       const stat = fs.fstatSync(this.fd);
       if (stat.size > MAX_SIZE) {
-        fs.closeSync(this.fd);
         const backup = LOG_PATH + '.1';
         try { fs.unlinkSync(backup); } catch {}
         fs.renameSync(LOG_PATH, backup);
+        fs.closeSync(this.fd);
         this.fd = fs.openSync(LOG_PATH, 'a');
       }
     } catch {}

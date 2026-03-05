@@ -49,7 +49,9 @@ async function callAnthropic(config: AIConfig, prompt: string): Promise<string> 
     throw new Error(`Anthropic API error: ${res.status}`);
   }
   const data = await res.json() as { content: { text: string }[] };
-  return data.content[0].text.trim();
+  const text = data.content?.[0]?.text;
+  if (!text) throw new Error('Anthropic API returned empty response');
+  return text.trim();
 }
 
 async function callOpenAI(config: AIConfig, prompt: string): Promise<string> {
@@ -76,15 +78,17 @@ async function callOpenAI(config: AIConfig, prompt: string): Promise<string> {
     throw new Error(`OpenAI API error: ${res.status}`);
   }
   const data = await res.json() as { choices: { message: { content: string } }[] };
-  return data.choices[0].message.content.trim();
+  const text = data.choices?.[0]?.message?.content;
+  if (!text) throw new Error('OpenAI API returned empty response');
+  return text.trim();
 }
 
 async function callGemini(config: AIConfig, prompt: string): Promise<string> {
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent?key=${config.apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent`,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.apiKey },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: { temperature: 0.3, maxOutputTokens: 1024 },
@@ -98,5 +102,7 @@ async function callGemini(config: AIConfig, prompt: string): Promise<string> {
     throw new Error(`Gemini API error: ${res.status}`);
   }
   const data = await res.json() as { candidates: { content: { parts: { text: string }[] } }[] };
-  return data.candidates[0].content.parts[0].text.trim();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error('Gemini API returned empty response');
+  return text.trim();
 }

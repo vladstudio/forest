@@ -198,31 +198,34 @@ export async function activate(context: vscode.ExtensionContext) {
       }
     }));
 
+  const branchOf = (arg?: string | TreeItemView) => arg instanceof TreeItemView ? arg.tree.branch : arg;
+  const treeOf = (arg?: TreeItemView) => arg instanceof TreeItemView ? arg.tree : undefined;
+  const andRefresh = <T>(fn: () => Promise<T>) => async () => { await fn(); forestProvider.refreshTrees(); };
+
   reg('forest.create', () => create(ctx));
   reg('forest.start', (arg: IssueItem | { ticketId: string; title: string }) =>
     start(ctx, arg instanceof IssueItem ? { ticketId: arg.issue.id, title: arg.issue.title } : arg));
-  reg('forest.switch', (arg?: string | TreeItemView) => switchTree(ctx, arg instanceof TreeItemView ? arg.tree.branch : arg));
-  const andRefresh = <T>(fn: () => Promise<T>) => async () => { await fn(); forestProvider.refreshTrees(); };
-  reg('forest.ship', (arg?: TreeItemView) => andRefresh(() => ship(ctx, arg instanceof TreeItemView ? arg.tree : undefined))());
-  reg('forest.cleanup', (arg?: string | TreeItemView) => cleanup(ctx, arg instanceof TreeItemView ? arg.tree.branch : arg));
-  reg('forest.cancel', (arg?: string | TreeItemView) => cancel(ctx, arg instanceof TreeItemView ? arg.tree.branch : arg));
-  reg('forest.shelve', (arg?: string | TreeItemView) => shelve(ctx, arg instanceof TreeItemView ? arg.tree.branch : arg));
-  reg('forest.resume', (arg?: string | TreeItemView) => resume(ctx, arg instanceof TreeItemView ? arg.tree.branch : arg));
-  reg('forest.update', (arg?: TreeItemView) => andRefresh(() => update(ctx, arg instanceof TreeItemView ? arg.tree : undefined))());
-  reg('forest.rebase', (arg?: TreeItemView) => andRefresh(() => rebase(ctx, arg instanceof TreeItemView ? arg.tree : undefined))());
+  reg('forest.switch', (arg?: string | TreeItemView) => switchTree(ctx, branchOf(arg)));
+  reg('forest.ship', (arg?: TreeItemView) => andRefresh(() => ship(ctx, treeOf(arg)))());
+  reg('forest.cleanup', (arg?: string | TreeItemView) => cleanup(ctx, branchOf(arg)));
+  reg('forest.cancel', (arg?: string | TreeItemView) => cancel(ctx, branchOf(arg)));
+  reg('forest.shelve', (arg?: string | TreeItemView) => shelve(ctx, branchOf(arg)));
+  reg('forest.resume', (arg?: string | TreeItemView) => resume(ctx, branchOf(arg)));
+  reg('forest.update', (arg?: TreeItemView) => andRefresh(() => update(ctx, treeOf(arg)))());
+  reg('forest.rebase', (arg?: TreeItemView) => andRefresh(() => rebase(ctx, treeOf(arg)))());
   reg('forest.list', () => list(ctx));
   reg('forest.openMain', () => vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(getRepoPath()), { forceNewWindow: true }));
   reg('forest.refresh', () => forestProvider.refresh());
   reg('forest.copyBranch', (arg?: TreeItemView) => {
-    const tree = arg instanceof TreeItemView ? arg.tree : ctx.currentTree;
+    const tree = treeOf(arg) ?? ctx.currentTree;
     if (tree) vscode.env.clipboard.writeText(tree.branch);
   });
   reg('forest.revealInFinder', (arg?: TreeItemView) => {
-    const tree = arg instanceof TreeItemView ? arg.tree : ctx.currentTree;
+    const tree = treeOf(arg) ?? ctx.currentTree;
     if (tree?.path) vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(tree.path));
   });
   reg('forest.openPR', (arg?: TreeItemView) => {
-    const tree = arg instanceof TreeItemView ? arg.tree : ctx.currentTree;
+    const tree = treeOf(arg) ?? ctx.currentTree;
     if (tree?.prUrl) vscode.env.openExternal(vscode.Uri.parse(tree.prUrl));
   });
   const unwrap = (arg: any) => arg instanceof ShortcutItem ? arg.shortcut : arg;

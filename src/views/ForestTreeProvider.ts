@@ -54,11 +54,12 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
   }
 
   private getHealth(tree: TreeState): Promise<TreeHealth> {
-    const cached = this.healthCache.get(tree.branch);
+    const key = `${tree.repoPath}:${tree.branch}`;
+    const cached = this.healthCache.get(key);
     if (cached && Date.now() - cached.time < this.HEALTH_TTL) return cached.promise;
 
     const promise = this.fetchHealth(tree);
-    this.healthCache.set(tree.branch, { promise, time: Date.now() });
+    this.healthCache.set(key, { promise, time: Date.now() });
     return promise;
   }
 

@@ -53,17 +53,21 @@ export class StateManager {
     try { lastContent = fs.readFileSync(this.statePath, 'utf8'); } catch {}
     const dir = path.dirname(this.statePath);
     const basename = path.basename(this.statePath);
+    let debounce: ReturnType<typeof setTimeout> | undefined;
     this.watcher = fs.watch(dir, (_event, filename) => {
       if (filename !== basename) return;
-      try {
-        const content = fs.readFileSync(this.statePath, 'utf8');
-        if (content !== lastContent) {
-          lastContent = content;
-          if (content === this.lastWrittenContent) return; // self-write
-          log.info('State file changed externally');
-          this._onDidChange.fire(JSON.parse(content));
-        }
-      } catch (e: any) { log.error(`State watch read failed: ${e.message}`); }
+      clearTimeout(debounce);
+      debounce = setTimeout(() => {
+        try {
+          const content = fs.readFileSync(this.statePath, 'utf8');
+          if (content !== lastContent) {
+            lastContent = content;
+            if (content === this.lastWrittenContent) return; // self-write
+            log.info('State file changed externally');
+            this._onDidChange.fire(JSON.parse(content));
+          }
+        } catch (e: any) { log.error(`State watch read failed: ${e.message}`); }
+      }, 50);
     });
   }
 
