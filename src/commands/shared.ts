@@ -84,6 +84,21 @@ export async function runSetupCommands(config: ForestConfig, treePath: string, c
   }
 }
 
+/** Common post-worktree-creation setup: copy files, install deps, run setup commands. */
+async function postWorktreeSetup(config: ForestConfig, repoPath: string, treePath: string, tree: TreeState): Promise<void> {
+  copyConfigFiles(config, repoPath, treePath);
+  generateWorkspaceFile(repoPath, treePath, tree);
+  await copyModulesFromTemplate(repoPath, treePath);
+  const needsSave = templateNeedsUpdate(repoPath);
+
+  if (fs.existsSync(path.join(treePath, '.envrc'))) {
+    try { await execShell('direnv allow', { cwd: treePath, timeout: 10_000 }); } catch {}
+  }
+
+  await runSetupCommands(config, treePath);
+  if (needsSave) saveTemplate(repoPath, treePath).catch(() => {});
+}
+
 /** Sanitize branch name for use as filename. */
 function sanitizeBranch(branch: string): string {
   return branch
@@ -166,22 +181,8 @@ export async function createTree(opts: {
           }
         }
 
-        progress.report({ message: 'Copying files...' });
-        copyConfigFiles(config, repoPath, treePath);
-
-        generateWorkspaceFile(repoPath, treePath, tree);
-
-        await copyModulesFromTemplate(repoPath, treePath);
-        const needsSave = templateNeedsUpdate(repoPath);
-
-        if (fs.existsSync(path.join(treePath, '.envrc'))) {
-          try { await execShell('direnv allow', { cwd: treePath, timeout: 10_000 }); } catch {}
-        }
-
-        progress.report({ message: 'Running setup...' });
-        await runSetupCommands(config, treePath);
-
-        if (needsSave) saveTemplate(repoPath, treePath).catch(() => {});
+        progress.report({ message: 'Setting up...' });
+        await postWorktreeSetup(config, repoPath, treePath, tree);
 
         progress.report({ message: 'Publishing branch...' });
         await git.pushBranch(treePath, branch).catch(() => {});
@@ -231,22 +232,8 @@ export async function resumeTree(opts: {
       progress.report({ message: 'Creating worktree...' });
       await git.checkoutWorktree(repoPath, treePath, tree.branch);
 
-      progress.report({ message: 'Copying files...' });
-      copyConfigFiles(config, repoPath, treePath);
-
-      generateWorkspaceFile(repoPath, treePath, tree);
-
-      await copyModulesFromTemplate(repoPath, treePath);
-      const needsSave = templateNeedsUpdate(repoPath);
-
-      if (fs.existsSync(path.join(treePath, '.envrc'))) {
-        try { await execShell('direnv allow', { cwd: treePath, timeout: 10_000 }); } catch {}
-      }
-
-      progress.report({ message: 'Running setup...' });
-      await runSetupCommands(config, treePath);
-
-      if (needsSave) saveTemplate(repoPath, treePath).catch(() => {});
+      progress.report({ message: 'Setting up...' });
+      await postWorktreeSetup(config, repoPath, treePath, tree);
 
       // Update state with new path
       await stateManager.updateTree(repoPath, tree.branch, { path: treePath });

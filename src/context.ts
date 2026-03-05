@@ -23,8 +23,14 @@ export function resolveMainRepo(wsPath: string): string {
   try {
     if (fs.statSync(gitPath).isFile()) {
       const content = fs.readFileSync(gitPath, 'utf8').trim();
-      const gitdir = content.replace('gitdir: ', '');
-      return path.resolve(gitdir, '..', '..', '..');
+      const gitdir = path.resolve(wsPath, content.replace('gitdir: ', ''));
+      // Use commondir (written by git for worktrees) for robust resolution
+      try {
+        const commondir = fs.readFileSync(path.join(gitdir, 'commondir'), 'utf8').trim();
+        return path.dirname(path.resolve(gitdir, commondir));
+      } catch {
+        return path.resolve(gitdir, '..', '..', '..');
+      }
     }
   } catch {}
   return wsPath;

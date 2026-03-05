@@ -50,12 +50,15 @@ export async function prIsMerged(repoPath: string, branch: string): Promise<bool
   } catch (e: any) { log.error(`prIsMerged(${branch}) failed: ${e.message}`); return false; }
 }
 
-let automergeCache: boolean | undefined;
+let automergeCache: { value: boolean; time: number } | undefined;
+const AUTOMERGE_TTL = 5 * 60_000;
 export async function repoHasAutomerge(worktreePath: string): Promise<boolean> {
-  if (automergeCache !== undefined) return automergeCache;
+  if (automergeCache && Date.now() - automergeCache.time < AUTOMERGE_TTL) return automergeCache.value;
   try {
     const { stdout } = await exec('gh', ['api', 'repos/{owner}/{repo}', '--jq', '.allow_auto_merge'], { cwd: worktreePath, timeout: 10_000 });
-    return (automergeCache = stdout.trim() === 'true');
+    const value = stdout.trim() === 'true';
+    automergeCache = { value, time: Date.now() };
+    return value;
   } catch (e: any) {
     log.error(`repoHasAutomerge check failed: ${e.message}`);
     return false;

@@ -18,7 +18,7 @@ function isPortOpen(port: number): Promise<boolean> {
 export class ShortcutManager {
   private terminals = new Map<string, vscode.Terminal[]>();
   private pendingTimers = new Set<ReturnType<typeof setTimeout>>();
-  private pendingRestart?: vscode.Disposable;
+  private pendingRestarts = new Map<string, vscode.Disposable>();
   private disposed = false;
   private disposables: vscode.Disposable[] = [];
 
@@ -63,15 +63,15 @@ export class ShortcutManager {
 
   restart(sc: ShortcutConfig): void {
     if (sc.type !== 'terminal') return;
-    this.pendingRestart?.dispose();
+    this.pendingRestarts.get(sc.name)?.dispose();
     const sub = vscode.window.onDidCloseTerminal(t => {
       if (t.name === sc.name) {
         sub.dispose();
-        this.pendingRestart = undefined;
+        this.pendingRestarts.delete(sc.name);
         this.open(sc);
       }
     });
-    this.pendingRestart = sub;
+    this.pendingRestarts.set(sc.name, sub);
     this.stop(sc);
   }
 
@@ -112,7 +112,7 @@ export class ShortcutManager {
     const list = this.terminals.get(sc.name) ?? [];
     const mode = sc.mode ?? 'multiple';
 
-    if (mode === 'single-tree' && list.length > 0) { list[0].show(); return; }
+    if (mode === 'single-tree' && list.length > 0) { list[0].show(); vscode.commands.executeCommand('workbench.action.terminal.focus'); return; }
     if (mode === 'single-repo') {
       // Broadcast claim first so other windows start killing their terminals
       const prev = this.currentTree
@@ -141,6 +141,7 @@ export class ShortcutManager {
       ...(location ? { location: { viewColumn: location } } : {}),
     });
     terminal.show(false);
+    vscode.commands.executeCommand('workbench.action.terminal.focus');
     if (sc.command) terminal.sendText(this.resolveVars(sc.command, true));
     list.push(terminal);
     this.terminals.set(sc.name, list);
@@ -297,7 +298,8 @@ export class ShortcutManager {
     this.disposed = true;
     this.pendingTimers.forEach(t => clearTimeout(t));
     this.pendingTimers.clear();
-    this.pendingRestart?.dispose();
+    this.pendingRestarts.forEach(d => d.dispose());
+    this.pendingRestarts.clear();
     this.disposables.forEach(d => d.dispose());
   }
 }

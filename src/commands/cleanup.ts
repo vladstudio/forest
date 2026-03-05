@@ -141,11 +141,11 @@ export async function shelve(ctx: ForestContext, branchArg?: string): Promise<vo
     async (progress) => {
       const shouldClose = ctx.currentTree?.branch === tree.branch;
 
-      await ctx.stateManager.removeTree(tree.repoPath, tree.branch);
-      try { fs.unlinkSync(workspaceFilePath(tree.repoPath, tree.branch)); } catch {}
-
       progress.report({ message: 'Removing worktree...' });
       await runStep(ctx, 'Remove worktree', () => git.removeWorktree(tree.repoPath, tree.path!));
+
+      await ctx.stateManager.updateTree(tree.repoPath, tree.branch, { path: undefined });
+      try { fs.unlinkSync(workspaceFilePath(tree.repoPath, tree.branch)); } catch {}
 
       if (shouldClose) {
         await vscode.commands.executeCommand('workbench.action.closeWindow');

@@ -15,6 +15,7 @@ export const log = {
 
 export class Logger {
   private fd: number;
+  private writeCount = 0;
 
   constructor() {
     fs.mkdirSync(path.dirname(LOG_PATH), { recursive: true });
@@ -25,7 +26,7 @@ export class Logger {
     const line = `[${new Date().toISOString()}] [${level}] ${msg}\n`;
     try {
       fs.writeSync(this.fd, line);
-      this.rotate();
+      if (++this.writeCount % 100 === 0) this.rotate();
     } catch {}
   }
 
