@@ -229,12 +229,6 @@
         "icon": "$(link-external)"
       },
       {
-        "command": "forest.warmTemplate",
-        "title": "Warm Template",
-        "category": "Forest",
-        "icon": "$(flame)"
-      },
-      {
         "command": "forest.stashPush",
         "title": "Stash Changes",
         "category": "Forest",

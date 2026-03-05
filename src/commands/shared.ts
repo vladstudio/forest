@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import * as crypto from 'crypto';
 import { type ForestConfig, getTreesDir } from '../config';
 import type { ForestContext } from '../context';
 import type { TreeState, StateManager } from '../state';
@@ -170,7 +171,8 @@ export async function createTree(opts: {
 
         generateWorkspaceFile(repoPath, treePath, tree);
 
-        const hadTemplate = await copyModulesFromTemplate(repoPath, treePath);
+        await copyModulesFromTemplate(repoPath, treePath);
+        const needsSave = templateNeedsUpdate(repoPath);
 
         if (fs.existsSync(path.join(treePath, '.envrc'))) {
           try { await execShell('direnv allow', { cwd: treePath, timeout: 10_000 }); } catch {}
@@ -179,7 +181,7 @@ export async function createTree(opts: {
         progress.report({ message: 'Running setup...' });
         await runSetupCommands(config, treePath);
 
-        if (!hadTemplate) await saveTemplate(repoPath, treePath);
+        if (needsSave) saveTemplate(repoPath, treePath).catch(() => {});
 
         progress.report({ message: 'Publishing branch...' });
         await git.pushBranch(treePath, branch).catch(() => {});
@@ -235,6 +237,7 @@ export async function resumeTree(opts: {
       generateWorkspaceFile(repoPath, treePath, tree);
 
       await copyModulesFromTemplate(repoPath, treePath);
+      const needsSave = templateNeedsUpdate(repoPath);
 
       if (fs.existsSync(path.join(treePath, '.envrc'))) {
         try { await execShell('direnv allow', { cwd: treePath, timeout: 10_000 }); } catch {}
@@ -242,6 +245,8 @@ export async function resumeTree(opts: {
 
       progress.report({ message: 'Running setup...' });
       await runSetupCommands(config, treePath);
+
+      if (needsSave) saveTemplate(repoPath, treePath).catch(() => {});
 
       // Update state with new path
       await stateManager.updateTree(repoPath, tree.branch, { path: treePath });
@@ -257,6 +262,15 @@ export async function resumeTree(opts: {
 
 function templateDir(repoPath: string): string {
   return path.join(getTreesDir(repoPath), '.template');
+}
+
+const lockfiles = ['bun.lock', 'bun.lockb', 'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml'];
+
+function lockfileHash(dir: string): string | undefined {
+  for (const name of lockfiles) {
+    const p = path.join(dir, name);
+    if (fs.existsSync(p)) return crypto.createHash('md5').update(fs.readFileSync(p)).digest('hex');
+  }
 }
 
 export async function copyModulesFromTemplate(repoPath: string, treePath: string): Promise<boolean> {
@@ -280,14 +294,18 @@ export async function saveTemplate(repoPath: string, treePath: string): Promise<
     if (fs.existsSync(dst)) fs.rmSync(dst, { recursive: true });
     const flag = os.platform() === 'darwin' ? '-Rc' : '-al';
     await execUtil('cp', [flag, src, dst]);
-  } catch {}
+  } catch { return; }
+  const hash = lockfileHash(repoPath);
+  if (hash) fs.writeFileSync(path.join(tplDir, '.lockfile-hash'), hash);
 }
 
-export async function warmTemplate(): Promise<void> {
-  const curPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  if (!curPath) return;
-  await saveTemplate(getRepoPath(), curPath);
-  vscode.window.showInformationMessage('Forest: Template warmed from current tree.');
+/** Compare repo lockfile hash against saved template hash. Called before setup runs. */
+export function templateNeedsUpdate(repoPath: string): boolean {
+  const current = lockfileHash(repoPath);
+  if (!current) return false;
+  const hashFile = path.join(templateDir(repoPath), '.lockfile-hash');
+  if (!fs.existsSync(hashFile)) return true;
+  return current !== fs.readFileSync(hashFile, 'utf8');
 }
 
 export function workspaceFilePath(repoPath: string, branch: string): string {

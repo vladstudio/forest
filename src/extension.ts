@@ -17,7 +17,7 @@ import { ship } from './commands/ship';
 import { cleanup, cancel, cleanupMerged, shelve, resume } from './commands/cleanup';
 import { update, rebase } from './commands/update';
 import { list } from './commands/list';
-import { warmTemplate, workspaceFilePath } from './commands/shared';
+import { workspaceFilePath } from './commands/shared';
 import * as git from './cli/git';
 import * as gh from './cli/gh';
 import * as linear from './cli/linear';
@@ -211,7 +211,6 @@ export async function activate(context: vscode.ExtensionContext) {
   reg('forest.update', (arg?: TreeItemView) => andRefresh(() => update(ctx, arg instanceof TreeItemView ? arg.tree : undefined))());
   reg('forest.rebase', (arg?: TreeItemView) => andRefresh(() => rebase(ctx, arg instanceof TreeItemView ? arg.tree : undefined))());
   reg('forest.list', () => list(ctx));
-  reg('forest.warmTemplate', () => warmTemplate());
   reg('forest.openMain', () => vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(getRepoPath()), { forceNewWindow: true }));
   reg('forest.refresh', () => forestProvider.refresh());
   reg('forest.copyBranch', (arg?: TreeItemView) => {
