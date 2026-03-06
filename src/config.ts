@@ -110,16 +110,13 @@ export async function loadConfig(): Promise<ForestConfig | null> {
   return merged as ForestConfig;
 }
 
-/** Returns ~/.forest/trees/<repoName>-<hash>. Migrates from old unhashed name on first call. */
+/** Returns ~/.forest/trees/<repoName>[-<hash>]. Uses old unhashed dir if it exists for backwards compat. */
 export function getTreesDir(repoPath: string): string {
   const base = path.basename(repoPath);
-  const name = `${base}-${crypto.createHash('md5').update(repoPath).digest('hex').slice(0, 8)}`;
-  const newDir = path.join(os.homedir(), '.forest', 'trees', name);
   const oldDir = path.join(os.homedir(), '.forest', 'trees', base);
-  if (!fs.existsSync(newDir) && fs.existsSync(oldDir)) {
-    try { fs.renameSync(oldDir, newDir); } catch {}
-  }
-  return newDir;
+  if (fs.existsSync(oldDir)) return oldDir;
+  const name = `${base}-${crypto.createHash('md5').update(repoPath).digest('hex').slice(0, 8)}`;
+  return path.join(os.homedir(), '.forest', 'trees', name);
 }
 
 function mergeConfig(base: any, local: any): any {
