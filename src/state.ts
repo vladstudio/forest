@@ -103,39 +103,17 @@ export class StateManager {
     return `${repoPath}:${branch}`;
   }
 
-  /** In-process queue + cross-process file lock around read-modify-write. */
+  /** In-process queue around read-modify-write. */
   private async modify(fn: (state: ForestState) => void): Promise<void> {
     const prev = this.writeLock;
     let release!: () => void;
     this.writeLock = new Promise(r => (release = r));
     await prev;
     try {
-      await this.withFileLock(async () => {
-        const state = await this.load();
-        fn(state);
-        await this.save(state);
-      });
+      const state = await this.load();
+      fn(state);
+      await this.save(state);
     } finally { release(); }
-  }
-
-  private get lockPath() { return this.statePath + '.lock'; }
-
-  private async withFileLock(fn: () => Promise<void>): Promise<void> {
-    for (let i = 0; ; i++) {
-      try { fs.mkdirSync(this.lockPath); break; } catch (e: any) {
-        if (e.code !== 'EEXIST') throw e;
-        try {
-          if (Date.now() - fs.statSync(this.lockPath).mtimeMs > 10_000) {
-            log.warn('Removing stale state lock');
-            fs.rmSync(this.lockPath); continue;
-          }
-        } catch {}
-        if (i >= 29) { log.error('Could not acquire state lock after 30 retries'); throw new Error('Could not acquire state lock'); }
-        if (i > 0 && i % 10 === 0) log.warn(`State lock contention: retry ${i}`);
-        await new Promise(r => setTimeout(r, 100));
-      }
-    }
-    try { await fn(); } finally { try { fs.rmSync(this.lockPath); } catch {} }
   }
 
   async addTree(repoPath: string, tree: TreeState): Promise<void> {
