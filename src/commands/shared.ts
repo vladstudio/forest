@@ -266,10 +266,8 @@ export function templateNeedsUpdate(repoPath: string): boolean {
   return current !== fs.readFileSync(hashFile, 'utf8');
 }
 
-export function workspaceFilePath(tree: Pick<TreeState, 'repoPath' | 'branch' | 'ticketId'>): string {
-  const repo = path.basename(tree.repoPath);
-  const name = tree.ticketId ?? sanitizeBranch(tree.branch);
-  return path.join(os.homedir(), '.forest', 'workspaces', `${repo}-${name}.code-workspace`);
+export function workspaceFilePath(tree: Pick<TreeState, 'branch' | 'ticketId'>): string {
+  return path.join(os.homedir(), '.forest', 'workspaces', `${tree.ticketId ?? sanitizeBranch(tree.branch)}.code-workspace`);
 }
 
 function generateWorkspaceFile(repoPath: string, treePath: string, tree: TreeState): void {
