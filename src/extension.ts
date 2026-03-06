@@ -382,7 +382,7 @@ export async function activate(context: vscode.ExtensionContext) {
     updateNoTrees();
   });
 
-  context.subscriptions.push(outputChannel, shortcutManager, shortcutsProvider, statusBarManager, stateManager);
+  context.subscriptions.push(outputChannel, shortcutManager, shortcutsProvider, stashesProvider, statusBarManager, stateManager);
   if (logger) context.subscriptions.push(logger);
 }
 

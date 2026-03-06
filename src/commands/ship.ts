@@ -105,7 +105,8 @@ export async function ship(ctx: ForestContext, treeArg?: import('../state').Tree
 
   const results = await Promise.allSettled(postShip);
   for (const r of results) if (r.status === 'rejected') {
-    log.error(`Post-ship task failed: ${r.reason?.message}`);
-    vscode.window.showWarningMessage(`Post-ship task failed: ${r.reason?.message}`);
+    const msg = r.reason?.message ?? String(r.reason);
+    log.error(`Post-ship task failed: ${msg}`);
+    vscode.window.showWarningMessage(`Post-ship task failed: ${msg}`);
   }
 }

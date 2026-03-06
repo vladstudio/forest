@@ -13,22 +13,22 @@ function showTimedNotification(message: string, ms = 2000): void {
 }
 
 async function pullAndRefresh(
-  ctx: ForestContext, treeArg: TreeState | undefined, label: string,
+  ctx: ForestContext, treeArg: TreeState | undefined, verb: string, gerund: string,
   pullFn: (path: string, base: string) => Promise<void>, message: string,
 ): Promise<void> {
   const tree = treeArg || ctx.currentTree;
-  if (!tree) { vscode.window.showErrorMessage(`${label} must be run from a tree window.`); return; }
-  if (!tree.path) { vscode.window.showErrorMessage(`Cannot ${label.toLowerCase()} a shelved tree. Resume it first.`); return; }
+  if (!tree) { vscode.window.showErrorMessage(`${verb} must be run from a tree window.`); return; }
+  if (!tree.path) { vscode.window.showErrorMessage(`Cannot ${verb.toLowerCase()} a shelved tree. Resume it first.`); return; }
   const config = ctx.config;
 
   await vscode.window.withProgress(
-    { location: vscode.ProgressLocation.Notification, title: `${label} ${displayName(tree)}...` },
+    { location: vscode.ProgressLocation.Notification, title: `${gerund} ${displayName(tree)}...` },
     async (progress) => {
       progress.report({ message: 'Pulling latest...' });
       try {
         await pullFn(tree.path!, config.baseBranch);
       } catch (e: any) {
-        vscode.window.showErrorMessage(`${label} failed: ${e.message}. Resolve conflicts manually.`);
+        vscode.window.showErrorMessage(`${verb} failed: ${e.message}. Resolve conflicts manually.`);
         return;
       }
 
@@ -44,9 +44,9 @@ async function pullAndRefresh(
 }
 
 export async function update(ctx: ForestContext, treeArg?: TreeState): Promise<void> {
-  return pullAndRefresh(ctx, treeArg, 'Update', git.pullMerge, 'Tree updated. Dependencies refreshed.');
+  return pullAndRefresh(ctx, treeArg, 'Update', 'Updating', git.pullMerge, 'Tree updated. Dependencies refreshed.');
 }
 
 export async function rebase(ctx: ForestContext, treeArg?: TreeState): Promise<void> {
-  return pullAndRefresh(ctx, treeArg, 'Rebase', git.pullRebase, 'Tree rebased. Dependencies refreshed.');
+  return pullAndRefresh(ctx, treeArg, 'Rebase', 'Rebasing', git.pullRebase, 'Tree rebased. Dependencies refreshed.');
 }
