@@ -88,15 +88,21 @@ export async function runSetupCommands(config: ForestConfig, treePath: string, c
 async function postWorktreeSetup(config: ForestConfig, repoPath: string, treePath: string, tree: TreeState): Promise<void> {
   copyConfigFiles(config, repoPath, treePath);
   generateWorkspaceFile(repoPath, treePath, tree);
-  await copyModulesFromTemplate(repoPath, treePath);
+
+  const direnvPromise = fs.existsSync(path.join(treePath, '.envrc'))
+    ? execShell('direnv allow', { cwd: treePath, timeout: 10_000 }).catch(() => {})
+    : undefined;
+
+  const [templateCopied] = await Promise.all([
+    copyModulesFromTemplate(repoPath, treePath),
+    direnvPromise,
+  ]);
   const needsSave = templateNeedsUpdate(repoPath);
 
-  if (fs.existsSync(path.join(treePath, '.envrc'))) {
-    try { await execShell('direnv allow', { cwd: treePath, timeout: 10_000 }); } catch {}
+  if (!templateCopied || needsSave) {
+    await runSetupCommands(config, treePath);
+    if (needsSave) saveTemplate(repoPath, treePath).catch(() => {});
   }
-
-  await runSetupCommands(config, treePath);
-  if (needsSave) saveTemplate(repoPath, treePath).catch(() => {});
 }
 
 /** Sanitize branch name for use as filename. */
@@ -184,8 +190,7 @@ export async function createTree(opts: {
         progress.report({ message: 'Setting up...' });
         await postWorktreeSetup(config, repoPath, treePath, tree);
 
-        progress.report({ message: 'Publishing branch...' });
-        await git.pushBranch(treePath, branch).catch(() => {});
+        git.pushBranch(treePath, branch).catch(() => {});
 
         progress.report({ message: 'Opening window...' });
         const wsFile = workspaceFilePath(repoPath, branch);

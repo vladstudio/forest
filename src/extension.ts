@@ -313,8 +313,9 @@ export async function activate(context: vscode.ExtensionContext) {
           log.info(`PR merged detected: ${tree.branch}`);
           await stateManager.updateTree(tree.repoPath, tree.branch, { mergeNotified: true });
           const name = tree.ticketId ?? tree.branch;
+          const detail = [tree.ticketId && config.linear.enabled && `move ${tree.ticketId} → ${config.linear.statuses.onCleanup}`, 'remove worktree + branch', isOwnWindow && 'close window'].filter(Boolean).join(', ');
           const action = await vscode.window.showInformationMessage(
-            `${name} PR was merged. Clean up?`,
+            `${name} PR was merged. Cleanup will ${detail}.`,
             'Cleanup', 'Dismiss',
           );
           if (action === 'Cleanup') await cleanupMerged(ctx, tree);

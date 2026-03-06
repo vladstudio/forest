@@ -8,7 +8,7 @@ export async function createWorktree(
   repoPath: string, worktreePath: string, branch: string, baseRef: string,
 ): Promise<void> {
   log.info(`createWorktree: ${branch} at ${worktreePath} (base: ${baseRef})`);
-  await exec('git', ['fetch', 'origin'], { cwd: repoPath });
+  await exec('git', ['fetch', 'origin', baseRef.replace(/^origin\//, '')], { cwd: repoPath });
   await exec('git', ['worktree', 'prune'], { cwd: repoPath });
   await exec('git', ['worktree', 'add', worktreePath, '-b', branch, baseRef], { cwd: repoPath });
 }
@@ -132,6 +132,8 @@ export async function lastCommitAge(worktreePath: string): Promise<string | null
 export async function checkoutWorktree(
   repoPath: string, worktreePath: string, branch: string,
 ): Promise<void> {
+  // Fetch only the branch we need (also fixes missing fetch in resumeTree path)
+  await exec('git', ['fetch', 'origin', branch], { cwd: repoPath }).catch(() => {});
   // If branch is checked out in main repo, detach so worktree add can use it
   const { stdout } = await exec('git', ['symbolic-ref', '--short', 'HEAD'], { cwd: repoPath }).catch(() => ({ stdout: '' }));
   if (stdout.trim() === branch) {

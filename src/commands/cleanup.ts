@@ -41,6 +41,9 @@ async function teardownTree(ctx: ForestContext, tree: TreeState, opts?: { skipRe
   }
 }
 
+const stepList = (...items: (string | false | 0 | '' | null | undefined)[]) =>
+  (items.filter(Boolean) as string[]).map((s, i) => `${i + 1}. ${s}`).join('\n');
+
 export async function cleanup(ctx: ForestContext, branchArg?: string): Promise<void> {
   const tree = resolveTree(ctx, branchArg);
 
@@ -49,9 +52,17 @@ export async function cleanup(ctx: ForestContext, branchArg?: string): Promise<v
     return;
   }
   const config = ctx.config;
+  const ghEnabled = config.github.enabled && !!tree.path && await gh.isAvailable();
+  const hasLinear = !!tree.ticketId && config.linear.enabled;
+  const willClose = ctx.currentTree?.branch === tree.branch;
 
   const confirm = await vscode.window.showWarningMessage(
-    `Cleanup ${displayName(tree)}?\n\nThis will remove the worktree, branch, and clean up.`,
+    `Cleanup ${displayName(tree)}?\n\n${stepList(
+      ghEnabled && 'Squash-merge the PR',
+      hasLinear && `Move ${tree.ticketId} → ${config.linear.statuses.onCleanup}`,
+      tree.path ? 'Remove worktree, delete branch' : 'Delete branch',
+      willClose && 'Close this window',
+    )}`,
     { modal: true }, 'Cleanup',
   );
   if (confirm !== 'Cleanup') return;
@@ -64,12 +75,10 @@ export async function cleanup(ctx: ForestContext, branchArg?: string): Promise<v
   await vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: `Cleaning up ${displayName(tree)}...` },
     async (progress) => {
-      const shouldMerge = config.github.enabled && tree.path && await gh.isAvailable();
       let mergeFailed = false;
-
       progress.report({ message: 'Merging & updating...' });
       await Promise.all([
-        shouldMerge
+        ghEnabled
           ? runStep(ctx, 'Merge PR', () => gh.mergePR(tree.path!)).then(ok => { if (!ok) mergeFailed = true; })
           : Promise.resolve(),
         tree.ticketId
@@ -80,7 +89,7 @@ export async function cleanup(ctx: ForestContext, branchArg?: string): Promise<v
       if (mergeFailed) return;
 
       progress.report({ message: 'Removing worktree...' });
-      await teardownTree(ctx, tree, { skipRemoteBranchDelete: !!shouldMerge });
+      await teardownTree(ctx, tree, { skipRemoteBranchDelete: ghEnabled });
     },
   );
 }
@@ -93,8 +102,15 @@ export async function cancel(ctx: ForestContext, branchArg?: string): Promise<vo
     return;
   }
 
+  const hasLinear = !!tree.ticketId && ctx.config.linear.enabled;
+  const willClose = ctx.currentTree?.branch === tree.branch;
+
   const confirm = await vscode.window.showWarningMessage(
-    `Cancel ${displayName(tree)}?\n\nThis will remove the worktree and branch without merging.${tree.ticketId && ctx.config.linear.enabled ? ' The Linear ticket will be set to ' + ctx.config.linear.statuses.onCancel + '.' : ''}`,
+    `Cancel ${displayName(tree)}?\n\n${stepList(
+      hasLinear && `Move ${tree.ticketId} → ${ctx.config.linear.statuses.onCancel}`,
+      tree.path ? 'Remove worktree, delete branch' : 'Delete branch',
+      willClose && 'Close this window',
+    )}`,
     { modal: true }, 'Cancel Tree',
   );
   if (confirm !== 'Cancel Tree') return;
@@ -130,8 +146,13 @@ export async function shelve(ctx: ForestContext, branchArg?: string): Promise<vo
     return;
   }
 
+  const willClose = ctx.currentTree?.branch === tree.branch;
+
   const confirm = await vscode.window.showWarningMessage(
-    `Shelve ${displayName(tree)}?\n\nThis will remove the worktree but keep the branch.`,
+    `Shelve ${displayName(tree)}?\n\n${stepList(
+      'Remove worktree (keep branch)',
+      willClose && 'Close this window',
+    )}`,
     { modal: true }, 'Shelve',
   );
   if (confirm !== 'Shelve') return;
@@ -139,15 +160,13 @@ export async function shelve(ctx: ForestContext, branchArg?: string): Promise<vo
   await vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: `Shelving ${displayName(tree)}...` },
     async (progress) => {
-      const shouldClose = ctx.currentTree?.branch === tree.branch;
-
       progress.report({ message: 'Removing worktree...' });
       await runStep(ctx, 'Remove worktree', () => git.removeWorktree(tree.repoPath, tree.path!));
 
       await ctx.stateManager.updateTree(tree.repoPath, tree.branch, { path: undefined });
       try { fs.unlinkSync(workspaceFilePath(tree.repoPath, tree.branch)); } catch {}
 
-      if (shouldClose) {
+      if (willClose) {
         await vscode.commands.executeCommand('workbench.action.closeWindow');
       }
     },
