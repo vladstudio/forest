@@ -5,7 +5,7 @@ import * as os from 'os';
 import * as crypto from 'crypto';
 import { resolveMainRepo } from './context';
 
-interface ShortcutBase { name: string; openOnLaunch?: number | false; mode?: 'single-repo' | 'single-tree' | 'multiple'; }
+interface ShortcutBase { name: string; openOnLaunch?: number | false; }
 interface TerminalShortcut extends ShortcutBase { type: 'terminal'; command?: string; env?: Record<string, string>; }
 interface BrowserShortcut extends ShortcutBase { type: 'browser'; url: string; browser?: 'simple' | 'external' | string; }
 interface FileShortcut extends ShortcutBase { type: 'file'; path: string; }

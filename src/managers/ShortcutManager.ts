@@ -25,7 +25,7 @@ export class ShortcutManager {
   private _onDidChange = new vscode.EventEmitter<void>();
   readonly onDidChange = this._onDidChange.event;
 
-  constructor(private config: ForestConfig, private currentTree: TreeState | undefined, private onSingleRepoClaim?: (shortcutName: string, branch: string) => Promise<string | undefined>) {
+  constructor(private config: ForestConfig, private currentTree: TreeState | undefined) {
     this.disposables.push(
       vscode.window.onDidCloseTerminal(t => this.handleTerminalClose(t)),
       this._onDidChange,
@@ -91,12 +91,11 @@ export class ShortcutManager {
 
     for (const sc of this.config.shortcuts) {
       if (!sc.openOnLaunch) continue;
+      const viewCol = typeof sc.openOnLaunch === 'number' && sc.openOnLaunch > 1 ? sc.openOnLaunch as vscode.ViewColumn : undefined;
       if (sc.type === 'terminal') {
-        const viewCol = typeof sc.openOnLaunch === 'number' && sc.openOnLaunch > 1 ? sc.openOnLaunch as vscode.ViewColumn : undefined;
         const existing = this.terminals.get(sc.name);
         if (!existing || existing.length === 0) await this.openTerminal(sc, viewCol);
       } else {
-        const viewCol = typeof sc.openOnLaunch === 'number' && sc.openOnLaunch > 1 ? sc.openOnLaunch as vscode.ViewColumn : undefined;
         this.open(sc, viewCol);
       }
     }
@@ -111,23 +110,6 @@ export class ShortcutManager {
     }
 
     const list = this.terminals.get(sc.name) ?? [];
-    const mode = sc.mode ?? 'multiple';
-
-    if (mode === 'single-tree' && list.length > 0) { list[0].show(); vscode.commands.executeCommand('workbench.action.terminal.focus'); return; }
-    if (mode === 'single-repo') {
-      // Broadcast claim first so other windows start killing their terminals
-      const prev = this.currentTree
-        ? await this.onSingleRepoClaim?.(sc.name, this.currentTree.branch)
-        : undefined;
-      // Dispose own terminals and wait for them to fully close
-      if (list.length > 0) {
-        await this.disposeAndWait(list);
-        list.length = 0;
-      } else if (prev && prev !== this.currentTree?.branch) {
-        // Another window had this shortcut — wait for cross-window disposal
-        await new Promise(r => setTimeout(r, 500));
-      }
-    }
 
     const env: Record<string, string> = {};
     if (sc.env) {
@@ -147,19 +129,6 @@ export class ShortcutManager {
     list.push(terminal);
     this.terminals.set(sc.name, list);
     this._onDidChange.fire();
-  }
-
-  private disposeAndWait(terminals: vscode.Terminal[]): Promise<void> {
-    const remaining = new Set(terminals);
-    return new Promise<void>(resolve => {
-      const done = () => { clearTimeout(timer); sub.dispose(); resolve(); };
-      const sub = vscode.window.onDidCloseTerminal(t => {
-        remaining.delete(t);
-        if (remaining.size === 0) done();
-      });
-      const timer = setTimeout(done, 3000);
-      for (const t of terminals) t.dispose();
-    });
   }
 
   private openExternalTerminal(sc: ShortcutConfig & { type: 'terminal' }, app: string): void {
@@ -282,13 +251,6 @@ export class ShortcutManager {
   private extractPort(url: string): number | null {
     const m = url.match(/:(\d+)/);
     return m ? parseInt(m[1], 10) : null;
-  }
-
-  /** Dispose terminals for a shortcut claimed by another window. */
-  handleExternalClaim(shortcutName: string): void {
-    const list = this.terminals.get(shortcutName);
-    if (!list || list.length === 0) return;
-    for (const t of [...list]) t.dispose();
   }
 
   updateTree(tree: TreeState): void {

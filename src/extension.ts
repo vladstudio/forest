@@ -153,9 +153,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   vscode.commands.executeCommand('setContext', 'forest.isTree', !!currentTree);
 
-  const shortcutManager = new ShortcutManager(config, currentTree, (name, branch) =>
-    stateManager.claimShortcut(repoPath, name, branch),
-  );
+  const shortcutManager = new ShortcutManager(config, currentTree);
   const statusBarManager = new StatusBarManager(currentTree);
   const forestProvider = new ForestTreeProvider(stateManager, config, context.globalState);
   const shortcutsProvider = new ShortcutsTreeProvider(config, shortcutManager);
@@ -294,58 +292,53 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.executeCommand('forest.trees.focus');
   }
 
+  // Helper: setInterval with a guard flag to prevent overlapping runs
+  const guardedInterval = (fn: () => Promise<void>, ms: number) => {
+    let running = false;
+    const id = setInterval(async () => {
+      if (running) return;
+      running = true;
+      try { await fn(); } finally { running = false; }
+    }, ms);
+    return { dispose: () => clearInterval(id) };
+  };
+
   // Auto-cleanup polling: check merged PRs every 5 minutes
   // Only notify in the tree's own window or the main (non-tree) window.
-  let autoCleanupRunning = false;
-  const autoCleanupInterval = setInterval(async () => {
-    if (autoCleanupRunning) return;
-    autoCleanupRunning = true;
-    try {
-      if (!(await gh.isAvailable())) return;
-      const s = await stateManager.load();
-      const trees = stateManager.getTreesForRepo(s, repoPath);
-      for (const tree of trees) {
-        if (!tree.prUrl || !tree.path || tree.mergeNotified) continue;
-        const isOwnWindow = ctx.currentTree?.branch === tree.branch;
-        const isMainWindow = !ctx.currentTree;
-        if (!isOwnWindow && !isMainWindow) continue;
-        if (await gh.prIsMerged(tree.repoPath, tree.branch)) {
-          log.info(`PR merged detected: ${tree.branch}`);
-          await stateManager.updateTree(tree.repoPath, tree.branch, { mergeNotified: true });
-          const name = tree.ticketId ?? tree.branch;
-          const detail = [tree.ticketId && config.linear.enabled && `move ${tree.ticketId} → ${config.linear.statuses.onCleanup}`, 'remove worktree + branch', isOwnWindow && 'close window'].filter(Boolean).join(', ');
-          const action = await vscode.window.showInformationMessage(
-            `${name} PR was merged. Cleanup will ${detail}.`,
-            'Cleanup', 'Dismiss',
-          );
-          if (action === 'Cleanup') await cleanupMerged(ctx, tree);
-        }
+  context.subscriptions.push(guardedInterval(async () => {
+    if (!(await gh.isAvailable())) return;
+    const s = await stateManager.load();
+    const trees = stateManager.getTreesForRepo(s, repoPath);
+    for (const tree of trees) {
+      if (!tree.prUrl || !tree.path || tree.mergeNotified) continue;
+      const isOwnWindow = ctx.currentTree?.branch === tree.branch;
+      const isMainWindow = !ctx.currentTree;
+      if (!isOwnWindow && !isMainWindow) continue;
+      if (await gh.prIsMerged(tree.repoPath, tree.branch)) {
+        log.info(`PR merged detected: ${tree.branch}`);
+        await stateManager.updateTree(tree.repoPath, tree.branch, { mergeNotified: true });
+        const name = tree.ticketId ?? tree.branch;
+        const detail = [tree.ticketId && config.linear.enabled && `move ${tree.ticketId} → ${config.linear.statuses.onCleanup}`, 'remove worktree + branch', isOwnWindow && 'close window'].filter(Boolean).join(', ');
+        const action = await vscode.window.showInformationMessage(
+          `${name} PR was merged. Cleanup will ${detail}.`,
+          'Cleanup', 'Dismiss',
+        );
+        if (action === 'Cleanup') await cleanupMerged(ctx, tree);
       }
-    } finally {
-      autoCleanupRunning = false;
     }
-  }, 5 * 60 * 1000);
-  context.subscriptions.push({ dispose: () => clearInterval(autoCleanupInterval) });
+  }, 5 * 60 * 1000));
 
   // Periodic orphan check: detect worktree folders deleted externally
-  let orphanCheckRunning = false;
-  const orphanCheckInterval = setInterval(async () => {
-    if (orphanCheckRunning) return;
-    orphanCheckRunning = true;
-    try {
-      const before = stateManager.getTreesForRepo(await stateManager.load(), repoPath).length;
-      const afterState = await pruneOrphans();
-      const after = stateManager.getTreesForRepo(afterState, repoPath).length;
-      if (after < before) forestProvider.refresh();
-    } finally {
-      orphanCheckRunning = false;
-    }
-  }, 60_000);
-  context.subscriptions.push({ dispose: () => clearInterval(orphanCheckInterval) });
+  context.subscriptions.push(guardedInterval(async () => {
+    const before = stateManager.getTreesForRepo(await stateManager.load(), repoPath).length;
+    const afterState = await pruneOrphans();
+    const after = stateManager.getTreesForRepo(afterState, repoPath).length;
+    if (after < before) forestProvider.refresh();
+  }, 60_000));
 
   // Auto-refresh tree health every 3 minutes (PR status, commits behind, age)
-  const healthRefreshInterval = setInterval(() => forestProvider.refreshTrees(), 3 * 60 * 1000);
-  context.subscriptions.push({ dispose: () => clearInterval(healthRefreshInterval) });
+  const healthId = setInterval(() => forestProvider.refreshTrees(), 3 * 60 * 1000);
+  context.subscriptions.push({ dispose: () => clearInterval(healthId) });
 
   // Watch state for changes from other windows
   let previousTrees = stateManager.getTreesForRepo(stateManager.loadSync(), repoPath);
@@ -356,14 +349,6 @@ export async function activate(context: vscode.ExtensionContext) {
         ctx.currentTree = updated;
         statusBarManager.update(updated);
         shortcutManager.updateTree(updated);
-      }
-      // Dispose terminals claimed by another window (single-repo mode)
-      if (newState.shortcutClaims) {
-        for (const sc of config.shortcuts) {
-          if (sc.type !== 'terminal' || (sc.mode ?? 'multiple') !== 'single-repo') continue;
-          const claim = newState.shortcutClaims[`${repoPath}:${sc.name}`];
-          if (claim && claim !== ctx.currentTree.branch) shortcutManager.handleExternalClaim(sc.name);
-        }
       }
     }
     // Clean up workspace files for trees removed by other windows.
