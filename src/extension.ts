@@ -137,7 +137,7 @@ export async function activate(context: vscode.ExtensionContext) {
         log.warn(`Pruning orphan: ${tree.branch} (${tree.path} missing)`);
         outputChannel.appendLine(`[Forest] Pruning orphan: ${tree.branch} (${tree.path} missing)`);
         await stateManager.removeTree(tree.repoPath, tree.branch);
-        try { fs.unlinkSync(workspaceFilePath(tree.repoPath, tree.branch, tree.ticketId)); } catch {}
+        try { fs.unlinkSync(workspaceFilePath(tree)); } catch {}
         git.deleteBranch(tree.repoPath, tree.branch).catch(() => {});
       }
     }
@@ -359,7 +359,7 @@ export async function activate(context: vscode.ExtensionContext) {
       if (prev.branch === ctx.currentTree?.branch) continue;
       if (!currentBranches.has(prev.branch)) {
         log.info(`Tree removed by other window: ${prev.branch}`);
-        try { fs.unlinkSync(workspaceFilePath(prev.repoPath, prev.branch, prev.ticketId)); } catch {}
+        try { fs.unlinkSync(workspaceFilePath(prev)); } catch {}
       }
     }
     previousTrees = currentTrees;

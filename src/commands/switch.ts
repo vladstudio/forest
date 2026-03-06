@@ -31,6 +31,6 @@ export async function switchTree(ctx: ForestContext, branchArg?: string): Promis
     try { await execShell('direnv allow', { cwd: tree.path, timeout: 10_000 }); } catch {}
   }
 
-  const wsFile = workspaceFilePath(getRepoPath(), tree.branch, tree.ticketId);
+  const wsFile = workspaceFilePath(tree);
   await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(wsFile), { forceNewWindow: true });
 }
