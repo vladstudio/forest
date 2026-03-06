@@ -145,16 +145,22 @@
         "icon": "$(check-all)"
       },
       {
-        "command": "forest.cancel",
-        "title": "Delete — Remove Without Merging",
+        "command": "forest.deleteTree",
+        "title": "Delete Tree, Keep Branches",
+        "category": "Forest",
+        "icon": "$(archive)"
+      },
+      {
+        "command": "forest.deleteTreeLocal",
+        "title": "Delete Tree + Local Branch",
         "category": "Forest",
         "icon": "$(trash)"
       },
       {
-        "command": "forest.shelve",
-        "title": "Shelve — Remove Worktree, Keep Branch",
+        "command": "forest.deleteTreeAll",
+        "title": "Delete Tree + Branches",
         "category": "Forest",
-        "icon": "$(archive)"
+        "icon": "$(close-all)"
       },
       {
         "command": "forest.update",
@@ -301,12 +307,17 @@
           "group": "4_danger"
         },
         {
-          "command": "forest.shelve",
+          "command": "forest.deleteTree",
           "when": "viewItem =~ /^tree-(progress|review)/",
           "group": "4_danger"
         },
         {
-          "command": "forest.cancel",
+          "command": "forest.deleteTreeLocal",
+          "when": "viewItem =~ /^tree-(progress|review)/",
+          "group": "4_danger"
+        },
+        {
+          "command": "forest.deleteTreeAll",
           "when": "viewItem =~ /^tree-(progress|review)/",
           "group": "4_danger"
         },

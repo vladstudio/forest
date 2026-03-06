@@ -17,7 +17,7 @@ export async function ship(ctx: ForestContext, treeArg?: import('../state').Tree
     return;
   }
   if (!tree.path) {
-    vscode.window.showErrorMessage('Cannot ship a shelved tree. Resume it first.');
+    vscode.window.showErrorMessage('Cannot ship: tree has no worktree path.');
     return;
   }
   const config = ctx.config;

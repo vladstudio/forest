@@ -134,7 +134,7 @@ export class TreeItemView extends vscode.TreeItem {
     this.tooltip = [
       displayName(tree),
       `Branch: ${tree.branch}`,
-      tree.path ? `Path: ${tree.path}` : 'Shelved (no worktree)',
+      tree.path ? `Path: ${tree.path}` : undefined,
       tree.prUrl ? `PR: ${tree.prUrl}` : undefined,
       tree.ticketId ? `Ticket: ${tree.ticketId}` : undefined,
     ].filter(Boolean).join('\n');

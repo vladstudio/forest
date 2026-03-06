@@ -16,7 +16,7 @@ async function syncTree(ctx: ForestContext, treeArg: TreeState | undefined, mode
   const tree = treeArg || ctx.currentTree;
   const label = mode === 'merge' ? 'Update' : 'Rebase';
   if (!tree) { vscode.window.showErrorMessage(`${label} must be run from a tree window.`); return; }
-  if (!tree.path) { vscode.window.showErrorMessage(`Cannot ${mode} a shelved tree. Resume it first.`); return; }
+  if (!tree.path) { vscode.window.showErrorMessage(`Cannot ${mode}: tree has no worktree path.`); return; }
   const config = ctx.config;
 
   await vscode.window.withProgress(

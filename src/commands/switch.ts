@@ -24,7 +24,7 @@ export async function switchTree(ctx: ForestContext, branchArg?: string): Promis
 
   const tree = ctx.stateManager.getTree(state, getRepoPath(), branch!);
   if (!tree) { vscode.window.showErrorMessage(`Tree for branch "${branch}" not found.`); return; }
-  if (!tree.path) { vscode.window.showErrorMessage('Tree is shelved. Resume it first.'); return; }
+  if (!tree.path) { vscode.window.showErrorMessage('Tree has no worktree path.'); return; }
 
   // Auto-allow direnv if .envrc exists
   if (fs.existsSync(path.join(tree.path, '.envrc'))) {

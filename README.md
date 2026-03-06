@@ -14,9 +14,9 @@ VSCode extension for parallel feature development using git worktrees. One Linea
 | **New Linear Issue + Tree** | Create a new Linear ticket + worktree in one step                   |
 | **Ship**                    | Push branch + create PR (with optional automerge) + move ticket to configured status |
 | **Cleanup**                 | Merge PR + delete worktree + move ticket to configured status       |
-| **Delete**                  | Remove worktree + branch without merging + move ticket to canceled  |
-| **Shelve**                  | Remove worktree but keep branch for later                           |
-| **Resume**                  | Recreate worktree for a shelved tree                                |
+| **Delete Tree**             | Remove worktree, keep branches                                     |
+| **Delete Tree + Local**     | Remove worktree + local branch, keep remote                        |
+| **Delete Tree + Branches**  | Remove worktree + all branches + move ticket to canceled            |
 | **Update**                  | Merge from main + re-run setup (reinstall deps, re-copy env files)  |
 | **List**                    | Quick-pick list of all active trees                                 |
 
@@ -210,7 +210,7 @@ All commands are available from the Forest sidebar (tree icon in activity bar) o
 3. Code, test, iterate — each tree is fully isolated
 4. **Ship** when ready — pushes and creates a PR
 5. **Cleanup** after merge — removes worktree, branch, and ticket
-6. **Delete** to discard a tree without merging
+6. **Delete** to remove a tree (keep branches, delete local only, or delete all)
 
 Switch between trees from the sidebar. All processes keep running in background windows.
 
@@ -222,9 +222,9 @@ Switch between trees from the sidebar. All processes keep running in background 
 | `Forest: Switch Tree`             | Open another tree's window              |
 | `Forest: Ship`                    | Push + create PR                        |
 | `Forest: Cleanup`                 | Merge PR + remove tree                  |
-| `Forest: Delete`                  | Remove tree without merging             |
-| `Forest: Shelve`                  | Remove worktree, keep branch            |
-| `Forest: Resume`                  | Recreate worktree for shelved tree      |
+| `Forest: Delete Tree`             | Remove tree, keep branches              |
+| `Forest: Delete Tree + Local`     | Remove tree + local branch              |
+| `Forest: Delete Tree + Branches`  | Remove tree + all branches              |
 | `Forest: Update`                  | Merge from main + refresh deps          |
 | `Forest: Rebase`                  | Rebase onto main                        |
 | `Forest: List`                    | List all trees                          |
