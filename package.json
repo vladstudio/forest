@@ -309,17 +309,17 @@
         {
           "command": "forest.deleteTree",
           "when": "viewItem =~ /^tree-(progress|review)/",
-          "group": "4_danger"
+          "group": "4_danger@1"
         },
         {
           "command": "forest.deleteTreeLocal",
           "when": "viewItem =~ /^tree-(progress|review)/",
-          "group": "4_danger"
+          "group": "4_danger@2"
         },
         {
           "command": "forest.deleteTreeAll",
           "when": "viewItem =~ /^tree-(progress|review)/",
-          "group": "4_danger"
+          "group": "4_danger@3"
         },
         {
           "command": "forest.openShortcutWith",
