@@ -111,12 +111,16 @@ export async function loadConfig(): Promise<ForestConfig | null> {
 }
 
 /** Returns ~/.forest/trees/<repoName>[-<hash>]. Uses old unhashed dir if it exists for backwards compat. */
+const treesDirCache = new Map<string, string>();
 export function getTreesDir(repoPath: string): string {
+  let dir = treesDirCache.get(repoPath);
+  if (dir) return dir;
   const base = path.basename(repoPath);
   const oldDir = path.join(os.homedir(), '.forest', 'trees', base);
-  if (fs.existsSync(oldDir)) return oldDir;
-  const name = `${base}-${crypto.createHash('md5').update(repoPath).digest('hex').slice(0, 8)}`;
-  return path.join(os.homedir(), '.forest', 'trees', name);
+  dir = fs.existsSync(oldDir) ? oldDir
+    : path.join(os.homedir(), '.forest', 'trees', `${base}-${crypto.createHash('md5').update(repoPath).digest('hex').slice(0, 8)}`);
+  treesDirCache.set(repoPath, dir);
+  return dir;
 }
 
 function mergeConfig(base: any, local: any): any {
