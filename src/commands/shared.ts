@@ -202,7 +202,7 @@ export async function createTree(opts: {
         git.pushBranch(treePath, branch).catch(() => vscode.window.showWarningMessage('Failed to push branch. You can push manually later.'));
 
         progress.report({ message: 'Opening window...' });
-        const wsFile = workspaceFilePath(repoPath, branch);
+        const wsFile = workspaceFilePath(repoPath, branch, ticketId);
         await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(wsFile), { forceNewWindow: true });
 
         return tree;
@@ -266,12 +266,12 @@ export function templateNeedsUpdate(repoPath: string): boolean {
   return current !== fs.readFileSync(hashFile, 'utf8');
 }
 
-export function workspaceFilePath(repoPath: string, branch: string): string {
-  return path.join(os.homedir(), '.forest', 'workspaces', `${sanitizeBranch(branch)}.code-workspace`);
+export function workspaceFilePath(repoPath: string, branch: string, ticketId?: string): string {
+  return path.join(os.homedir(), '.forest', 'workspaces', `${ticketId ?? sanitizeBranch(branch)}.code-workspace`);
 }
 
 function generateWorkspaceFile(repoPath: string, treePath: string, tree: TreeState): void {
-  const wsPath = workspaceFilePath(repoPath, tree.branch);
+  const wsPath = workspaceFilePath(repoPath, tree.branch, tree.ticketId);
   fs.mkdirSync(path.dirname(wsPath), { recursive: true });
   const name = displayName(tree);
   const workspace = {

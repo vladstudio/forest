@@ -43,7 +43,7 @@ async function teardownTree(ctx: ForestContext, tree: TreeState, opts: TeardownO
       await runStep(ctx, 'Delete branch', () => git.deleteBranch(tree.repoPath, tree.branch, { skipRemote: !opts.deleteRemote }));
     }
     await ctx.stateManager.removeTree(tree.repoPath, tree.branch);
-    try { fs.unlinkSync(workspaceFilePath(tree.repoPath, tree.branch)); } catch {}
+    try { fs.unlinkSync(workspaceFilePath(tree.repoPath, tree.branch, tree.ticketId)); } catch {}
     ctx.outputChannel.appendLine('[Forest] State updated');
     if (shouldClose) {
       await vscode.commands.executeCommand('workbench.action.closeWindow');
