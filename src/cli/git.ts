@@ -97,7 +97,7 @@ export async function discardChanges(repoPath: string): Promise<void> {
 
 export async function hasUncommittedChanges(worktreePath: string): Promise<boolean> {
   const { stdout } = await exec('git', ['status', '--porcelain'], { cwd: worktreePath });
-  return stdout.length > 0;
+  return stdout.trim().length > 0;
 }
 
 export async function commitsBehind(worktreePath: string, baseRef: string): Promise<number> {

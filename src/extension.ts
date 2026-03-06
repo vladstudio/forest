@@ -73,7 +73,7 @@ export async function activate(context: vscode.ExtensionContext) {
             .then(doc => vscode.window.showTextDocument(doc));
         }
       });
-    });
+    }).catch(() => {});
   }
 
   // Watch config files for external edits
@@ -176,11 +176,11 @@ export async function activate(context: vscode.ExtensionContext) {
   // Update noTrees context + sidebar badge
   const updateNoTrees = async () => {
     const s = await stateManager.load();
-    const trees = stateManager.getTreesForRepo(s, getRepoPath());
+    const trees = stateManager.getTreesForRepo(s, repoPath);
     vscode.commands.executeCommand('setContext', 'forest.noTrees', trees.length === 0);
     forestView.badge = trees.length ? { value: trees.length, tooltip: `${trees.length} trees` } : undefined;
   };
-  updateNoTrees();
+  updateNoTrees().catch(() => {});
 
   const ctx: ForestContext = {
     config, stateManager, shortcutManager,
@@ -214,7 +214,7 @@ export async function activate(context: vscode.ExtensionContext) {
   reg('forest.update', (arg?: TreeItemView) => andRefresh(() => update(ctx, treeOf(arg)))());
   reg('forest.rebase', (arg?: TreeItemView) => andRefresh(() => rebase(ctx, treeOf(arg)))());
   reg('forest.list', () => list(ctx));
-  reg('forest.openMain', () => vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(getRepoPath()), { forceNewWindow: true }));
+  reg('forest.openMain', () => vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(repoPath), { forceNewWindow: true }));
   reg('forest.refresh', () => forestProvider.refresh());
   reg('forest.copyBranch', (arg?: TreeItemView) => {
     const tree = treeOf(arg) ?? ctx.currentTree;
@@ -303,7 +303,7 @@ export async function activate(context: vscode.ExtensionContext) {
     try {
       if (!(await gh.isAvailable())) return;
       const s = await stateManager.load();
-      const trees = stateManager.getTreesForRepo(s, getRepoPath());
+      const trees = stateManager.getTreesForRepo(s, repoPath);
       for (const tree of trees) {
         if (!tree.prUrl || !tree.path || tree.mergeNotified) continue;
         const isOwnWindow = ctx.currentTree?.branch === tree.branch;
@@ -333,9 +333,9 @@ export async function activate(context: vscode.ExtensionContext) {
     if (orphanCheckRunning) return;
     orphanCheckRunning = true;
     try {
-      const before = stateManager.getTreesForRepo(stateManager.loadSync(), repoPath).length;
-      await pruneOrphans();
-      const after = stateManager.getTreesForRepo(stateManager.loadSync(), repoPath).length;
+      const before = stateManager.getTreesForRepo(await stateManager.load(), repoPath).length;
+      const afterState = await pruneOrphans();
+      const after = stateManager.getTreesForRepo(afterState, repoPath).length;
       if (after < before) forestProvider.refresh();
     } finally {
       orphanCheckRunning = false;
@@ -348,10 +348,10 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push({ dispose: () => clearInterval(healthRefreshInterval) });
 
   // Watch state for changes from other windows
-  let previousTrees = stateManager.getTreesForRepo(stateManager.loadSync(), getRepoPath());
+  let previousTrees = stateManager.getTreesForRepo(stateManager.loadSync(), repoPath);
   stateManager.onDidChange((newState) => {
     if (ctx.currentTree) {
-      const updated = stateManager.getTree(newState, getRepoPath(), ctx.currentTree.branch);
+      const updated = stateManager.getTree(newState, repoPath, ctx.currentTree.branch);
       if (updated) {
         ctx.currentTree = updated;
         statusBarManager.update(updated);
@@ -368,7 +368,7 @@ export async function activate(context: vscode.ExtensionContext) {
     }
     // Clean up workspace files for trees removed by other windows.
     // Worktree/branch cleanup is handled by the window that initiated removal.
-    const currentTrees = stateManager.getTreesForRepo(newState, getRepoPath());
+    const currentTrees = stateManager.getTreesForRepo(newState, repoPath);
     const currentBranches = new Set(currentTrees.map(t => t.branch));
     for (const prev of previousTrees) {
       if (prev.branch === ctx.currentTree?.branch) continue;

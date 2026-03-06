@@ -103,8 +103,9 @@ export async function ship(ctx: ForestContext, treeArg?: import('../state').Tree
     postShip.push(ctx.stateManager.updateTree(tree.repoPath, tree.branch, { prUrl }));
   }
 
-  await Promise.all(postShip).catch((e: any) => {
-    log.error(`Post-ship task failed: ${e.message}`);
-    vscode.window.showWarningMessage(`Post-ship task failed: ${e.message}`);
-  });
+  const results = await Promise.allSettled(postShip);
+  for (const r of results) if (r.status === 'rejected') {
+    log.error(`Post-ship task failed: ${r.reason?.message}`);
+    vscode.window.showWarningMessage(`Post-ship task failed: ${r.reason?.message}`);
+  }
 }

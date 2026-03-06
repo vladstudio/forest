@@ -23,7 +23,8 @@ function parseTicketId(branch: string, branchFormat: string): string | undefined
   let pattern = branchFormat.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   pattern = pattern
     .replace('\\$\\{ticketId\\}', '(?<ticketId>[A-Z]+-\\d+)')
-    .replace('\\$\\{slug\\}', '.+');
+    .replace('\\$\\{slug\\}', '.+')
+    .replace(/\\\$\\\{[^}]+\\\}/g, '.+');
   try {
     return new RegExp(`^${pattern}$`).exec(branch)?.groups?.ticketId;
   } catch { return undefined; }

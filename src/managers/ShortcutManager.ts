@@ -11,7 +11,7 @@ function isPortOpen(port: number): Promise<boolean> {
     const sock = net.createConnection({ port, host: 'localhost' });
     const timer = setTimeout(() => { sock.destroy(); resolve(false); }, 1000);
     sock.once('connect', () => { clearTimeout(timer); sock.destroy(); resolve(true); });
-    sock.once('error', () => { clearTimeout(timer); resolve(false); });
+    sock.once('error', () => { clearTimeout(timer); sock.destroy(); resolve(false); });
   });
 }
 
@@ -96,7 +96,8 @@ export class ShortcutManager {
         const existing = this.terminals.get(sc.name);
         if (!existing || existing.length === 0) await this.openTerminal(sc, viewCol);
       } else {
-        this.open(sc, sc.openOnLaunch as vscode.ViewColumn);
+        const viewCol = typeof sc.openOnLaunch === 'number' && sc.openOnLaunch > 1 ? sc.openOnLaunch as vscode.ViewColumn : undefined;
+        this.open(sc, viewCol);
       }
     }
     this._onDidChange.fire();

@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import type { ForestContext } from '../context';
+import type { TreeState } from '../state';
 import { displayName } from '../state';
 import * as git from '../cli/git';
 import { copyConfigFiles, runSetupCommands } from './shared';
@@ -11,26 +12,23 @@ function showTimedNotification(message: string, ms = 2000): void {
   );
 }
 
-export async function update(ctx: ForestContext, treeArg?: import('../state').TreeState): Promise<void> {
+async function pullAndRefresh(
+  ctx: ForestContext, treeArg: TreeState | undefined, label: string,
+  pullFn: (path: string, base: string) => Promise<void>, message: string,
+): Promise<void> {
   const tree = treeArg || ctx.currentTree;
-  if (!tree) {
-    vscode.window.showErrorMessage('Update must be run from a tree window.');
-    return;
-  }
-  if (!tree.path) {
-    vscode.window.showErrorMessage('Cannot update a shelved tree. Resume it first.');
-    return;
-  }
+  if (!tree) { vscode.window.showErrorMessage(`${label} must be run from a tree window.`); return; }
+  if (!tree.path) { vscode.window.showErrorMessage(`Cannot ${label.toLowerCase()} a shelved tree. Resume it first.`); return; }
   const config = ctx.config;
 
   await vscode.window.withProgress(
-    { location: vscode.ProgressLocation.Notification, title: `Updating ${displayName(tree)}...` },
+    { location: vscode.ProgressLocation.Notification, title: `${label} ${displayName(tree)}...` },
     async (progress) => {
       progress.report({ message: 'Pulling latest...' });
       try {
-        await git.pullMerge(tree.path!, config.baseBranch);
+        await pullFn(tree.path!, config.baseBranch);
       } catch (e: any) {
-        vscode.window.showErrorMessage(`Merge failed: ${e.message}. Resolve conflicts manually.`);
+        vscode.window.showErrorMessage(`${label} failed: ${e.message}. Resolve conflicts manually.`);
         return;
       }
 
@@ -40,41 +38,15 @@ export async function update(ctx: ForestContext, treeArg?: import('../state').Tr
       progress.report({ message: 'Running setup...' });
       await runSetupCommands(config, tree.path!, ctx.outputChannel);
 
-      showTimedNotification('Tree updated. Dependencies refreshed.');
+      showTimedNotification(message);
     },
   );
 }
 
-export async function rebase(ctx: ForestContext, treeArg?: import('../state').TreeState): Promise<void> {
-  const tree = treeArg || ctx.currentTree;
-  if (!tree) {
-    vscode.window.showErrorMessage('Rebase must be run from a tree window.');
-    return;
-  }
-  if (!tree.path) {
-    vscode.window.showErrorMessage('Cannot rebase a shelved tree. Resume it first.');
-    return;
-  }
-  const config = ctx.config;
+export async function update(ctx: ForestContext, treeArg?: TreeState): Promise<void> {
+  return pullAndRefresh(ctx, treeArg, 'Update', git.pullMerge, 'Tree updated. Dependencies refreshed.');
+}
 
-  await vscode.window.withProgress(
-    { location: vscode.ProgressLocation.Notification, title: `Rebasing ${displayName(tree)}...` },
-    async (progress) => {
-      progress.report({ message: 'Rebasing onto main...' });
-      try {
-        await git.pullRebase(tree.path!, config.baseBranch);
-      } catch (e: any) {
-        vscode.window.showErrorMessage(`Rebase failed: ${e.message}. Resolve conflicts manually.`);
-        return;
-      }
-
-      progress.report({ message: 'Copying files...' });
-      copyConfigFiles(config, tree.repoPath, tree.path!);
-
-      progress.report({ message: 'Running setup...' });
-      await runSetupCommands(config, tree.path!, ctx.outputChannel);
-
-      showTimedNotification('Tree rebased. Dependencies refreshed.');
-    },
-  );
+export async function rebase(ctx: ForestContext, treeArg?: TreeState): Promise<void> {
+  return pullAndRefresh(ctx, treeArg, 'Rebase', git.pullRebase, 'Tree rebased. Dependencies refreshed.');
 }

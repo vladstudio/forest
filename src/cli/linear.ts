@@ -97,10 +97,10 @@ export async function listMyIssues(states: string[], teams?: string[]): Promise<
       state: { type: { in: states } },
     };
     if (teams?.length) filter.team = { key: { in: teams } };
-    const data = await gql<{ issues: { nodes: { identifier: string; title: string; state: { name: string; type: string }; priority: number }[] } }>(
+    const data = await gql<{ issues: { nodes: { identifier: string; title: string; state: { name: string; type: string }; priority: number; url: string }[] } }>(
       `query($filter: IssueFilter!) {
         issues(filter: $filter, orderBy: updatedAt, first: 50) {
-          nodes { identifier title state { name type } priority }
+          nodes { identifier title state { name type } priority url }
         }
       }`,
       { filter },
@@ -110,6 +110,7 @@ export async function listMyIssues(states: string[], teams?: string[]): Promise<
       title: n.title,
       state: n.state.type,
       priority: n.priority,
+      url: n.url,
     }));
   } catch (e: any) { log.error(`listMyIssues failed: ${e.message}`); return []; }
 }
@@ -176,6 +177,10 @@ export async function validateStatuses(
   try {
     const problems: string[] = [];
     const VALID_TYPES = ['triage', 'backlog', 'unstarted', 'started', 'completed', 'canceled'];
+    // Validate issueList — must be valid state types
+    for (const t of statuses.issueList) {
+      if (!VALID_TYPES.includes(t)) problems.push(`issueList: "${t}" is not a valid state type`);
+    }
     for (const team of teams) {
       const states = await getWorkflowStates(team);
       if (!states.length) { problems.push(`Team "${team}" has no workflow states (wrong team key?)`); continue; }
@@ -188,10 +193,6 @@ export async function validateStatuses(
           const available = [...new Set(states.map(s => s.name))].join(', ');
           problems.push(`${field}: "${value}" not found for team ${team} (available: ${available})`);
         }
-      }
-      // Validate issueList — must be valid state types
-      for (const t of statuses.issueList) {
-        if (!VALID_TYPES.includes(t)) problems.push(`issueList: "${t}" is not a valid state type`);
       }
     }
     return problems;

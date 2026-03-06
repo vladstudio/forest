@@ -89,7 +89,7 @@ export class StateManager {
     }
   }
 
-  async save(state: ForestState): Promise<void> {
+  private async save(state: ForestState): Promise<void> {
     const keys = Object.keys(state.trees);
     log.info(`State save: ${keys.length} trees [${keys.join(', ')}]`);
     const data = JSON.stringify(state, null, 2);
@@ -127,7 +127,7 @@ export class StateManager {
         try {
           if (Date.now() - fs.statSync(this.lockPath).mtimeMs > 10_000) {
             log.warn('Removing stale state lock');
-            fs.rmdirSync(this.lockPath); continue;
+            fs.rmSync(this.lockPath); continue;
           }
         } catch {}
         if (i >= 29) { log.error('Could not acquire state lock after 30 retries'); throw new Error('Could not acquire state lock'); }
@@ -135,7 +135,7 @@ export class StateManager {
         await new Promise(r => setTimeout(r, 100));
       }
     }
-    try { await fn(); } finally { try { fs.rmdirSync(this.lockPath); } catch {} }
+    try { await fn(); } finally { try { fs.rmSync(this.lockPath); } catch {} }
   }
 
   async addTree(repoPath: string, tree: TreeState): Promise<void> {

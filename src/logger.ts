@@ -37,8 +37,9 @@ export class Logger {
         const backup = LOG_PATH + '.1';
         try { fs.unlinkSync(backup); } catch {}
         fs.renameSync(LOG_PATH, backup);
+        const newFd = fs.openSync(LOG_PATH, 'a');
         fs.closeSync(this.fd);
-        this.fd = fs.openSync(LOG_PATH, 'a');
+        this.fd = newFd;
       }
     } catch {}
   }

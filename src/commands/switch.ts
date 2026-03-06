@@ -9,9 +9,9 @@ import { workspaceFilePath } from './shared';
 
 export async function switchTree(ctx: ForestContext, branchArg?: string): Promise<void> {
   let branch = branchArg;
+  const state = await ctx.stateManager.load();
 
   if (!branch) {
-    const state = await ctx.stateManager.load();
     const trees = ctx.stateManager.getTreesForRepo(state, getRepoPath()).filter(t => t.path);
     if (!trees.length) { vscode.window.showInformationMessage('No trees to switch to.'); return; }
     const pick = await vscode.window.showQuickPick(
@@ -22,7 +22,6 @@ export async function switchTree(ctx: ForestContext, branchArg?: string): Promis
     branch = pick.id;
   }
 
-  const state = await ctx.stateManager.load();
   const tree = ctx.stateManager.getTree(state, getRepoPath(), branch!);
   if (!tree) { vscode.window.showErrorMessage(`Tree for branch "${branch}" not found.`); return; }
   if (!tree.path) { vscode.window.showErrorMessage('Tree is shelved. Resume it first.'); return; }

@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as git from '../cli/git';
 import { StashItem } from './items';
 
-export class StashesTreeProvider implements vscode.TreeDataProvider<StashItem> {
+export class StashesTreeProvider implements vscode.TreeDataProvider<StashItem>, vscode.Disposable {
   private _onDidChange = new vscode.EventEmitter<StashItem | undefined>();
   readonly onDidChangeTreeData = this._onDidChange.event;
 
@@ -16,4 +16,6 @@ export class StashesTreeProvider implements vscode.TreeDataProvider<StashItem> {
   getTreeItem(el: StashItem): vscode.TreeItem { return el; }
 
   refresh(): void { this._onDidChange.fire(undefined); }
+
+  dispose(): void { this._onDidChange.dispose(); }
 }

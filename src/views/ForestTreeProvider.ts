@@ -60,6 +60,7 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
 
     const promise = this.fetchHealth(tree);
     this.healthCache.set(key, { promise, time: Date.now() });
+    promise.catch(() => this.healthCache.delete(key));
     return promise;
   }
 
@@ -79,7 +80,7 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
     return { behind, age, pr };
   }
 
-  private async getTodoIssues(): Promise<linear.LinearIssue[]> {
+  private async getTodoIssues(state: Awaited<ReturnType<StateManager['load']>>): Promise<linear.LinearIssue[]> {
     if (!this.config.linear.enabled || !linear.isAvailable()) return [];
 
     if (Date.now() - this.issueCache.time > this.ISSUE_TTL) {
@@ -88,7 +89,6 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
     }
 
     // Filter out issues that already have trees (by ticketId)
-    const state = await this.stateManager.load();
     const existingTickets = new Set(
       this.stateManager.getTreesForRepo(state, getRepoPath())
         .filter(t => t.ticketId)
@@ -156,7 +156,7 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
 
     // Todo (Linear issues without branches)
     if (this.config.linear.enabled) {
-      const issues = await this.getTodoIssues();
+      const issues = await this.getTodoIssues(state);
       if (issues.length) {
         groups.push(new StageGroupItem('Tickets: Todo', issues.length, 'inbox', issues.map(i => new IssueItem(i)), isCollapsed('Tickets: Todo')));
       }

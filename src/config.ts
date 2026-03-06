@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import * as crypto from 'crypto';
 import { resolveMainRepo } from './context';
 
 interface ShortcutBase { name: string; openOnLaunch?: number | false; mode?: 'single-repo' | 'single-tree' | 'multiple'; }
@@ -96,7 +97,8 @@ export async function loadConfig(): Promise<ForestConfig | null> {
   }
 
   // Normalize baseBranch: auto-prepend origin/ if missing
-  if (merged.baseBranch && !merged.baseBranch.includes('/')) {
+  merged.baseBranch = merged.baseBranch?.trim() || 'main';
+  if (!merged.baseBranch.includes('/')) {
     merged.baseBranch = `origin/${merged.baseBranch}`;
   }
 
@@ -110,7 +112,8 @@ export async function loadConfig(): Promise<ForestConfig | null> {
 
 /** Returns ~/.forest/trees/<repoName>. */
 export function getTreesDir(repoPath: string): string {
-  return path.join(os.homedir(), '.forest', 'trees', path.basename(repoPath));
+  const name = `${path.basename(repoPath)}-${crypto.createHash('md5').update(repoPath).digest('hex').slice(0, 8)}`;
+  return path.join(os.homedir(), '.forest', 'trees', name);
 }
 
 function mergeConfig(base: any, local: any): any {
@@ -127,7 +130,7 @@ function mergeConfig(base: any, local: any): any {
       result[key] = baseArr;
     } else if (typeof local[key] === 'object' && !Array.isArray(local[key]) && local[key] !== null) {
       result[key] = mergeConfig(base[key] || {}, local[key]);
-    } else {
+    } else if (local[key] !== null) {
       result[key] = local[key];
     }
   }

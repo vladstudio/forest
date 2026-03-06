@@ -81,7 +81,7 @@ export async function cleanup(ctx: ForestContext, branchArg?: string): Promise<v
         ghEnabled
           ? runStep(ctx, 'Merge PR', () => gh.mergePR(tree.path!)).then(ok => { if (!ok) mergeFailed = true; })
           : Promise.resolve(),
-        tree.ticketId
+        tree.ticketId && config.linear.enabled
           ? updateLinear(ctx, tree.ticketId, config.linear.statuses.onCleanup)
           : Promise.resolve(),
       ]);

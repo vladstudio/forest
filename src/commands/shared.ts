@@ -7,7 +7,6 @@ import { type ForestConfig, getTreesDir } from '../config';
 import type { ForestContext } from '../context';
 import type { TreeState, StateManager } from '../state';
 import { displayName } from '../state';
-import { slugify } from '../utils/slug';
 import * as git from '../cli/git';
 import * as linear from '../cli/linear';
 import { exec as execUtil, execShell, execStream } from '../utils/exec';
@@ -198,7 +197,7 @@ export async function createTree(opts: {
         await postWorktreeSetup(config, repoPath, treePath, tree, progress);
 
         progress.report({ message: 'Pushing branch...' });
-        git.pushBranch(treePath, branch).catch(() => {});
+        git.pushBranch(treePath, branch).catch(() => vscode.window.showWarningMessage('Failed to push branch. You can push manually later.'));
 
         progress.report({ message: 'Opening window...' });
         const wsFile = workspaceFilePath(repoPath, branch);
