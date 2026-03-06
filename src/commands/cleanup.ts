@@ -15,6 +15,12 @@ function resolveTree(ctx: ForestContext, branchArg?: string): TreeState | undefi
     : ctx.currentTree;
 }
 
+function requireTree(ctx: ForestContext, branchArg: string | undefined, action: string): TreeState | undefined {
+  const tree = resolveTree(ctx, branchArg);
+  if (!tree) vscode.window.showErrorMessage(`No tree to ${action}. Run from a tree window or select from sidebar.`);
+  return tree;
+}
+
 const teardownInProgress = new Set<string>();
 
 async function teardownTree(ctx: ForestContext, tree: TreeState, opts?: { skipRemoteBranchDelete?: boolean }): Promise<void> {
@@ -45,12 +51,8 @@ const stepList = (...items: (string | false | 0 | '' | null | undefined)[]) =>
   (items.filter(Boolean) as string[]).map((s, i) => `${i + 1}. ${s}`).join('\n');
 
 export async function cleanup(ctx: ForestContext, branchArg?: string): Promise<void> {
-  const tree = resolveTree(ctx, branchArg);
-
-  if (!tree) {
-    vscode.window.showErrorMessage('No tree to clean up. Run from a tree window or select from sidebar.');
-    return;
-  }
+  const tree = requireTree(ctx, branchArg, 'clean up');
+  if (!tree) return;
   const config = ctx.config;
   const ghEnabled = config.github.enabled && !!tree.path && await gh.isAvailable();
   const hasLinear = !!tree.ticketId && config.linear.enabled;
@@ -95,12 +97,8 @@ export async function cleanup(ctx: ForestContext, branchArg?: string): Promise<v
 }
 
 export async function cancel(ctx: ForestContext, branchArg?: string): Promise<void> {
-  const tree = resolveTree(ctx, branchArg);
-
-  if (!tree) {
-    vscode.window.showErrorMessage('No tree to cancel. Run from a tree window or select from sidebar.');
-    return;
-  }
+  const tree = requireTree(ctx, branchArg, 'cancel');
+  if (!tree) return;
 
   const hasLinear = !!tree.ticketId && ctx.config.linear.enabled;
   const willClose = ctx.currentTree?.branch === tree.branch;
@@ -134,12 +132,8 @@ export async function cleanupMerged(ctx: ForestContext, tree: TreeState): Promis
 }
 
 export async function shelve(ctx: ForestContext, branchArg?: string): Promise<void> {
-  const tree = resolveTree(ctx, branchArg);
-
-  if (!tree) {
-    vscode.window.showErrorMessage('No tree to shelve. Run from a tree window or select from sidebar.');
-    return;
-  }
+  const tree = requireTree(ctx, branchArg, 'shelve');
+  if (!tree) return;
 
   if (!tree.path) {
     vscode.window.showInformationMessage('Tree is already shelved.');
@@ -174,12 +168,8 @@ export async function shelve(ctx: ForestContext, branchArg?: string): Promise<vo
 }
 
 export async function resume(ctx: ForestContext, branchArg?: string): Promise<void> {
-  const tree = resolveTree(ctx, branchArg);
-
-  if (!tree) {
-    vscode.window.showErrorMessage('No tree to resume. Run from a tree window or select from sidebar.');
-    return;
-  }
+  const tree = requireTree(ctx, branchArg, 'resume');
+  if (!tree) return;
 
   if (tree.path) {
     vscode.window.showInformationMessage('This tree is not shelved. Use Switch to open it instead.');

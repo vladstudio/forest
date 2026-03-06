@@ -100,19 +100,15 @@ export async function hasUncommittedChanges(worktreePath: string): Promise<boole
   return stdout.trim().length > 0;
 }
 
-export async function commitsBehind(worktreePath: string, baseRef: string): Promise<number> {
+async function revListCount(worktreePath: string, range: string): Promise<number> {
   try {
-    const { stdout } = await exec('git', ['rev-list', '--count', `HEAD..${baseRef}`], { cwd: worktreePath, timeout: 10_000 });
+    const { stdout } = await exec('git', ['rev-list', '--count', range], { cwd: worktreePath, timeout: 10_000 });
     return parseInt(stdout) || 0;
   } catch { return 0; }
 }
 
-export async function commitsAhead(worktreePath: string, baseRef: string): Promise<number> {
-  try {
-    const { stdout } = await exec('git', ['rev-list', '--count', `${baseRef}..HEAD`], { cwd: worktreePath, timeout: 10_000 });
-    return parseInt(stdout) || 0;
-  } catch { return 0; }
-}
+export const commitsBehind = (wt: string, base: string) => revListCount(wt, `HEAD..${base}`);
+export const commitsAhead = (wt: string, base: string) => revListCount(wt, `${base}..HEAD`);
 
 export async function diffFromBase(worktreePath: string, baseRef: string): Promise<string> {
   const { stdout } = await exec('git', ['diff', baseRef + '...HEAD'], { cwd: worktreePath, timeout: 30_000 });

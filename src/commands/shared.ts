@@ -120,6 +120,18 @@ function sanitizeBranch(branch: string): string {
     .replace(/[<>:"|?*\x00-\x1f]/g, '-');
 }
 
+function resolveTreePath(repoPath: string, branch: string, ticketId?: string): string {
+  const treesDir = getTreesDir(repoPath);
+  fs.mkdirSync(treesDir, { recursive: true });
+  return path.join(treesDir, ticketId ?? sanitizeBranch(branch));
+}
+
+async function checkMaxTrees(stateManager: StateManager, repoPath: string, max: number): Promise<void> {
+  const state = await stateManager.load();
+  const active = stateManager.getTreesForRepo(state, repoPath).filter(t => t.path);
+  if (active.length >= max) throw new Error(`Max trees (${max}) reached. Clean up some trees first.`);
+}
+
 /** If there are uncommitted changes, ask what to do. Returns true if stashed, false if clean/discarded, undefined if cancelled. */
 export async function promptUncommittedChanges(repoPath: string): Promise<boolean | undefined> {
   if (!await git.hasUncommittedChanges(repoPath)) return false;
@@ -152,18 +164,8 @@ export async function createTree(opts: {
     throw new Error(`Tree for branch "${branch}" already exists`);
   }
 
-  // Check max trees
-  const trees = stateManager.getTreesForRepo(state, repoPath);
-  const activeTrees = trees.filter(t => t.path);
-  if (activeTrees.length >= config.maxTrees) {
-    throw new Error(`Max trees (${config.maxTrees}) reached. Clean up some trees first.`);
-  }
-
-  // Worktree path — use ticketId if available (shorter, cleaner), else sanitized branch
-  const treesDir = getTreesDir(repoPath);
-  fs.mkdirSync(treesDir, { recursive: true });
-  const dirName = ticketId ?? sanitizeBranch(branch);
-  const treePath = path.join(treesDir, dirName);
+  await checkMaxTrees(stateManager, repoPath, config.maxTrees);
+  const treePath = resolveTreePath(repoPath, branch, ticketId);
 
   const tree: TreeState = {
     branch, repoPath, path: treePath,
@@ -224,18 +226,8 @@ export async function resumeTree(opts: {
   const { tree, config, stateManager } = opts;
   const repoPath = tree.repoPath;
 
-  // Check max trees
-  const state = await stateManager.load();
-  const trees = stateManager.getTreesForRepo(state, repoPath);
-  const activeTrees = trees.filter(t => t.path);
-  if (activeTrees.length >= config.maxTrees) {
-    throw new Error(`Max trees (${config.maxTrees}) reached. Clean up some trees first.`);
-  }
-
-  const treesDir = getTreesDir(repoPath);
-  fs.mkdirSync(treesDir, { recursive: true });
-  const dirName = tree.ticketId ?? sanitizeBranch(tree.branch);
-  const treePath = path.join(treesDir, dirName);
+  await checkMaxTrees(stateManager, repoPath, config.maxTrees);
+  const treePath = resolveTreePath(repoPath, tree.branch, tree.ticketId);
 
   log.info(`resumeTree: ${tree.branch}`);
   return await vscode.window.withProgress(
