@@ -313,7 +313,7 @@
         },
         {
           "command": "forest.shelve",
-          "when": "viewItem == tree-progress-current || viewItem == tree-review-current",
+          "when": "viewItem =~ /^tree-(progress|review)/",
           "group": "4_danger"
         },
         {
