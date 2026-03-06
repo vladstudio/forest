@@ -84,15 +84,22 @@ export async function runSetupCommands(config: ForestConfig, treePath: string, c
   }
 }
 
+type ProgressReporter = { report(value: { message?: string }): void };
+
 /** Common post-worktree-creation setup: copy files, install deps, run setup commands. */
-async function postWorktreeSetup(config: ForestConfig, repoPath: string, treePath: string, tree: TreeState): Promise<void> {
+async function postWorktreeSetup(config: ForestConfig, repoPath: string, treePath: string, tree: TreeState, progress?: ProgressReporter): Promise<void> {
+  progress?.report({ message: 'Copying config files...' });
   copyConfigFiles(config, repoPath, treePath);
   generateWorkspaceFile(repoPath, treePath, tree);
 
-  const direnvPromise = fs.existsSync(path.join(treePath, '.envrc'))
+  const hasDirenv = fs.existsSync(path.join(treePath, '.envrc'));
+  if (hasDirenv) progress?.report({ message: 'Running direnv allow...' });
+
+  const direnvPromise = hasDirenv
     ? execShell('direnv allow', { cwd: treePath, timeout: 10_000 }).catch(() => {})
     : undefined;
 
+  progress?.report({ message: 'Copying dependencies from template...' });
   const [templateCopied] = await Promise.all([
     copyModulesFromTemplate(repoPath, treePath),
     direnvPromise,
@@ -100,6 +107,7 @@ async function postWorktreeSetup(config: ForestConfig, repoPath: string, treePat
   const needsSave = templateNeedsUpdate(repoPath);
 
   if (!templateCopied || needsSave) {
+    progress?.report({ message: 'Running setup commands...' });
     await runSetupCommands(config, treePath);
     if (needsSave) saveTemplate(repoPath, treePath).catch(() => {});
   }
@@ -187,9 +195,9 @@ export async function createTree(opts: {
           }
         }
 
-        progress.report({ message: 'Setting up...' });
-        await postWorktreeSetup(config, repoPath, treePath, tree);
+        await postWorktreeSetup(config, repoPath, treePath, tree, progress);
 
+        progress.report({ message: 'Pushing branch...' });
         git.pushBranch(treePath, branch).catch(() => {});
 
         progress.report({ message: 'Opening window...' });
@@ -237,8 +245,7 @@ export async function resumeTree(opts: {
       progress.report({ message: 'Creating worktree...' });
       await git.checkoutWorktree(repoPath, treePath, tree.branch);
 
-      progress.report({ message: 'Setting up...' });
-      await postWorktreeSetup(config, repoPath, treePath, tree);
+      await postWorktreeSetup(config, repoPath, treePath, tree, progress);
 
       // Update state with new path
       await stateManager.updateTree(repoPath, tree.branch, { path: treePath });
