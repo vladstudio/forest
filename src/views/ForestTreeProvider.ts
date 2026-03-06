@@ -65,7 +65,7 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
   }
 
   private async fetchHealth(tree: TreeState): Promise<TreeHealth> {
-    // No path (shelved) or path doesn't exist yet (being created in another window)
+    // Path doesn't exist yet (being created in another window)
     if (!tree.path || !fs.existsSync(tree.path)) return { behind: 0, age: null, pr: null };
 
     const [behind, age, pr] = await Promise.all([
@@ -131,12 +131,9 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
       }
 
       const health = healthResults[i] ?? undefined;
-      const shelved = !t.path;
 
       let ctx: TreeContext;
-      if (shelved) {
-        ctx = 'tree-shelved';
-      } else if (health?.pr?.state === 'MERGED') {
+      if (health?.pr?.state === 'MERGED') {
         ctx = 'tree-done';
       } else if (health?.pr) {
         ctx = 'tree-review';
@@ -148,7 +145,7 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
 
       if (ctx === 'tree-done') done.push(item);
       else if (ctx === 'tree-review') inReview.push(item);
-      else inProgress.push(item); // includes shelved
+      else inProgress.push(item);
     });
 
     const groups: StageGroupItem[] = [];

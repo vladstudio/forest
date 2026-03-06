@@ -6,7 +6,7 @@ import { displayName } from '../state';
 import * as git from '../cli/git';
 import * as gh from '../cli/gh';
 import { getRepoPath } from '../context';
-import { runStep, updateLinear, workspaceFilePath, resumeTree } from './shared';
+import { runStep, updateLinear, workspaceFilePath } from './shared';
 import { log } from '../logger';
 
 function resolveTree(ctx: ForestContext, branchArg?: string): TreeState | undefined {
@@ -135,11 +135,6 @@ export async function shelve(ctx: ForestContext, branchArg?: string): Promise<vo
   const tree = requireTree(ctx, branchArg, 'shelve');
   if (!tree) return;
 
-  if (!tree.path) {
-    vscode.window.showInformationMessage('Tree is already shelved.');
-    return;
-  }
-
   const willClose = ctx.currentTree?.branch === tree.branch;
 
   const confirm = await vscode.window.showWarningMessage(
@@ -157,7 +152,7 @@ export async function shelve(ctx: ForestContext, branchArg?: string): Promise<vo
       progress.report({ message: 'Removing worktree...' });
       await runStep(ctx, 'Remove worktree', () => git.removeWorktree(tree.repoPath, tree.path!));
 
-      await ctx.stateManager.updateTree(tree.repoPath, tree.branch, { path: undefined });
+      await ctx.stateManager.removeTree(tree.repoPath, tree.branch);
       try { fs.unlinkSync(workspaceFilePath(tree.repoPath, tree.branch)); } catch {}
 
       if (willClose) {
@@ -167,18 +162,3 @@ export async function shelve(ctx: ForestContext, branchArg?: string): Promise<vo
   );
 }
 
-export async function resume(ctx: ForestContext, branchArg?: string): Promise<void> {
-  const tree = requireTree(ctx, branchArg, 'resume');
-  if (!tree) return;
-
-  if (tree.path) {
-    vscode.window.showInformationMessage('This tree is not shelved. Use Switch to open it instead.');
-    return;
-  }
-
-  try {
-    await resumeTree({ tree, config: ctx.config, stateManager: ctx.stateManager });
-  } catch (e: any) {
-    vscode.window.showErrorMessage(e.message);
-  }
-}

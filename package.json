@@ -157,12 +157,6 @@
         "icon": "$(archive)"
       },
       {
-        "command": "forest.resume",
-        "title": "Resume — Recreate Worktree",
-        "category": "Forest",
-        "icon": "$(debug-start)"
-      },
-      {
         "command": "forest.update",
         "title": "Update — Merge from Main",
         "category": "Forest",
@@ -283,7 +277,7 @@
         },
         {
           "command": "forest.revealInFinder",
-          "when": "viewItem =~ /^tree-/ && viewItem != tree-shelved",
+          "when": "viewItem =~ /^tree-/",
           "group": "1_navigation"
         },
         {
@@ -302,11 +296,6 @@
           "group": "3_lifecycle"
         },
         {
-          "command": "forest.resume",
-          "when": "viewItem == tree-shelved",
-          "group": "3_lifecycle"
-        },
-        {
           "command": "forest.cleanup",
           "when": "viewItem =~ /^tree-done/",
           "group": "4_danger"
@@ -318,7 +307,7 @@
         },
         {
           "command": "forest.cancel",
-          "when": "viewItem =~ /^tree-(progress|review|shelved)/",
+          "when": "viewItem =~ /^tree-(progress|review)/",
           "group": "4_danger"
         },
         {

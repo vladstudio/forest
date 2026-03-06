@@ -14,7 +14,7 @@ import { StashesTreeProvider } from './views/StashesTreeProvider';
 import { create, start } from './commands/create';
 import { switchTree } from './commands/switch';
 import { ship } from './commands/ship';
-import { cleanup, cancel, cleanupMerged, shelve, resume } from './commands/cleanup';
+import { cleanup, cancel, cleanupMerged, shelve } from './commands/cleanup';
 import { update, rebase } from './commands/update';
 import { list } from './commands/list';
 import { workspaceFilePath } from './commands/shared';
@@ -208,7 +208,6 @@ export async function activate(context: vscode.ExtensionContext) {
   reg('forest.cleanup', (arg?: string | TreeItemView) => cleanup(ctx, branchOf(arg)));
   reg('forest.cancel', (arg?: string | TreeItemView) => cancel(ctx, branchOf(arg)));
   reg('forest.shelve', (arg?: string | TreeItemView) => shelve(ctx, branchOf(arg)));
-  reg('forest.resume', (arg?: string | TreeItemView) => resume(ctx, branchOf(arg)));
   reg('forest.update', (arg?: TreeItemView) => andRefresh(() => update(ctx, treeOf(arg)))());
   reg('forest.rebase', (arg?: TreeItemView) => andRefresh(() => rebase(ctx, treeOf(arg)))());
   reg('forest.list', () => list(ctx));

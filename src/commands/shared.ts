@@ -217,38 +217,6 @@ export async function createTree(opts: {
   }
 }
 
-/** Recreate a worktree for a shelved tree. */
-export async function resumeTree(opts: {
-  tree: TreeState;
-  config: ForestConfig;
-  stateManager: StateManager;
-}): Promise<TreeState> {
-  const { tree, config, stateManager } = opts;
-  const repoPath = tree.repoPath;
-
-  await checkMaxTrees(stateManager, repoPath, config.maxTrees);
-  const treePath = resolveTreePath(repoPath, tree.branch, tree.ticketId);
-
-  log.info(`resumeTree: ${tree.branch}`);
-  return await vscode.window.withProgress(
-    { location: vscode.ProgressLocation.Notification, title: `Resuming ${displayName(tree)}...`, cancellable: false },
-    async (progress) => {
-      progress.report({ message: 'Creating worktree...' });
-      await git.checkoutWorktree(repoPath, treePath, tree.branch);
-
-      await postWorktreeSetup(config, repoPath, treePath, tree, progress);
-
-      // Update state with new path
-      await stateManager.updateTree(repoPath, tree.branch, { path: treePath });
-
-      progress.report({ message: 'Opening window...' });
-      const wsFile = workspaceFilePath(repoPath, tree.branch);
-      await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(wsFile), { forceNewWindow: true });
-
-      return { ...tree, path: treePath };
-    },
-  );
-}
 
 function templateDir(repoPath: string): string {
   return path.join(getTreesDir(repoPath), '.template');

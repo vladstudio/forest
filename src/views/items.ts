@@ -94,7 +94,7 @@ function abbreviateAge(age: string): string {
     .replace(/ years? ago/, 'y');
 }
 
-export type TreeContext = 'tree-progress' | 'tree-shelved' | 'tree-review' | 'tree-done' | 'tree-cleaning';
+export type TreeContext = 'tree-progress' | 'tree-review' | 'tree-done' | 'tree-cleaning';
 
 export class TreeItemView extends vscode.TreeItem {
   constructor(
@@ -120,14 +120,11 @@ export class TreeItemView extends vscode.TreeItem {
       if (health.behind > 0) parts.push(`${health.behind}\u2193`);
       if (health.age) parts.push(abbreviateAge(health.age));
     }
-    if (ctx === 'tree-shelved') parts.push('shelved');
     if (ctx === 'tree-cleaning') parts.push('cleaning up...');
     this.description = parts.join(' \u00b7 ');
 
     if (ctx === 'tree-cleaning') {
       this.iconPath = new vscode.ThemeIcon('loading~spin');
-    } else if (ctx === 'tree-shelved') {
-      this.iconPath = new vscode.ThemeIcon('archive', new vscode.ThemeColor('disabledForeground'));
     } else if (isCurrent) {
       this.iconPath = new vscode.ThemeIcon('arrow-right', new vscode.ThemeColor('charts.green'));
     } else {
