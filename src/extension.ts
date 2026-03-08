@@ -267,10 +267,18 @@ export async function activate(context: vscode.ExtensionContext) {
     const entries = await git.stashList(repoPath);
     const label = entries.find(e => e.index === index)?.message ?? `stash@{${index}}`;
     const pick = await vscode.window.showQuickPick(
-      [{ label: '$(cloud-download) Apply', id: 'apply' }, { label: '$(trash) Delete', id: 'delete' }],
+      [
+        { label: '$(cloud-download) Apply and Delete', id: 'apply-delete' },
+        { label: '$(cloud-download) Apply and Keep', id: 'apply-keep' },
+        { label: '$(trash) Delete', id: 'delete' },
+      ],
       { placeHolder: 'Stash action' },
     );
-    if (pick?.id === 'apply') {
+    if (pick?.id === 'apply-delete') {
+      await git.stashApply(wsPath, index);
+      await git.stashDrop(repoPath, index);
+      stashesProvider.refresh();
+    } else if (pick?.id === 'apply-keep') {
       await git.stashApply(wsPath, index);
       stashesProvider.refresh();
     } else if (pick?.id === 'delete') {
