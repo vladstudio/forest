@@ -1,12 +1,11 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs';
 import type { ForestContext } from '../context';
 import type { TreeState } from '../state';
 import { displayName } from '../state';
 import * as git from '../cli/git';
 import * as gh from '../cli/gh';
 import { getRepoPath } from '../context';
-import { runStep, updateLinear, workspaceFilePath } from './shared';
+import { deleteWorkspaceFiles, runStep, updateLinear } from './shared';
 import { log } from '../logger';
 
 function resolveTree(ctx: ForestContext, branchArg?: string): TreeState | undefined {
@@ -28,26 +27,45 @@ interface TeardownOpts {
   deleteRemote?: boolean;
 }
 
-async function teardownTree(ctx: ForestContext, tree: TreeState, opts: TeardownOpts = {}): Promise<void> {
+async function teardownTree(ctx: ForestContext, tree: TreeState, opts: TeardownOpts = {}): Promise<boolean> {
   const key = `${tree.repoPath}:${tree.branch}`;
-  if (teardownInProgress.has(key)) { log.warn(`teardownTree already in progress: ${tree.branch}`); return; }
+  if (teardownInProgress.has(key)) { log.warn(`teardownTree already in progress: ${tree.branch}`); return false; }
   log.info(`teardownTree: ${tree.branch}`);
   teardownInProgress.add(key);
+  let removedFromState = false;
+  const clearCleaning = () => ctx.stateManager.updateTree(tree.repoPath, tree.branch, { cleaning: undefined });
   try {
     await ctx.stateManager.updateTree(tree.repoPath, tree.branch, { cleaning: true });
     const shouldClose = ctx.currentTree?.branch === tree.branch;
     if (tree.path) {
-      await runStep(ctx, 'Remove worktree', () => git.removeWorktree(tree.repoPath, tree.path!));
+      const removed = await runStep(ctx, 'Remove worktree', () => git.removeWorktree(tree.repoPath, tree.path!));
+      if (!removed) {
+        // Fail closed: keep the tree in state so the user can retry cleanup.
+        await clearCleaning();
+        return false;
+      }
     }
     if (opts.deleteLocal) {
-      await runStep(ctx, 'Delete branch', () => git.deleteBranch(tree.repoPath, tree.branch, { skipRemote: !opts.deleteRemote }));
+      const deleted = await runStep(ctx, 'Delete branch', () => git.deleteBranch(tree.repoPath, tree.branch, { skipRemote: !opts.deleteRemote }));
+      if (!deleted) {
+        // Branch deletion is destructive too; don't forget the tree on partial failure.
+        await clearCleaning();
+        return false;
+      }
     }
     await ctx.stateManager.removeTree(tree.repoPath, tree.branch);
-    try { fs.unlinkSync(workspaceFilePath(tree)); } catch {}
+    removedFromState = true;
+    deleteWorkspaceFiles(tree);
     ctx.outputChannel.appendLine('[Forest] State updated');
     if (shouldClose) {
       await vscode.commands.executeCommand('workbench.action.closeWindow');
     }
+    return true;
+  } catch (e: any) {
+    if (!removedFromState) {
+      await clearCleaning().catch(() => {});
+    }
+    throw e;
   } finally {
     teardownInProgress.delete(key);
   }
@@ -187,4 +205,3 @@ export async function deleteTreeAll(ctx: ForestContext, branchArg?: string): Pro
     },
   );
 }
-

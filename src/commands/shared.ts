@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import * as crypto from 'crypto';
+import { repoHash, tryUnlinkSync } from '../utils/fs';
 import { type ForestConfig, getTreesDir } from '../config';
 import type { ForestContext } from '../context';
 import type { TreeState, StateManager } from '../state';
@@ -89,7 +90,7 @@ type ProgressReporter = { report(value: { message?: string }): void };
 async function postWorktreeSetup(config: ForestConfig, repoPath: string, treePath: string, tree: TreeState, progress?: ProgressReporter): Promise<void> {
   progress?.report({ message: 'Copying config files...' });
   copyConfigFiles(config, repoPath, treePath);
-  generateWorkspaceFile(repoPath, treePath, tree);
+  ensureWorkspaceFile(tree);
 
   const hasDirenv = fs.existsSync(path.join(treePath, '.envrc'));
   if (hasDirenv) progress?.report({ message: 'Running direnv allow...' });
@@ -266,20 +267,40 @@ export function templateNeedsUpdate(repoPath: string): boolean {
   return current !== fs.readFileSync(hashFile, 'utf8');
 }
 
-export function workspaceFilePath(tree: Pick<TreeState, 'branch' | 'ticketId'>): string {
+export function workspaceFilePath(tree: Pick<TreeState, 'repoPath' | 'branch' | 'ticketId'>): string {
+  // Include repo identity so identical branch/ticket names across repos do not collide.
+  const repoName = path.basename(tree.repoPath);
+  const fileName = `${repoName}-${repoHash(tree.repoPath)}-${tree.ticketId ?? sanitizeBranch(tree.branch)}.code-workspace`;
+  return path.join(os.homedir(), '.forest', 'workspaces', fileName);
+}
+
+function legacyWorkspaceFilePath(tree: Pick<TreeState, 'branch' | 'ticketId'>): string {
   return path.join(os.homedir(), '.forest', 'workspaces', `${tree.ticketId ?? sanitizeBranch(tree.branch)}.code-workspace`);
 }
 
-function generateWorkspaceFile(repoPath: string, treePath: string, tree: TreeState): void {
+export function deleteWorkspaceFiles(tree: Pick<TreeState, 'repoPath' | 'branch' | 'ticketId'>): void {
+  for (const wsPath of [workspaceFilePath(tree), legacyWorkspaceFilePath(tree)]) {
+    tryUnlinkSync(wsPath);
+  }
+}
+
+export function ensureWorkspaceFile(tree: TreeState): string {
+  if (!tree.path) throw new Error('Tree has no worktree path.');
   const wsPath = workspaceFilePath(tree);
   fs.mkdirSync(path.dirname(wsPath), { recursive: true });
   const name = displayName(tree);
   const workspace = {
-    folders: [{ path: treePath }],
+    folders: [{ path: tree.path }],
     settings: {
       'window.title': `${name}\${separator}\${activeEditorShort}`,
       'terminal.integrated.enablePersistentSessions': false,
     },
   };
   fs.writeFileSync(wsPath, JSON.stringify(workspace, null, 2));
+  // Remove the pre-repo-scoped filename so reopened trees converge on the new path.
+  const legacyPath = legacyWorkspaceFilePath(tree);
+  if (legacyPath !== wsPath) {
+    tryUnlinkSync(legacyPath);
+  }
+  return wsPath;
 }

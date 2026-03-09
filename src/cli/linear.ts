@@ -131,7 +131,6 @@ export async function getIssue(issueId: string): Promise<LinearIssue | null> {
 export async function createIssue(opts: {
   title: string;
   priority?: number;
-  label?: string;
   team?: string;
 }): Promise<string> {
   // Need team ID to create an issue

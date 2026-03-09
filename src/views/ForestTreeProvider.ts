@@ -71,7 +71,8 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
     const [behind, age, pr] = await Promise.all([
       git.commitsBehind(tree.path, this.config.baseBranch),
       git.lastCommitAge(tree.path),
-      gh.prStatus(tree.path),
+      // Skip GitHub CLI work entirely when the integration is disabled.
+      this.config.github.enabled ? gh.prStatus(tree.path) : Promise.resolve(null),
     ]);
     // Backfill prUrl in state when discovered from GitHub
     if (pr?.url && !tree.prUrl) {

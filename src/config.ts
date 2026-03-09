@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import * as crypto from 'crypto';
+import { repoHash } from './utils/fs';
 import { resolveMainRepo } from './context';
 
 interface ShortcutBase { name: string; openOnLaunch?: number | false; }
@@ -118,7 +118,7 @@ export function getTreesDir(repoPath: string): string {
   const base = path.basename(repoPath);
   const oldDir = path.join(os.homedir(), '.forest', 'trees', base);
   dir = fs.existsSync(oldDir) ? oldDir
-    : path.join(os.homedir(), '.forest', 'trees', `${base}-${crypto.createHash('md5').update(repoPath).digest('hex').slice(0, 8)}`);
+    : path.join(os.homedir(), '.forest', 'trees', `${base}-${repoHash(repoPath)}`);
   treesDirCache.set(repoPath, dir);
   return dir;
 }

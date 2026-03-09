@@ -17,7 +17,7 @@ import { ship } from './commands/ship';
 import { cleanup, cleanupMerged, deleteTree, deleteTreeLocal, deleteTreeAll } from './commands/cleanup';
 import { update, rebase } from './commands/update';
 import { list } from './commands/list';
-import { workspaceFilePath } from './commands/shared';
+import { deleteWorkspaceFiles } from './commands/shared';
 import * as git from './cli/git';
 import * as gh from './cli/gh';
 import * as linear from './cli/linear';
@@ -45,9 +45,10 @@ export async function activate(context: vscode.ExtensionContext) {
   }
 
   vscode.commands.executeCommand('setContext', 'forest.active', true);
-  const ghAvailable = await gh.isAvailable();
-  vscode.commands.executeCommand('setContext', 'forest.ghAvailable', ghAvailable);
-  if (!ghAvailable) {
+  // When GitHub integration is disabled, keep the full UI active without requiring gh.
+  const ghReady = !config.github.enabled || await gh.isAvailable();
+  vscode.commands.executeCommand('setContext', 'forest.ghAvailable', ghReady);
+  if (!ghReady) {
     context.subscriptions.push(
       vscode.window.registerTreeDataProvider('forest.ghMissing', emptyProvider),
     );
@@ -101,7 +102,7 @@ export async function activate(context: vscode.ExtensionContext) {
   await stateManager.initialize();
 
   const logger = config.logging ? initLogger() : undefined;
-  log.info(`Activated — repo: ${repoPath}, linear: ${config.linear.enabled}, gh: ${ghAvailable}`);
+  log.info(`Activated — repo: ${repoPath}, linear: ${config.linear.enabled}, github: ${config.github.enabled}, gh: ${ghReady}`);
 
   const outputChannel = vscode.window.createOutputChannel('Forest');
 
@@ -137,7 +138,7 @@ export async function activate(context: vscode.ExtensionContext) {
         log.warn(`Pruning orphan: ${tree.branch} (${tree.path} missing)`);
         outputChannel.appendLine(`[Forest] Pruning orphan: ${tree.branch} (${tree.path} missing)`);
         await stateManager.removeTree(tree.repoPath, tree.branch);
-        try { fs.unlinkSync(workspaceFilePath(tree)); } catch {}
+        deleteWorkspaceFiles(tree);
         git.deleteBranch(tree.repoPath, tree.branch).catch(() => {});
       }
     }
@@ -367,7 +368,7 @@ export async function activate(context: vscode.ExtensionContext) {
       if (prev.branch === ctx.currentTree?.branch) continue;
       if (!currentBranches.has(prev.branch)) {
         log.info(`Tree removed by other window: ${prev.branch}`);
-        try { fs.unlinkSync(workspaceFilePath(prev)); } catch {}
+        deleteWorkspaceFiles(prev);
       }
     }
     previousTrees = currentTrees;
