@@ -43,7 +43,7 @@ Add `.forest/config.json` to your repo root (tip: ask Claude to generate one for
   "linear": {
     "teams": ["ENG"],
     "statuses": {
-      "issueList": ["triage", "backlog", "unstarted"],
+      "issueList": ["triage", "backlog", "unstarted", "started"],
       "onNew": "started",
       "onShip": "in review",
       "onCleanup": "completed"

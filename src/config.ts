@@ -44,7 +44,7 @@ export interface ForestConfig {
 const DEFAULTS: Partial<ForestConfig> = {
   copy: [],
   shortcuts: [],
-  linear: { enabled: false, statuses: { issueList: ['triage', 'backlog', 'unstarted'], onNew: 'started', onShip: 'in review', onCleanup: 'completed', onCancel: 'canceled' } },
+  linear: { enabled: false, statuses: { issueList: ['triage', 'backlog', 'unstarted', 'started'], onNew: 'started', onShip: 'in review', onCleanup: 'completed', onCancel: 'canceled' } },
   github: { enabled: true },
   branchFormat: '${ticketId}-${slug}',
   baseBranch: 'main',
