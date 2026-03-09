@@ -197,10 +197,8 @@ export async function createTree(opts: {
           }
         }
 
+        void git.pushBranch(treePath, branch).catch(() => vscode.window.showWarningMessage('Failed to push branch. You can push manually later.'));
         await postWorktreeSetup(config, repoPath, treePath, tree, progress);
-
-        progress.report({ message: 'Pushing branch...' });
-        git.pushBranch(treePath, branch).catch(() => vscode.window.showWarningMessage('Failed to push branch. You can push manually later.'));
 
         progress.report({ message: 'Opening window...' });
         const wsFile = workspaceFilePath(tree);
