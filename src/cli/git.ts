@@ -24,14 +24,19 @@ export async function removeWorktree(repoPath: string, worktreePath: string): Pr
     log.error(`removeWorktree: refusing dangerous path: ${worktreePath}`);
     throw new Error(`removeWorktree: refusing dangerous path: ${worktreePath}`);
   }
+  // Fast path: rename dir (O(1) on same fs) → prune metadata → delete in background.
+  // Avoids `git worktree remove` which checks status of every file.
+  const tombstone = worktreePath + `.deleting-${Date.now()}`;
   try {
-    await exec('git', ['worktree', 'remove', worktreePath, '--force'], { cwd: repoPath });
+    await fs.promises.rename(worktreePath, tombstone);
   } catch {
-    // Not registered — prune stale metadata
+    // Directory already gone or can't rename — fall back to prune
     await exec('git', ['worktree', 'prune'], { cwd: repoPath }).catch(() => {});
+    return;
   }
-  // Always remove the directory — git worktree remove leaves gitignored files behind
-  await fs.promises.rm(worktreePath, { recursive: true, force: true });
+  await exec('git', ['worktree', 'prune'], { cwd: repoPath }).catch(() => {});
+  // Background delete — don't block the caller
+  fs.promises.rm(tombstone, { recursive: true, force: true }).catch(() => {});
 }
 
 export async function deleteBranch(repoPath: string, branch: string, opts?: { skipRemote?: boolean }): Promise<void> {
