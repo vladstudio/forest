@@ -170,4 +170,5 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
   }
 
   getTreeItem(el: ForestElement): vscode.TreeItem { return el; }
+  dispose(): void { this._onDidChange.dispose(); }
 }

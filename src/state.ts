@@ -33,6 +33,7 @@ export class StateManager {
   private _onDidChange = new vscode.EventEmitter<ForestState>();
   readonly onDidChange = this._onDidChange.event;
   private watcher?: fs.FSWatcher;
+  private debounceTimer?: ReturnType<typeof setTimeout>;
   private writeLock = Promise.resolve();
   private lastWrittenContent = '';
 
@@ -52,11 +53,10 @@ export class StateManager {
     try { lastContent = fs.readFileSync(this.statePath, 'utf8'); } catch {}
     const dir = path.dirname(this.statePath);
     const basename = path.basename(this.statePath);
-    let debounce: ReturnType<typeof setTimeout> | undefined;
     this.watcher = fs.watch(dir, (_event, filename) => {
       if (filename !== basename) return;
-      clearTimeout(debounce);
-      debounce = setTimeout(() => {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = setTimeout(() => {
         try {
           const content = fs.readFileSync(this.statePath, 'utf8');
           if (content !== lastContent) {
@@ -102,16 +102,32 @@ export class StateManager {
     return `${repoPath}:${branch}`;
   }
 
-  /** In-process queue around read-modify-write. */
+  /** Cross-process file lock using mkdir (atomic on all platforms). */
+  private async withFileLock<T>(fn: () => Promise<T>): Promise<T> {
+    const lock = this.statePath + '.lock';
+    for (let i = 0;; i++) {
+      try { fs.mkdirSync(lock); } catch (e: any) {
+        if (e.code !== 'EEXIST') throw e;
+        try { if (Date.now() - fs.statSync(lock).mtimeMs > 10_000) { fs.rmdirSync(lock); continue; } } catch {}
+        if (i >= 99) throw new Error('State file is locked');
+        await new Promise(r => setTimeout(r, 50)); continue;
+      }
+      try { return await fn(); } finally { try { fs.rmdirSync(lock); } catch {} }
+    }
+  }
+
+  /** In-process queue + cross-process file lock around read-modify-write. */
   private async modify(fn: (state: ForestState) => void): Promise<void> {
     const prev = this.writeLock;
     let release!: () => void;
     this.writeLock = new Promise(r => (release = r));
     await prev;
     try {
-      const state = await this.load();
-      fn(state);
-      await this.save(state);
+      await this.withFileLock(async () => {
+        const state = await this.load();
+        fn(state);
+        await this.save(state);
+      });
     } finally { release(); }
   }
 
@@ -143,6 +159,7 @@ export class StateManager {
   }
 
   dispose(): void {
+    clearTimeout(this.debounceTimer);
     this.watcher?.close();
     this._onDidChange.dispose();
   }

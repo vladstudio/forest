@@ -307,7 +307,7 @@ export async function activate(context: vscode.ExtensionContext) {
     const id = setInterval(async () => {
       if (running) return;
       running = true;
-      try { await fn(); } finally { running = false; }
+      try { await fn(); } catch (e: any) { log.error(`guardedInterval: ${e.message}`); } finally { running = false; }
     }, ms);
     return { dispose: () => clearInterval(id) };
   };
@@ -376,7 +376,7 @@ export async function activate(context: vscode.ExtensionContext) {
     updateNoTrees();
   });
 
-  context.subscriptions.push(outputChannel, shortcutManager, shortcutsProvider, stashesProvider, statusBarManager, stateManager);
+  context.subscriptions.push(outputChannel, shortcutManager, shortcutsProvider, stashesProvider, statusBarManager, stateManager, forestProvider);
   if (logger) context.subscriptions.push(logger);
 }
 

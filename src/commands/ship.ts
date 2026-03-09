@@ -57,6 +57,10 @@ export async function ship(ctx: ForestContext, treeArg?: import('../state').Tree
       // Create PR via gh CLI
       let url: string | null = null;
       if (ghEnabled) {
+        const existing = await gh.prStatus(tree.path!);
+        if (existing?.url) {
+          url = existing.url;
+        } else {
         const prTitle = tree.ticketId && tree.title
           ? `${tree.ticketId}: ${tree.title}`
           : name;
@@ -75,6 +79,7 @@ export async function ship(ctx: ForestContext, treeArg?: import('../state').Tree
 
         progress.report({ message: 'Creating PR...' });
         url = await gh.createPR(tree.path!, config.baseBranch, prTitle, prBody);
+        }
       }
 
       return url;

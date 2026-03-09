@@ -52,10 +52,12 @@ export function execStream(
   opts?: { cwd?: string; timeout?: number; onData?: (chunk: string) => void },
 ): Promise<ExecResult> {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, { shell: true, cwd: opts?.cwd });
+    let child: ReturnType<typeof spawn>;
+    try { child = spawn(command, { shell: true, cwd: opts?.cwd }); } catch (e) { return reject(e); }
     let stdout = '';
     let stderr = '';
-    const timer = opts?.timeout ? setTimeout(() => { child.kill('SIGKILL'); reject(new Error('Timeout')); }, opts.timeout) : undefined;
+    let settled = false;
+    const timer = opts?.timeout ? setTimeout(() => { if (!settled) { settled = true; child.kill('SIGKILL'); reject(new Error('Timeout')); } }, opts.timeout) : undefined;
     child.stdout?.on('data', (data: Buffer) => {
       const s = data.toString();
       if (stdout.length < MAX_STREAM_BUFFER) stdout += s;
@@ -68,11 +70,15 @@ export function execStream(
     });
     child.on('close', (code) => {
       if (timer) clearTimeout(timer);
+      if (settled) return;
+      settled = true;
       if (code !== 0) reject(new Error(`Command failed (exit ${code}): ${stderr.trim() || stdout.trim()}`));
       else resolve({ stdout: stdout.trim(), stderr: stderr.trim() });
     });
     child.on('error', (e) => {
       if (timer) clearTimeout(timer);
+      if (settled) return;
+      settled = true;
       reject(e);
     });
   });

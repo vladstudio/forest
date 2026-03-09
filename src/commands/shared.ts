@@ -146,6 +146,8 @@ export async function promptUncommittedChanges(repoPath: string): Promise<boolea
   return false;
 }
 
+const createInProgress = new Set<string>();
+
 /** Shared tree creation logic. */
 export async function createTree(opts: {
   branch: string;
@@ -158,7 +160,10 @@ export async function createTree(opts: {
 }): Promise<TreeState> {
   const { branch, config, stateManager, ticketId, title, existingBranch, carryChanges } = opts;
   const repoPath = getRepoPath();
-
+  const createKey = `${repoPath}:${branch}`;
+  if (createInProgress.has(createKey)) throw new Error('Tree creation already in progress.');
+  createInProgress.add(createKey);
+  try {
   // Check existing
   const state = await stateManager.load();
   if (stateManager.getTree(state, repoPath, branch)) {
@@ -190,15 +195,14 @@ export async function createTree(opts: {
           await git.createWorktree(repoPath, treePath, branch, config.baseBranch);
         }
         if (carryChanges) {
-          try { await git.stashPop(treePath); } catch {
-            // Conflict — unstash back to main repo so changes aren't lost
-            await git.stashPop(repoPath).catch(() => {});
-            throw new Error('Could not apply uncommitted changes to new tree (conflict). Changes restored to main repo.');
+          try { await git.stashApply(treePath, 0); } catch {
+            throw new Error('Could not apply uncommitted changes (conflict). Run "git stash pop" in your main repo to recover.');
           }
         }
 
         void git.pushBranch(treePath, branch).catch(() => vscode.window.showWarningMessage('Failed to push branch. You can push manually later.'));
         await postWorktreeSetup(config, repoPath, treePath, tree, progress);
+        if (carryChanges) await git.stashDrop(treePath, 0).catch(() => {});
 
         progress.report({ message: 'Opening window...' });
         const wsFile = workspaceFilePath(tree);
@@ -214,6 +218,7 @@ export async function createTree(opts: {
     if (!existingBranch) await git.deleteBranch(repoPath, branch).catch(() => {});
     throw e;
   }
+  } finally { createInProgress.delete(createKey); }
 }
 
 

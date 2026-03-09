@@ -22,7 +22,7 @@ export async function switchTree(ctx: ForestContext, branchArg?: string): Promis
     branch = pick.id;
   }
 
-  const tree = ctx.stateManager.getTree(state, getRepoPath(), branch!);
+  const tree = ctx.stateManager.getTree(await ctx.stateManager.load(), getRepoPath(), branch!);
   if (!tree) { vscode.window.showErrorMessage(`Tree for branch "${branch}" not found.`); return; }
   if (!tree.path) { vscode.window.showErrorMessage('Tree has no worktree path.'); return; }
 

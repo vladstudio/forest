@@ -123,6 +123,10 @@ export async function cleanup(ctx: ForestContext, branchArg?: string): Promise<v
 
 /** Cleanup after an already-merged PR — skips merge and confirmation. */
 export async function cleanupMerged(ctx: ForestContext, tree: TreeState): Promise<void> {
+  if (tree.path && await git.hasUncommittedChanges(tree.path)) {
+    vscode.window.showWarningMessage('Tree has uncommitted changes. Commit or discard first.');
+    return;
+  }
   if (tree.ticketId) await updateLinear(ctx, tree.ticketId, ctx.config.linear.statuses.onCleanup);
   await teardownTree(ctx, tree, { deleteLocal: true, deleteRemote: true });
 }

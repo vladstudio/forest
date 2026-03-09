@@ -96,7 +96,7 @@ export class ShortcutManager {
         const existing = this.terminals.get(sc.name);
         if (!existing || existing.length === 0) await this.openTerminal(sc, viewCol);
       } else {
-        this.open(sc, viewCol);
+        this.open(sc, viewCol).catch(() => {});
       }
     }
     this._onDidChange.fire();
@@ -139,16 +139,16 @@ export class ShortcutManager {
 
     if (lowerApp === 'iterm' || lowerApp === 'iterm2') {
       const script = cmd ? `cd ${shellEscape(cwd)} && ${cmd}` : `cd ${shellEscape(cwd)}`;
-      cp.execFile('osascript', ['-e', `tell application "iTerm" to create window with default profile command ${JSON.stringify(script)}`], { timeout: 5000 }).unref();
+      cp.execFile('osascript', ['-e', `tell application "iTerm" to create window with default profile command ${JSON.stringify(script)}`], { timeout: 5000 }).on('error', () => {}).unref();
     } else if (lowerApp === 'terminal' || lowerApp === 'terminal.app') {
       const script = cmd ? `cd ${shellEscape(cwd)} && ${cmd}` : `cd ${shellEscape(cwd)}`;
-      cp.execFile('osascript', ['-e', `tell application "Terminal" to do script ${JSON.stringify(script)}`], { timeout: 5000 }).unref();
+      cp.execFile('osascript', ['-e', `tell application "Terminal" to do script ${JSON.stringify(script)}`], { timeout: 5000 }).on('error', () => {}).unref();
     } else if (lowerApp === 'ghostty') {
-      cp.spawn('ghostty', ['--working-directory', cwd, ...(cmd ? ['-e', cmd] : [])], { detached: true, stdio: 'ignore' }).unref();
+      cp.spawn('ghostty', ['--working-directory', cwd, ...(cmd ? ['-e', cmd] : [])], { detached: true, stdio: 'ignore' }).on('error', () => {}).unref();
     } else {
       // Unsupported terminal — open app at cwd, command cannot be sent
       vscode.window.showWarningMessage(`Terminal "${app}" is not supported for command sending. Use iTerm, Terminal, or Ghostty.`);
-      cp.spawn('open', ['-a', app, cwd], { detached: true, stdio: 'ignore' }).unref();
+      cp.spawn('open', ['-a', app, cwd], { detached: true, stdio: 'ignore' }).on('error', () => {}).unref();
     }
   }
 
