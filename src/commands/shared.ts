@@ -133,15 +133,15 @@ async function checkMaxTrees(stateManager: StateManager, repoPath: string, max: 
   if (active.length >= max) throw new Error(`Max trees (${max}) reached. Clean up some trees first.`);
 }
 
-/** If there are uncommitted changes, ask what to do. Returns true if stashed, false if clean/discarded, undefined if cancelled. */
-export async function promptUncommittedChanges(repoPath: string): Promise<boolean | undefined> {
+/** If there are uncommitted changes, ask what to do. Returns stash ref, false if clean/discarded, undefined if cancelled. */
+export async function promptUncommittedChanges(repoPath: string): Promise<string | false | undefined> {
   if (!await git.hasUncommittedChanges(repoPath)) return false;
   const pick = await vscode.window.showQuickPick([
     { label: '$(arrow-right) Carry to new tree', id: 'carry' },
     { label: '$(trash) Discard changes', id: 'discard' },
   ], { placeHolder: 'You have uncommitted changes' });
   if (!pick) return undefined;
-  if (pick.id === 'carry') { await git.stash(repoPath); return true; }
+  if (pick.id === 'carry') return git.stash(repoPath, `forest-carry-${Date.now()}`);
   await git.discardChanges(repoPath);
   return false;
 }
@@ -156,7 +156,7 @@ export async function createTree(opts: {
   ticketId?: string;
   title?: string;
   existingBranch?: boolean;
-  carryChanges?: boolean;
+  carryChanges?: string | false;
 }): Promise<TreeState> {
   const { branch, config, stateManager, ticketId, title, existingBranch, carryChanges } = opts;
   const repoPath = getRepoPath();
@@ -164,60 +164,60 @@ export async function createTree(opts: {
   if (createInProgress.has(createKey)) throw new Error('Tree creation already in progress.');
   createInProgress.add(createKey);
   try {
-  // Check existing
-  const state = await stateManager.load();
-  if (stateManager.getTree(state, repoPath, branch)) {
-    throw new Error(`Tree for branch "${branch}" already exists`);
-  }
+    // Check existing
+    const state = await stateManager.load();
+    if (stateManager.getTree(state, repoPath, branch)) {
+      throw new Error(`Tree for branch "${branch}" already exists`);
+    }
 
-  await checkMaxTrees(stateManager, repoPath, config.maxTrees);
-  const treePath = resolveTreePath(repoPath, branch, ticketId);
+    await checkMaxTrees(stateManager, repoPath, config.maxTrees);
+    const treePath = resolveTreePath(repoPath, branch, ticketId);
 
-  const tree: TreeState = {
-    branch, repoPath, path: treePath,
-    createdAt: new Date().toISOString(),
-    ...(ticketId ? { ticketId } : {}),
-    ...(title ? { title } : {}),
-  };
+    const tree: TreeState = {
+      branch, repoPath, path: treePath,
+      createdAt: new Date().toISOString(),
+      ...(ticketId ? { ticketId } : {}),
+      ...(title ? { title } : {}),
+    };
 
-  log.info(`createTree: ${branch} ticket=${ticketId ?? '(none)'} existing=${!!existingBranch} carry=${!!carryChanges}`);
-  // Save state early to prevent duplicates across windows.
-  await stateManager.addTree(repoPath, tree);
+    log.info(`createTree: ${branch} ticket=${ticketId ?? '(none)'} existing=${!!existingBranch} carry=${!!carryChanges}`);
+    // Save state early to prevent duplicates across windows.
+    await stateManager.addTree(repoPath, tree);
 
-  try {
-    return await vscode.window.withProgress(
-      { location: vscode.ProgressLocation.Notification, title: `Creating tree for ${displayName(tree)}...`, cancellable: false },
-      async (progress) => {
-        progress.report({ message: 'Creating worktree...' });
-        if (existingBranch) {
-          await git.checkoutWorktree(repoPath, treePath, branch);
-        } else {
-          await git.createWorktree(repoPath, treePath, branch, config.baseBranch);
-        }
-        if (carryChanges) {
-          try { await git.stashApply(treePath, 0); } catch {
-            throw new Error('Could not apply uncommitted changes (conflict). Run "git stash pop" in your main repo to recover.');
+    try {
+      return await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: `Creating tree for ${displayName(tree)}...`, cancellable: false },
+        async (progress) => {
+          progress.report({ message: 'Creating worktree...' });
+          if (existingBranch) {
+            await git.checkoutWorktree(repoPath, treePath, branch);
+          } else {
+            await git.createWorktree(repoPath, treePath, branch, config.baseBranch);
           }
-        }
+          if (carryChanges) {
+            try { await git.stashApply(treePath, carryChanges); } catch {
+              throw new Error('Could not apply uncommitted changes (conflict). Run "git stash pop" in your main repo to recover.');
+            }
+            await git.stashDrop(treePath, carryChanges).catch(() => {});
+          }
 
-        void git.pushBranch(treePath, branch).catch(() => vscode.window.showWarningMessage('Failed to push branch. You can push manually later.'));
-        await postWorktreeSetup(config, repoPath, treePath, tree, progress);
-        if (carryChanges) await git.stashDrop(treePath, 0).catch(() => {});
+          void git.pushBranch(treePath, branch).catch(() => vscode.window.showWarningMessage('Failed to push branch. You can push manually later.'));
+          await postWorktreeSetup(config, repoPath, treePath, tree, progress);
 
-        progress.report({ message: 'Opening window...' });
-        const wsFile = workspaceFilePath(tree);
-        await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(wsFile), { forceNewWindow: true });
+          progress.report({ message: 'Opening window...' });
+          const wsFile = workspaceFilePath(tree);
+          await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(wsFile), { forceNewWindow: true });
 
-        return tree;
-      },
-    );
-  } catch (e: any) {
-    log.error(`createTree failed: ${branch} — ${e.message}`);
-    await stateManager.removeTree(repoPath, branch);
-    await git.removeWorktree(repoPath, treePath).catch(() => {});
-    if (!existingBranch) await git.deleteBranch(repoPath, branch).catch(() => {});
-    throw e;
-  }
+          return tree;
+        },
+      );
+    } catch (e: any) {
+      log.error(`createTree failed: ${branch} — ${e.message}`);
+      await stateManager.removeTree(repoPath, branch);
+      await git.removeWorktree(repoPath, treePath).catch(() => {});
+      if (!existingBranch) await git.deleteBranch(repoPath, branch).catch(() => {});
+      throw e;
+    }
   } finally { createInProgress.delete(createKey); }
 }
 

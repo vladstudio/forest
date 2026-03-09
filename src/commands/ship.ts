@@ -57,28 +57,32 @@ export async function ship(ctx: ForestContext, treeArg?: import('../state').Tree
       // Create PR via gh CLI
       let url: string | null = null;
       if (ghEnabled) {
-        const existing = await gh.prStatus(tree.path!);
-        if (existing?.url) {
-          url = existing.url;
+        if (tree.prUrl) {
+          url = tree.prUrl;
         } else {
-        const prTitle = tree.ticketId && tree.title
-          ? `${tree.ticketId}: ${tree.title}`
-          : name;
+          const existing = await gh.prStatus(tree.path!);
+          if (existing?.url) {
+            url = existing.url;
+          } else {
+            const prTitle = tree.ticketId && tree.title
+              ? `${tree.ticketId}: ${tree.title}`
+              : name;
 
-        let prBody: string | undefined;
-        if (config.ai) {
-          try {
-            progress.report({ message: 'Generating PR description...' });
-            const diff = await git.diffFromBase(tree.path!, config.baseBranch);
-            prBody = await generatePRBody(config.ai, diff, prTitle);
-          } catch (e: any) {
-            log.error(`AI PR body generation failed: ${e.message}`);
-            vscode.window.showWarningMessage(`AI description failed, using commits. ${e.message}`);
+            let prBody: string | undefined;
+            if (config.ai) {
+              try {
+                progress.report({ message: 'Generating PR description...' });
+                const diff = await git.diffFromBase(tree.path!, config.baseBranch);
+                prBody = await generatePRBody(config.ai, diff, prTitle);
+              } catch (e: any) {
+                log.error(`AI PR body generation failed: ${e.message}`);
+                vscode.window.showWarningMessage(`AI description failed, using commits. ${e.message}`);
+              }
+            }
+
+            progress.report({ message: 'Creating PR...' });
+            url = await gh.createPR(tree.path!, config.baseBranch, prTitle, prBody);
           }
-        }
-
-        progress.report({ message: 'Creating PR...' });
-        url = await gh.createPR(tree.path!, config.baseBranch, prTitle, prBody);
         }
       }
 

@@ -101,22 +101,17 @@ export async function cleanup(ctx: ForestContext, branchArg?: string): Promise<v
   await vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: `Cleaning up ${displayName(tree)}...` },
     async (progress) => {
-      let mergeFailed = false;
-      progress.report({ message: 'Merging & updating...' });
-      await Promise.all([
-        ghEnabled
-          ? runStep(ctx, 'Merge PR', () => gh.mergePR(tree.path!)).then(ok => { if (!ok) mergeFailed = true; })
-          : Promise.resolve(),
-        tree.ticketId && config.linear.enabled
-          ? updateLinear(ctx, tree.ticketId, config.linear.statuses.onCleanup)
-          : Promise.resolve(),
-      ]);
-
-      if (mergeFailed) return;
+      progress.report({ message: 'Merging...' });
+      if (ghEnabled && !await runStep(ctx, 'Merge PR', () => gh.mergePR(tree.path!))) return;
 
       progress.report({ message: 'Removing tree...' });
       // gh merge already deletes the remote branch
-      await teardownTree(ctx, tree, { deleteLocal: true, deleteRemote: !ghEnabled });
+      if (!await teardownTree(ctx, tree, { deleteLocal: true, deleteRemote: !ghEnabled })) return;
+
+      if (tree.ticketId && config.linear.enabled) {
+        progress.report({ message: 'Updating ticket...' });
+        await updateLinear(ctx, tree.ticketId, config.linear.statuses.onCleanup);
+      }
     },
   );
 }
@@ -127,8 +122,8 @@ export async function cleanupMerged(ctx: ForestContext, tree: TreeState): Promis
     vscode.window.showWarningMessage('Tree has uncommitted changes. Commit or discard first.');
     return;
   }
+  if (!await teardownTree(ctx, tree, { deleteLocal: true, deleteRemote: true })) return;
   if (tree.ticketId) await updateLinear(ctx, tree.ticketId, ctx.config.linear.statuses.onCleanup);
-  await teardownTree(ctx, tree, { deleteLocal: true, deleteRemote: true });
 }
 
 /** Delete tree, keep both local and remote branches. */
@@ -200,12 +195,12 @@ export async function deleteTreeAll(ctx: ForestContext, branchArg?: string): Pro
   await vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: `Deleting ${displayName(tree)}...` },
     async (progress) => {
+      progress.report({ message: 'Removing tree...' });
+      if (!await teardownTree(ctx, tree, { deleteLocal: true, deleteRemote: true })) return;
       if (tree.ticketId) {
         progress.report({ message: 'Updating ticket...' });
         await updateLinear(ctx, tree.ticketId, ctx.config.linear.statuses.onCancel);
       }
-      progress.report({ message: 'Removing tree...' });
-      await teardownTree(ctx, tree, { deleteLocal: true, deleteRemote: true });
     },
   );
 }

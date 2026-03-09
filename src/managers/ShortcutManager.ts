@@ -206,7 +206,7 @@ export class ShortcutManager {
       // Custom browser command (e.g. "firefox", "/Applications/Firefox.app")
       const args = process.platform === 'darwin' ? ['-a', browser, url] : [url];
       const cmd = process.platform === 'darwin' ? 'open' : browser;
-      cp.spawn(cmd, args, { detached: true, stdio: 'ignore' }).unref();
+      cp.spawn(cmd, args, { detached: true, stdio: 'ignore' }).on('error', () => {}).unref();
     }
   }
 

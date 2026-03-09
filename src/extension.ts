@@ -139,7 +139,6 @@ export async function activate(context: vscode.ExtensionContext) {
         outputChannel.appendLine(`[Forest] Pruning orphan: ${tree.branch} (${tree.path} missing)`);
         await stateManager.removeTree(tree.repoPath, tree.branch);
         deleteWorkspaceFiles(tree);
-        git.deleteBranch(tree.repoPath, tree.branch).catch(() => {});
       }
     }
     return stateManager.load();

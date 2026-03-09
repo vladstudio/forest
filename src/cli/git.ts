@@ -4,6 +4,8 @@ import * as os from 'os';
 import { exec } from '../utils/exec';
 import { log } from '../logger';
 
+const stashRef = (ref: number | string) => typeof ref === 'number' ? `stash@{${ref}}` : ref;
+
 export async function createWorktree(
   repoPath: string, worktreePath: string, branch: string, baseRef: string,
 ): Promise<void> {
@@ -59,8 +61,13 @@ export async function pullRebase(worktreePath: string, baseRef: string): Promise
   await exec('git', ['rebase', baseRef], { cwd: worktreePath, timeout: 60_000 });
 }
 
-export async function stash(repoPath: string): Promise<void> {
-  await exec('git', ['stash', '-u'], { cwd: repoPath });
+export async function stash(repoPath: string, message?: string): Promise<string | undefined> {
+  await exec('git', ['stash', 'push', '-u', ...(message ? ['-m', message] : [])], { cwd: repoPath });
+  if (!message) return;
+  const { stdout } = await exec('git', ['stash', 'list', '--format=%gd%x00%gs'], { cwd: repoPath });
+  const ref = stdout.split('\n').map(line => line.split('\0')).find(([, m]) => m === message)?.[0];
+  if (!ref) throw new Error('Could not find created stash');
+  return ref;
 }
 
 export async function stashPop(worktreePath: string): Promise<void> {
@@ -84,16 +91,16 @@ export async function stashList(repoPath: string): Promise<StashEntry[]> {
   } catch { return []; }
 }
 
-export async function stashApply(repoPath: string, index: number): Promise<void> {
-  await exec('git', ['stash', 'apply', `stash@{${index}}`], { cwd: repoPath });
+export async function stashApply(repoPath: string, ref: number | string): Promise<void> {
+  await exec('git', ['stash', 'apply', stashRef(ref)], { cwd: repoPath });
 }
 
-export async function stashDrop(repoPath: string, index: number): Promise<void> {
-  await exec('git', ['stash', 'drop', `stash@{${index}}`], { cwd: repoPath });
+export async function stashDrop(repoPath: string, ref: number | string): Promise<void> {
+  await exec('git', ['stash', 'drop', stashRef(ref)], { cwd: repoPath });
 }
 
 export async function discardChanges(repoPath: string): Promise<void> {
-  await exec('git', ['checkout', '.'], { cwd: repoPath });
+  await exec('git', ['reset', '--hard', 'HEAD'], { cwd: repoPath });
   await exec('git', ['clean', '-fd'], { cwd: repoPath });
 }
 

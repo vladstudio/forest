@@ -71,12 +71,17 @@ export class StateManager {
   }
 
   async load(): Promise<ForestState> {
-    try {
-      return JSON.parse(fs.readFileSync(this.statePath, 'utf8')) as ForestState;
-    } catch {
-      const empty: ForestState = { version: 1, trees: {} };
-      await this.save(empty);
-      return empty;
+    try { return JSON.parse(fs.readFileSync(this.statePath, 'utf8')) as ForestState; } catch (e: any) {
+      if (e.code === 'ENOENT') {
+        const empty: ForestState = { version: 1, trees: {} };
+        await this.save(empty);
+        return empty;
+      }
+      const backup = `${this.statePath}.corrupt-${Date.now()}`;
+      try { fs.copyFileSync(this.statePath, backup); } catch {}
+      log.error(`State load failed: ${e.message}`);
+      vscode.window.showErrorMessage('Forest state is unreadable. Starting empty; original kept as a .corrupt backup.');
+      return { version: 1, trees: {} };
     }
   }
 
