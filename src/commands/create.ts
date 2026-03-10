@@ -37,8 +37,8 @@ function showBranchInput(options?: { value?: string }): Promise<string | undefin
     input.onDidAccept(() => {
       const sanitized = sanitizeBranch(input.value);
       if (!sanitized) return;
-      input.dispose();
       resolve(sanitized);
+      input.dispose();
     });
     input.onDidHide(() => { input.dispose(); resolve(undefined); });
     input.show();
