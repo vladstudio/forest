@@ -9,9 +9,9 @@ import { updateLinear } from './shared';
 import { log } from '../logger';
 
 
-export async function ship(ctx: ForestContext, treeArg?: import('../state').TreeState): Promise<void> {
+export async function ship(ctx: ForestContext, treeArg?: import('../state').TreeState, automerge = false): Promise<void> {
   const tree = treeArg || ctx.currentTree;
-  log.info(`ship: ${tree?.branch ?? '(no tree)'} ticket=${tree?.ticketId ?? '(none)'}`);
+  log.info(`ship: ${tree?.branch ?? '(no tree)'} ticket=${tree?.ticketId ?? '(none)'} automerge=${automerge}`);
   if (!tree) {
     vscode.window.showErrorMessage('Ship must be run from a tree window.');
     return;
@@ -31,20 +31,6 @@ export async function ship(ctx: ForestContext, treeArg?: import('../state').Tree
   }
 
   const ghEnabled = config.github.enabled && await gh.isAvailable();
-
-  // Offer automerge if repo supports it
-  let automerge = false;
-  if (ghEnabled) {
-    const hasAutomerge = await gh.repoHasAutomerge(tree.path!);
-    if (hasAutomerge) {
-      const pick = await vscode.window.showQuickPick([
-        { label: 'Create PR', value: false },
-        { label: 'Create PR + Automerge', value: true },
-      ], { placeHolder: 'Ship options' });
-      if (!pick) return;
-      automerge = pick.value;
-    }
-  }
 
   const name = displayName(tree);
   const prUrl = await vscode.window.withProgress(

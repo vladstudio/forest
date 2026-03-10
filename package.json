@@ -136,7 +136,13 @@
       },
       {
         "command": "forest.ship",
-        "title": "Ship — Push & Create PR",
+        "title": "Ship — Create PR",
+        "category": "Forest",
+        "icon": "$(rocket)"
+      },
+      {
+        "command": "forest.shipAutomerge",
+        "title": "Ship — Create PR + Automerge",
         "category": "Forest",
         "icon": "$(rocket)"
       },
@@ -291,7 +297,12 @@
         {
           "command": "forest.ship",
           "when": "viewItem == tree-progress-current",
-          "group": "2_ship"
+          "group": "2_ship@1"
+        },
+        {
+          "command": "forest.shipAutomerge",
+          "when": "viewItem == tree-progress-current",
+          "group": "2_ship@2"
         },
         {
           "command": "forest.openPR",
@@ -394,6 +405,10 @@
         },
         {
           "command": "forest.stashDrop",
+          "when": "false"
+        },
+        {
+          "command": "forest.shipAutomerge",
           "when": "false"
         }
       ]
