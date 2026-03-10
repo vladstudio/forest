@@ -113,22 +113,13 @@ export async function start(ctx: ForestContext, arg: { ticketId: string; title: 
 
 /** Unified creation wizard (the [+] button). */
 export async function create(ctx: ForestContext): Promise<void> {
-  const config = ctx.config;
-  const linearEnabled = config.linear.enabled && linear.isAvailable();
-
-  const items: { label: string; id: string }[] = [];
-  if (linearEnabled) {
-    items.push({ label: '$(add) New Linear issue + branch', id: 'issue' });
-  }
-  items.push({ label: '$(add) New branch', id: 'new' });
-  items.push({ label: '$(git-branch) Existing branch', id: 'existing' });
-
-  const choice = await vscode.window.showQuickPick(items, { placeHolder: 'Create a new tree' });
+  const choice = await vscode.window.showQuickPick([
+    { label: '$(add) New branch', id: 'new' },
+    { label: '$(git-branch) Existing branch', id: 'existing' },
+  ], { placeHolder: 'Create a new tree' });
   if (!choice) return;
 
-  if (choice.id === 'issue') {
-    await createFromNewIssue(ctx);
-  } else if (choice.id === 'existing') {
+  if (choice.id === 'existing') {
     await createFromExistingBranch(ctx);
   } else {
     await createFromNewBranch(ctx);
@@ -139,34 +130,57 @@ async function createFromNewBranch(ctx: ForestContext): Promise<void> {
   const config = ctx.config;
   const linearEnabled = config.linear.enabled && linear.isAvailable();
 
-  const branchName = await showBranchInput();
-  if (!branchName) return;
-
-  // Optional: link a Linear issue
+  // Ticket decision first — so branch name can be pre-filled from format
   let ticketId: string | undefined;
   let title: string | undefined;
+  let revertOnCancel = false;
 
   if (linearEnabled) {
     const link = await vscode.window.showQuickPick([
+      { label: '$(add) Create new Linear issue', id: 'create' },
       { label: '$(search) Link to existing Linear issue', id: 'select' },
       { label: '$(dash) No Linear issue', id: 'skip' },
     ], { placeHolder: 'Link a Linear issue?' });
     if (!link) return;
 
-    if (link.id === 'select') {
+    if (link.id === 'create') {
+      const result = await createIssue(ctx);
+      if (!result) return;
+      ticketId = result.ticketId;
+      title = result.title;
+      revertOnCancel = true;
+    } else if (link.id === 'select') {
       const result = await pickIssue(ctx);
       if (result === undefined) return;
       if (result) { ticketId = result.ticketId; title = result.title; }
     }
   }
 
+  // Pre-fill branch name from format when ticket is known
+  let branchOpts: { value?: string } | undefined;
+  if (ticketId && title) {
+    branchOpts = { value: config.branchFormat
+      .replace('${ticketId}', ticketId)
+      .replace('${slug}', slugify(title)) };
+  }
+
+  const branchName = await showBranchInput(branchOpts);
+  if (!branchName) {
+    if (revertOnCancel && ticketId) await revertLinear(ctx, ticketId);
+    return;
+  }
+
   const stashed = await promptUncommittedChanges(getRepoPath());
-  if (stashed === undefined) return;
+  if (stashed === undefined) {
+    if (revertOnCancel && ticketId) await revertLinear(ctx, ticketId);
+    return;
+  }
 
   try {
     await createTree({ branch: branchName, config, stateManager: ctx.stateManager, ticketId, title, carryChanges: stashed });
     if (ticketId) await updateLinear(ctx, ticketId, config.linear.statuses.onNew);
   } catch (e: any) {
+    if (revertOnCancel && ticketId) await revertLinear(ctx, ticketId);
     vscode.window.showErrorMessage(e.message);
   }
 }
@@ -206,6 +220,8 @@ async function createFromExistingBranch(ctx: ForestContext): Promise<void> {
     }
   }
 
+  let revertOnCancel = false;
+
   if (!ticketId && linearEnabled) {
     const link = await vscode.window.showQuickPick([
       { label: '$(search) Link to existing Linear issue', id: 'select' },
@@ -224,41 +240,21 @@ async function createFromExistingBranch(ctx: ForestContext): Promise<void> {
       ticketId = result.ticketId;
       title = result.title;
       linkedLinear = true;
+      revertOnCancel = true;
     }
   }
 
   const stashed = await promptUncommittedChanges(repoPath);
-  if (stashed === undefined) return;
+  if (stashed === undefined) {
+    if (revertOnCancel && ticketId) await revertLinear(ctx, ticketId);
+    return;
+  }
 
   try {
     await createTree({ branch, config, stateManager: ctx.stateManager, ticketId, title, existingBranch: true, carryChanges: stashed });
     if (linkedLinear && ticketId) await updateLinear(ctx, ticketId, config.linear.statuses.onNew);
   } catch (e: any) {
-    vscode.window.showErrorMessage(e.message);
-  }
-}
-
-async function createFromNewIssue(ctx: ForestContext): Promise<void> {
-  const config = ctx.config;
-  const result = await createIssue(ctx);
-  if (!result) return;
-
-  const { ticketId, title } = result;
-  const defaultBranch = config.branchFormat
-    .replace('${ticketId}', ticketId)
-    .replace('${slug}', slugify(title));
-
-  const branch = await showBranchInput({ value: defaultBranch });
-  if (!branch) { await revertLinear(ctx, ticketId); return; }
-
-  const stashed = await promptUncommittedChanges(getRepoPath());
-  if (stashed === undefined) { await revertLinear(ctx, ticketId); return; }
-
-  try {
-    await createTree({ branch, config, stateManager: ctx.stateManager, ticketId, title, carryChanges: stashed });
-    await updateLinear(ctx, ticketId, config.linear.statuses.onNew);
-  } catch (e: any) {
-    await revertLinear(ctx, ticketId);
+    if (revertOnCancel && ticketId) await revertLinear(ctx, ticketId);
     vscode.window.showErrorMessage(e.message);
   }
 }
@@ -287,10 +283,11 @@ async function createIssue(ctx: ForestContext): Promise<{ ticketId: string; titl
   const issueTitle = await vscode.window.showInputBox({ prompt: 'Issue title', placeHolder: '' });
   if (!issueTitle) return null;
 
-  const priority = await vscode.window.showQuickPick(
-    [{ label: 'Urgent', value: 1 }, { label: 'High', value: 2 }, { label: 'Normal', value: 3 }, { label: 'Low', value: 4 }],
-    { placeHolder: 'Priority (optional — Enter to skip)' },
+  const priorityPick = await vscode.window.showQuickPick(
+    [{ label: '$(dash) No priority', value: 0 }, { label: 'Urgent', value: 1 }, { label: 'High', value: 2 }, { label: 'Normal', value: 3 }, { label: 'Low', value: 4 }],
+    { placeHolder: 'Priority' },
   ) as any;
+  if (!priorityPick) return null;
 
   const team = await pickTeam(config.linear.teams);
   if (!team) return null;
@@ -298,7 +295,7 @@ async function createIssue(ctx: ForestContext): Promise<{ ticketId: string; titl
   try {
     const ticketId = await vscode.window.withProgress(
       { location: vscode.ProgressLocation.Notification, title: 'Creating Linear issue...', cancellable: false },
-      () => linear.createIssue({ title: issueTitle, priority: priority?.value, team }),
+      () => linear.createIssue({ title: issueTitle, priority: priorityPick.value || undefined, team }),
     );
     return { ticketId, title: issueTitle };
   } catch (e: any) {
