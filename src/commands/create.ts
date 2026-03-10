@@ -6,11 +6,43 @@ import { createTree, updateLinear, pickTeam, promptUncommittedChanges } from './
 import { slugify } from '../utils/slug';
 import { getRepoPath } from '../context';
 
-const BAD_BRANCH_CHARS = /[<>:"|?*\x00-\x1f\s~^\\]/;
-function validateBranch(value: string): string | undefined {
-  if (!value) return 'Branch name is required';
-  if (BAD_BRANCH_CHARS.test(value)) return 'Branch name contains invalid characters';
-  return undefined;
+function sanitizeBranch(value: string): string {
+  return value
+    .replace(/[<>:"|?*\x00-\x1f\s~^\\]+/g, '-')
+    .replace(/\.{2,}/g, '-')
+    .replace(/\/\//g, '/')
+    .replace(/-+/g, '-')
+    .replace(/^[-./]+|[-./]+$/g, '');
+}
+
+function showBranchInput(options?: { value?: string }): Promise<string | undefined> {
+  return new Promise(resolve => {
+    const input = vscode.window.createInputBox();
+    input.prompt = 'Branch name';
+    input.placeholder = 'my feature branch';
+    if (options?.value) input.value = options.value;
+
+    const update = () => {
+      const sanitized = sanitizeBranch(input.value);
+      if (sanitized !== input.value && input.value.length > 0) {
+        input.prompt = `Branch: ${sanitized}`;
+      } else {
+        input.prompt = 'Branch name';
+      }
+      input.validationMessage = sanitized ? undefined : input.value.length > 0 ? 'Branch name is required' : undefined;
+    };
+    update();
+
+    input.onDidChangeValue(update);
+    input.onDidAccept(() => {
+      const sanitized = sanitizeBranch(input.value);
+      if (!sanitized) return;
+      input.dispose();
+      resolve(sanitized);
+    });
+    input.onDidHide(() => { input.dispose(); resolve(undefined); });
+    input.show();
+  });
 }
 
 async function revertLinear(ctx: ForestContext, ticketId: string): Promise<void> {
@@ -63,11 +95,7 @@ export async function start(ctx: ForestContext, arg: { ticketId: string; title: 
     branch = picked.label;
     existingBranch = true;
   } else {
-    const edited = await vscode.window.showInputBox({
-      prompt: 'Branch name',
-      value: defaultBranch,
-      validateInput: validateBranch,
-    });
+    const edited = await showBranchInput({ value: defaultBranch });
     if (!edited) return;
     branch = edited;
   }
@@ -111,7 +139,7 @@ async function createFromNewBranch(ctx: ForestContext): Promise<void> {
   const config = ctx.config;
   const linearEnabled = config.linear.enabled && linear.isAvailable();
 
-  const branchName = await vscode.window.showInputBox({ prompt: 'Branch name', placeHolder: 'my-feature', validateInput: validateBranch });
+  const branchName = await showBranchInput();
   if (!branchName) return;
 
   // Optional: link a Linear issue
@@ -220,11 +248,7 @@ async function createFromNewIssue(ctx: ForestContext): Promise<void> {
     .replace('${ticketId}', ticketId)
     .replace('${slug}', slugify(title));
 
-  const branch = await vscode.window.showInputBox({
-    prompt: 'Branch name',
-    value: defaultBranch,
-    validateInput: validateBranch,
-  });
+  const branch = await showBranchInput({ value: defaultBranch });
   if (!branch) { await revertLinear(ctx, ticketId); return; }
 
   const stashed = await promptUncommittedChanges(getRepoPath());
