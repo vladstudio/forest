@@ -126,7 +126,7 @@
         "command": "forest.start",
         "title": "Start — Create Tree from Issue",
         "category": "Forest",
-        "icon": "$(play)"
+        "icon": "$(git-branch)"
       },
       {
         "command": "forest.switch",
