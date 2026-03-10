@@ -1,4 +1,3 @@
-import * as net from 'net';
 import * as cp from 'child_process';
 import * as vscode from 'vscode';
 import * as path from 'path';
@@ -6,20 +5,9 @@ import type { ForestConfig, ShortcutConfig } from '../config';
 import type { TreeState } from '../state';
 import { shellEscape } from '../utils/slug';
 
-function isPortOpen(port: number): Promise<boolean> {
-  return new Promise(resolve => {
-    const sock = net.createConnection({ port, host: 'localhost' });
-    const timer = setTimeout(() => { sock.destroy(); resolve(false); }, 1000);
-    sock.once('connect', () => { clearTimeout(timer); sock.destroy(); resolve(true); });
-    sock.once('error', () => { clearTimeout(timer); sock.destroy(); resolve(false); });
-  });
-}
-
 export class ShortcutManager {
   private terminals = new Map<string, vscode.Terminal[]>();
-  private pendingTimers = new Set<ReturnType<typeof setTimeout>>();
   private pendingRestarts = new Map<string, vscode.Disposable>();
-  private disposed = false;
   private disposables: vscode.Disposable[] = [];
 
   private _onDidChange = new vscode.EventEmitter<void>();
@@ -155,40 +143,7 @@ export class ShortcutManager {
   private async openBrowser(sc: ShortcutConfig & { type: 'browser' }, viewColumn?: vscode.ViewColumn, browser?: string): Promise<void> {
     const url = this.resolveVars(sc.url);
     if (!url) { vscode.window.showWarningMessage(`Cannot open "${sc.name}": URL resolved to empty (variable not set).`); return; }
-    browser ??= sc.browser ?? this.config.browser[0];
-    const port = this.extractPort(url);
-    const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)/.test(url);
-
-    if (port && isLocalhost) {
-      await this.waitAndOpenBrowser(port, url, browser, viewColumn);
-    } else {
-      this.openUrl(url, browser, viewColumn);
-    }
-  }
-
-  private async waitAndOpenBrowser(port: number, url: string, browser: string, viewColumn?: vscode.ViewColumn): Promise<void> {
-    if (await isPortOpen(port)) { this.openUrl(url, browser, viewColumn); return; }
-
-    const timeout = 120_000;
-    const start = Date.now();
-    await vscode.window.withProgress(
-      { location: vscode.ProgressLocation.Notification, title: `Waiting for port ${port}…`, cancellable: true },
-      (_progress, token) => new Promise<void>(resolve => {
-        const check = async (): Promise<void> => {
-          if (this.disposed || token.isCancellationRequested) { resolve(); return; }
-          if (Date.now() - start > timeout) {
-            resolve();
-            const c = await vscode.window.showWarningMessage(`Timed out waiting for port ${port}.`, 'Open Anyway');
-            if (c) this.openUrl(url, browser, viewColumn);
-            return;
-          }
-          if (await isPortOpen(port)) { resolve(); this.openUrl(url, browser, viewColumn); return; }
-          const timer = setTimeout(() => { this.pendingTimers.delete(timer); check(); }, 2000);
-          this.pendingTimers.add(timer);
-        };
-        check();
-      }),
-    );
+    this.openUrl(url, browser ?? sc.browser ?? this.config.browser[0], viewColumn);
   }
 
   private async openUrl(url: string, browser: string, viewColumn?: vscode.ViewColumn): Promise<void> {
@@ -248,19 +203,11 @@ export class ShortcutManager {
       .replace(/\$\{prUrl\}/g, esc(tree.prUrl ?? ''));
   }
 
-  private extractPort(url: string): number | null {
-    const m = url.match(/:(\d+)/);
-    return m ? parseInt(m[1], 10) : null;
-  }
-
   updateTree(tree: TreeState): void {
     this.currentTree = tree;
   }
 
   dispose(): void {
-    this.disposed = true;
-    this.pendingTimers.forEach(t => clearTimeout(t));
-    this.pendingTimers.clear();
     this.pendingRestarts.forEach(d => d.dispose());
     this.pendingRestarts.clear();
     this.disposables.forEach(d => d.dispose());

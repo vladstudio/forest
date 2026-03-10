@@ -2,7 +2,6 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import * as crypto from 'crypto';
 import { repoHash, tryUnlinkSync } from '../utils/fs';
 import { type ForestConfig, getTreesDir } from '../config';
 import type { ForestContext } from '../context';
@@ -10,7 +9,7 @@ import type { TreeState, StateManager } from '../state';
 import { displayName } from '../state';
 import * as git from '../cli/git';
 import * as linear from '../cli/linear';
-import { exec as execUtil, execShell, execStream } from '../utils/exec';
+import { execShell, execStream } from '../utils/exec';
 import { getRepoPath } from '../context';
 import { log } from '../logger';
 
@@ -86,31 +85,20 @@ export async function runSetupCommands(config: ForestConfig, treePath: string, c
 
 type ProgressReporter = { report(value: { message?: string }): void };
 
-/** Common post-worktree-creation setup: copy files, install deps, run setup commands. */
+/** Common post-worktree-creation setup: copy files, run direnv, run setup commands. */
 async function postWorktreeSetup(config: ForestConfig, repoPath: string, treePath: string, tree: TreeState, progress?: ProgressReporter): Promise<void> {
   progress?.report({ message: 'Copying config files...' });
   copyConfigFiles(config, repoPath, treePath);
   ensureWorkspaceFile(tree);
 
   const hasDirenv = fs.existsSync(path.join(treePath, '.envrc'));
-  if (hasDirenv) progress?.report({ message: 'Running direnv allow...' });
-
-  const direnvPromise = hasDirenv
-    ? execShell('direnv allow', { cwd: treePath, timeout: 10_000 }).catch(() => {})
-    : undefined;
-
-  progress?.report({ message: 'Copying dependencies from template...' });
-  const [templateCopied] = await Promise.all([
-    copyModulesFromTemplate(repoPath, treePath),
-    direnvPromise,
-  ]);
-  const needsSave = templateNeedsUpdate(repoPath);
-
-  if (!templateCopied || needsSave) {
-    progress?.report({ message: 'Running setup commands...' });
-    await runSetupCommands(config, treePath);
-    if (needsSave) saveTemplate(repoPath, treePath).catch(() => {});
+  if (hasDirenv) {
+    progress?.report({ message: 'Running direnv allow...' });
+    await execShell('direnv allow', { cwd: treePath, timeout: 10_000 }).catch(() => {});
   }
+
+  progress?.report({ message: 'Running setup commands...' });
+  await runSetupCommands(config, treePath);
 }
 
 /** Sanitize branch name for use as filename. */
@@ -221,54 +209,6 @@ export async function createTree(opts: {
   } finally { createInProgress.delete(createKey); }
 }
 
-
-function templateDir(repoPath: string): string {
-  return path.join(getTreesDir(repoPath), '.template');
-}
-
-const lockfiles = ['bun.lock', 'bun.lockb', 'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml'];
-
-function lockfileHash(dir: string): string | undefined {
-  for (const name of lockfiles) {
-    const p = path.join(dir, name);
-    if (fs.existsSync(p)) return crypto.createHash('md5').update(fs.readFileSync(p)).digest('hex');
-  }
-}
-
-export async function copyModulesFromTemplate(repoPath: string, treePath: string): Promise<boolean> {
-  const src = path.join(templateDir(repoPath), 'node_modules');
-  const dst = path.join(treePath, 'node_modules');
-  if (!fs.existsSync(src)) return false;
-  try {
-    const flag = os.platform() === 'darwin' ? '-Rc' : '-al';
-    await execUtil('cp', [flag, src, dst]);
-    return true;
-  } catch { return false; }
-}
-
-export async function saveTemplate(repoPath: string, treePath: string): Promise<void> {
-  const src = path.join(treePath, 'node_modules');
-  if (!fs.existsSync(src)) return;
-  const tplDir = templateDir(repoPath);
-  fs.mkdirSync(tplDir, { recursive: true });
-  const dst = path.join(tplDir, 'node_modules');
-  try {
-    if (fs.existsSync(dst)) fs.rmSync(dst, { recursive: true });
-    const flag = os.platform() === 'darwin' ? '-Rc' : '-al';
-    await execUtil('cp', [flag, src, dst]);
-  } catch { return; }
-  const hash = lockfileHash(repoPath);
-  if (hash) fs.writeFileSync(path.join(tplDir, '.lockfile-hash'), hash);
-}
-
-/** Compare repo lockfile hash against saved template hash. Called before setup runs. */
-export function templateNeedsUpdate(repoPath: string): boolean {
-  const current = lockfileHash(repoPath);
-  if (!current) return false;
-  const hashFile = path.join(templateDir(repoPath), '.lockfile-hash');
-  if (!fs.existsSync(hashFile)) return true;
-  return current !== fs.readFileSync(hashFile, 'utf8');
-}
 
 export function workspaceFilePath(tree: Pick<TreeState, 'repoPath' | 'branch' | 'ticketId'>): string {
   // Include repo identity so identical branch/ticket names across repos do not collide.

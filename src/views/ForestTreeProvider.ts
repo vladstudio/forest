@@ -22,8 +22,7 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
   readonly onDidChangeTreeData = this._onDidChange.event;
   private healthCache = new Map<string, { promise: Promise<TreeHealth>; time: number }>();
   private issueCache: { issues: linear.LinearIssue[]; time: number } = { issues: [], time: 0 };
-  private readonly HEALTH_TTL = 30_000;
-  private readonly ISSUE_TTL = 60_000;
+  private readonly CACHE_TTL = 30_000;
   private collapsedGroups: Record<string, boolean>;
   private static readonly COLLAPSED_KEY = 'forest.collapsedGroups';
   private static readonly DEFAULT_COLLAPSED: Record<string, boolean> = { 'Tickets: Todo': true };
@@ -56,7 +55,7 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
   private getHealth(tree: TreeState): Promise<TreeHealth> {
     const key = `${tree.repoPath}:${tree.branch}`;
     const cached = this.healthCache.get(key);
-    if (cached && Date.now() - cached.time < this.HEALTH_TTL) return cached.promise;
+    if (cached && Date.now() - cached.time < this.CACHE_TTL) return cached.promise;
 
     const promise = this.fetchHealth(tree);
     this.healthCache.set(key, { promise, time: Date.now() });
@@ -84,7 +83,7 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
   private async getTodoIssues(state: Awaited<ReturnType<StateManager['load']>>): Promise<linear.LinearIssue[]> {
     if (!this.config.linear.enabled || !linear.isAvailable()) return [];
 
-    if (Date.now() - this.issueCache.time > this.ISSUE_TTL) {
+    if (Date.now() - this.issueCache.time > this.CACHE_TTL) {
       this.issueCache.issues = await linear.listMyIssues(this.config.linear.statuses.issueList, this.config.linear.teams);
       this.issueCache.time = Date.now();
     }
