@@ -1,6 +1,6 @@
 {
-  "name": "forest",
-  "displayName": "Forest",
+  "name": "vladstudio-forest",
+  "displayName": "Forest — Git Worktrees",
   "description": "Manage parallel feature development with git worktrees",
   "version": "0.1.0",
   "publisher": "vladstudio",

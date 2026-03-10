@@ -6,7 +6,9 @@
 
 VSCode extension for parallel feature development using git worktrees. One Linear ticket = one branch = one worktree = one VSCode window.
 
-https://github.com/user-attachments/assets/forest-demo.mp4
+[Install from VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=vladstudio.vladstudio-forest)
+
+<video src="forest-demo.mp4" autoplay loop muted></video>
 
 ## Concepts
 
