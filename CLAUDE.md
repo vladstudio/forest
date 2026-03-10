@@ -9,6 +9,7 @@ bun run compile        # Type-check + esbuild bundle
 bun run watch          # Concurrent tsc + esbuild watch mode
 bun run package        # Production build (minified, no sourcemaps)
 bun run check-types    # TypeScript type-check only (tsc --noEmit)
+bun run lint           # ESLint on src/
 ```
 
 Press F5 in VS Code to launch the Extension Development Host for testing.
@@ -25,7 +26,7 @@ Output: `dist/extension.js` (single bundle, `vscode` marked as external).
 Three-tier merge: defaults → `.forest/config.json` (repo) → `.forest/local.json` (gitignored per-dev). Shortcuts merge by `name` field; type is inferred from fields (`url` → browser, `path` → file, else terminal). Shortcuts support `onNewTree: true` to auto-open when a tree is first created. `baseBranch` stored without `origin/` prefix (auto-prepended). `linear` auto-enabled when `teams` or `apiKey` present. `github` accepts boolean shorthand. Supports `${repo}`, `${ticketId}`, `${branch}`, `${slug}`, `${treePath}`, `${prNumber}`, `${prUrl}` variable expansion. Top-level `browser` setting is a `string[]` (first item is default, right-click picks from list); values: `simple` | `external` | app name. Per-shortcut `browser` field overrides it. Top-level `terminal` is also `string[]`; values: `integrated` | app name (`iTerm`, `Terminal`, `Ghostty`). Both accept a single string for backward compatibility.
 
 ### State (`src/state.ts`)
-Global state at `~/.forest/state.json`. Trees keyed as `repoPath:ticketId`. File-watch-based cross-window coordination with debounced events. Atomic writes via temp+rename. Write-locked to prevent races.
+Global state at `~/.forest/state.json`. Trees keyed as `repoPath:branch`. File-watch-based cross-window coordination with debounced events. Atomic writes via temp+rename. Write-locked to prevent races.
 
 ### Context (`src/context.ts`)
 `ForestContext` is a dependency container passed to all commands — no globals. Contains config, all managers, providers, and current tree.
@@ -38,13 +39,18 @@ Thin wrappers (40-60 lines) around shared logic in `commands/shared.ts`. `create
 - **StatusBarManager**: Shows current tree info in status bar.
 
 ### Views (`src/views/`)
-Standard `TreeDataProvider` pattern. `items.ts` defines all TreeItem subclasses with `contextValue` for context menus. Health metrics (commits behind, PR status, age) cached 30 seconds in `TreesTreeProvider`.
+Standard `TreeDataProvider` pattern. `items.ts` defines all TreeItem subclasses with `contextValue` for context menus. Health metrics (commits behind, PR status, age) cached 30 seconds in `ForestTreeProvider`.
 
 ### CLI Wrappers (`src/cli/`)
 `git.ts`, `linear.ts`, `gh.ts` — thin exec wrappers. Tool availability cached once per session. All calls wrapped in try/catch for graceful degradation when tools are missing. `gh.ts` also has `repoHasAutomerge()` (cached) and `enableAutomerge()` for the ship automerge flow. `ai.ts` — raw `fetch` calls to AI providers (anthropic, openai, gemini) for PR body generation; used by `ship` when `config.ai` is set, falls back to `--fill` on failure.
 
-### Execution (`src/utils/exec.ts`)
-Three patterns: `exec()` (safe execFile), `execShell()` (user commands), `execStream()` (long-running with output channel streaming). All have timeouts and max buffer limits.
+### Logging (`src/logger.ts`)
+File-based logging to `~/.forest/forest.log`. Rotation at 5 MB. Levels: INFO, WARN, ERROR. Lazy init via `initLogger()` (only when `config.logging` is true).
+
+### Utilities (`src/utils/`)
+- `exec.ts`: Three execution patterns: `exec()` (safe execFile), `execShell()` (user commands), `execStream()` (long-running with output channel streaming). All have timeouts and max buffer limits.
+- `slug.ts`: `slugify()` for branch name generation, `shellEscape()` for safe shell interpolation.
+- `fs.ts`: `repoHash()` for disambiguating repos with the same basename, `tryUnlinkSync()` for safe file deletion.
 
 ## Conventions
 

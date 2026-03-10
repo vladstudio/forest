@@ -6,12 +6,13 @@
 
 VSCode extension for parallel feature development using git worktrees. One Linear ticket = one branch = one worktree = one VSCode window.
 
+https://github.com/user-attachments/assets/forest-demo.mp4
+
 ## Concepts
 
 | Term                        | Action                                                              |
 | --------------------------- | ------------------------------------------------------------------- |
-| **New Tree**                | Create a worktree from an existing Linear ticket                    |
-| **New Linear Issue + Tree** | Create a new Linear ticket + worktree in one step                   |
+| **New Tree**                | Unified wizard: pick new or existing branch, optionally link a Linear ticket |
 | **Ship**                    | Push branch + create PR (with optional automerge) + move ticket to configured status |
 | **Cleanup**                 | Merge PR + delete worktree + move ticket to configured status       |
 | **Delete Tree**             | Remove worktree, keep branches                                     |
@@ -90,6 +91,7 @@ To set up Forest, ask Claude (or any AI) to read this README and generate `.fore
 | `baseBranch`   | no       | `main`                | Base branch name (`origin/` prefix is added automatically)                                                                                                                                                                                                                                                                |
 | `maxTrees`     | no       | `10`                  | Max concurrent worktrees                                                                                                                                                                                                                                                                                                  |
 | `ai`           | no       | disabled              | AI-generated PR descriptions. Set `provider` (`anthropic`, `openai`, `gemini`), `model`, and `apiKey`. Best placed in `local.json`                                                                                                                                                                                       |
+| `logging`      | no       | `true`                | File-based logging to `~/.forest/forest.log`. Rotates at 5 MB                                                                                                                                                                                                                                                            |
 | `browser`      | no       | `["simple"]`          | Browser app list. First item is the default; right-click a shortcut to pick another. Values: `simple` (VS Code Simple Browser), `external` (system default), or an app name (e.g. `"Firefox"`)                                                                                                                            |
 | `terminal`     | no       | `["integrated"]`      | Terminal app list. First item is the default; right-click to pick another. Values: `integrated` (VS Code terminal), or an external app (`iTerm`, `Terminal`, `Ghostty`). External terminals receive the shortcut command automatically                                                                                     |
 
@@ -104,6 +106,7 @@ To set up Forest, ask Claude (or any AI) to read this README and generate `.fore
 ### Tree Grouping
 
 - **Todo** — Linear issues without a branch yet
+- **Cleaning up** — cleanup in progress (loading spinner)
 - **In Progress** — no PR created yet
 - **In Review** — PR is open
 - **Done** — PR has been merged
@@ -146,10 +149,6 @@ Shortcuts support these variables in commands, URLs, and file paths:
 { "name": "PR", "url": "${prUrl}" },
 { "name": "logs", "command": "tail -f ${treePath}/logs/dev.log" }
 ```
-
-### Browser Wait-for-Port
-
-Browser shortcuts targeting `localhost` automatically wait up to 2 minutes for the port to open before launching, with a progress notification. No more refreshing a blank page while the dev server starts.
 
 ### Direnv Support
 
@@ -209,6 +208,7 @@ Switch between trees from the sidebar. All processes keep running in background 
 | `Forest: New Tree`                | Create tree (unified wizard)            |
 | `Forest: Switch Tree`             | Open another tree's window              |
 | `Forest: Ship`                    | Push + create PR                        |
+| `Forest: Ship + Automerge`        | Push + create PR + enable automerge     |
 | `Forest: Cleanup`                 | Merge PR + remove tree                  |
 | `Forest: Delete Tree`             | Remove tree, keep branches              |
 | `Forest: Delete Tree + Local`     | Remove tree + local branch              |
@@ -216,8 +216,9 @@ Switch between trees from the sidebar. All processes keep running in background 
 | `Forest: Update`                  | Merge from main + re-copy config files  |
 | `Forest: Rebase`                  | Rebase onto main                        |
 | `Forest: List`                    | List all trees                          |
-| `Forest: Open Main`              | Open main repo window                   |
+| `Forest: Open Main`               | Open main repo window                   |
 | `Forest: Open PR`                 | Open PR in browser                      |
+| `Forest: Reveal in Finder`        | Open worktree directory in Finder       |
 | `Forest: Copy Branch Name`        | Copy current tree's branch to clipboard |
 | `Forest: Copy Setup Prompt`       | Copy AI setup prompt to clipboard       |
 
