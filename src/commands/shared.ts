@@ -9,7 +9,7 @@ import type { TreeState, StateManager } from '../state';
 import { displayName } from '../state';
 import * as git from '../cli/git';
 import * as linear from '../cli/linear';
-import { execShell, execStream } from '../utils/exec';
+import { execShell } from '../utils/exec';
 import { getRepoPath } from '../context';
 import { log } from '../logger';
 
@@ -61,31 +61,9 @@ export function copyConfigFiles(config: ForestConfig, repoPath: string, treePath
   }
 }
 
-export async function runSetupCommands(config: ForestConfig, treePath: string, channel?: vscode.OutputChannel): Promise<void> {
-  const cmds = Array.isArray(config.setup) ? config.setup : config.setup ? [config.setup] : [];
-  for (const cmd of cmds) {
-    try {
-      if (channel) {
-        channel.appendLine(`$ ${cmd}`);
-        channel.show(true);
-        await execStream(cmd, {
-          cwd: treePath,
-          timeout: 120_000,
-          onData: (chunk) => channel.append(chunk),
-        });
-        channel.appendLine('');
-      } else {
-        await execShell(cmd, { cwd: treePath, timeout: 120_000 });
-      }
-    } catch (e: any) {
-      vscode.window.showWarningMessage(`Setup command failed: ${e.message}`);
-    }
-  }
-}
-
 type ProgressReporter = { report(value: { message?: string }): void };
 
-/** Common post-worktree-creation setup: copy files, run direnv, run setup commands. */
+/** Common post-worktree-creation setup: copy files, run direnv. */
 async function postWorktreeSetup(config: ForestConfig, repoPath: string, treePath: string, tree: TreeState, progress?: ProgressReporter): Promise<void> {
   progress?.report({ message: 'Copying config files...' });
   copyConfigFiles(config, repoPath, treePath);
@@ -96,9 +74,6 @@ async function postWorktreeSetup(config: ForestConfig, repoPath: string, treePat
     progress?.report({ message: 'Running direnv allow...' });
     await execShell('direnv allow', { cwd: treePath, timeout: 10_000 }).catch(() => {});
   }
-
-  progress?.report({ message: 'Running setup commands...' });
-  await runSetupCommands(config, treePath);
 }
 
 /** Sanitize branch name for use as filename. */
@@ -161,11 +136,13 @@ export async function createTree(opts: {
     await checkMaxTrees(stateManager, repoPath, config.maxTrees);
     const treePath = resolveTreePath(repoPath, branch, ticketId);
 
+    const hasNewTreeShortcuts = config.shortcuts.some(s => s.onNewTree);
     const tree: TreeState = {
       branch, repoPath, path: treePath,
       createdAt: new Date().toISOString(),
       ...(ticketId ? { ticketId } : {}),
       ...(title ? { title } : {}),
+      ...(hasNewTreeShortcuts ? { needsSetup: true } : {}),
     };
 
     log.info(`createTree: ${branch} ticket=${ticketId ?? '(none)'} existing=${!!existingBranch} carry=${!!carryChanges}`);

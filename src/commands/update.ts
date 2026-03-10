@@ -3,7 +3,7 @@ import type { ForestContext } from '../context';
 import type { TreeState } from '../state';
 import { displayName } from '../state';
 import * as git from '../cli/git';
-import { copyConfigFiles, runSetupCommands } from './shared';
+import { copyConfigFiles } from './shared';
 
 function showTimedNotification(message: string, ms = 2000): void {
   vscode.window.withProgress(
@@ -33,10 +33,7 @@ async function syncTree(ctx: ForestContext, treeArg: TreeState | undefined, mode
       progress.report({ message: 'Copying files...' });
       copyConfigFiles(config, tree.repoPath, tree.path!);
 
-      progress.report({ message: 'Running setup...' });
-      await runSetupCommands(config, tree.path!, ctx.outputChannel);
-
-      showTimedNotification(`Tree ${mode === 'merge' ? 'updated' : 'rebased'}. Dependencies refreshed.`);
+      showTimedNotification(`Tree ${mode === 'merge' ? 'updated' : 'rebased'}.`);
     },
   );
 }

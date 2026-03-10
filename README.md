@@ -17,7 +17,7 @@ VSCode extension for parallel feature development using git worktrees. One Linea
 | **Delete Tree**             | Remove worktree, keep branches                                     |
 | **Delete Tree + Local**     | Remove worktree + local branch, keep remote                        |
 | **Delete Tree + Branches**  | Remove worktree + all branches + move ticket to canceled            |
-| **Update**                  | Merge from main + re-run setup (reinstall deps, re-copy env files)  |
+| **Update**                  | Merge from main + re-copy env files                                 |
 | **List**                    | Quick-pick list of all active trees                                 |
 
 ## Prerequisites
@@ -33,12 +33,12 @@ Add `.forest/config.json` to your repo root (tip: ask Claude to generate one for
 {
   "version": 1,
   "copy": [".env", ".env.local"],
-  "setup": "bun install --frozen-lockfile",
   "shortcuts": [
-    { "name": "dev", "command": "bunx turbo dev", "openOnLaunch": 1 },
-    { "name": "claude", "command": "claude", "openOnLaunch": 1 },
+    { "name": "install", "command": "bun install --frozen-lockfile", "onNewTree": true },
+    { "name": "dev", "command": "bunx turbo dev" },
+    { "name": "claude", "command": "claude" },
     { "name": "shell" },
-    { "name": "App", "url": "http://localhost:3000", "openOnLaunch": 2 }
+    { "name": "App", "url": "http://localhost:3000" }
   ],
   "linear": {
     "teams": ["ENG"],
@@ -73,17 +73,15 @@ Per-developer overrides go in `.forest/local.json` (should be gitignored):
 
 To set up Forest, ask Claude (or any AI) to read this README and generate `.forest/config.json`. The AI should inspect the repo and ask you:
 
-1. **Setup command?** → detect from lockfile: `bun install`, `npm install`, `yarn`, `pnpm install`
-2. **Files to copy into trees?** → check which of `.env`, `.env.local`, `.envrc` exist
-3. **Shortcuts?** → what terminals to open (dev server, claude, shell), any browser URLs
-4. **Linear integration?** → yes/no, and team key(s) (e.g. `["ENG", "UX"]`)
+1. **Files to copy into trees?** → check which of `.env`, `.env.local`, `.envrc` exist
+2. **Shortcuts?** → what terminals to open (dev server, claude, shell), any browser URLs, any one-time setup commands (e.g. `bun install` with `onNewTree: true`)
+3. **Linear integration?** → yes/no, and team key(s) (e.g. `["ENG", "UX"]`)
 
 ### Config reference
 
 | Field          | Required | Default               | Description                                                                                                                                                                                                                                                                                                               |
 | -------------- | -------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `version`      | yes      | —                     | Always `1`                                                                                                                                                                                                                                                                                                                |
-| `setup`        | no       | —                     | Command(s) to run after creating a tree                                                                                                                                                                                                                                                                                   |
 | `copy`         | no       | `[]`                  | Files to copy from repo root into each tree                                                                                                                                                                                                                                                                               |
 | `shortcuts`    | no       | `[]`                  | Terminals, browsers, files to open per tree                                                                                                                                                                                                                                                                               |
 | `linear`       | no       | disabled              | Linear integration. Auto-enabled when `teams` or `apiKey` is set. `teams` is an array of team **keys** (e.g. `["ENG"]` or `["ENG", "UX"]`). `statuses` controls issue list and lifecycle transitions including `onCancel` (**must use lowercase** state names: `triage`, `backlog`, `unstarted`, `started`, `completed`, `canceled`) |
@@ -95,7 +93,7 @@ To set up Forest, ask Claude (or any AI) to read this README and generate `.fore
 | `browser`      | no       | `["simple"]`          | Browser app list. First item is the default; right-click a shortcut to pick another. Values: `simple` (VS Code Simple Browser), `external` (system default), or an app name (e.g. `"Firefox"`)                                                                                                                            |
 | `terminal`     | no       | `["integrated"]`      | Terminal app list. First item is the default; right-click to pick another. Values: `integrated` (VS Code terminal), or an external app (`iTerm`, `Terminal`, `Ghostty`). External terminals receive the shortcut command automatically                                                                                     |
 
-**Shortcut types** are inferred from fields: `url` → browser, `path` → file, otherwise → terminal (explicit `type` still accepted). All support `openOnLaunch: N` (VS Code ViewColumn for placement, `false` to disable). Terminals also accept `command` and `env`. Browser shortcuts accept a per-shortcut `browser` override (same values as the top-level `browser` setting). Both `browser` and `terminal` accept a single string for backward compatibility.
+**Shortcut types** are inferred from fields: `url` → browser, `path` → file, otherwise → terminal (explicit `type` still accepted). Shortcuts support `onNewTree: true` to auto-open when a tree is first created (e.g. for dependency installation). Terminals also accept `command` and `env`. Browser shortcuts accept a per-shortcut `browser` override (same values as the top-level `browser` setting). Both `browser` and `terminal` accept a single string for backward compatibility.
 
 **Variable expansion in shortcuts:** `${ticketId}`, `${branch}`, `${slug}`, `${repo}`, `${treePath}`, `${prNumber}`, `${prUrl}`.
 
@@ -127,7 +125,7 @@ When a PR is merged, you get a notification: *"ENG-1234 PR was merged. Clean up?
 
 ### Update (Rebase + Refresh)
 
-`Update` fetches and rebases your tree on the base branch before copying config files and running setup. If the rebase fails, it auto-aborts and shows an error.
+`Update` fetches and merges (or rebases) your tree on the base branch and re-copies config files. If the merge/rebase fails, it shows an error.
 
 ### Shortcut Variable Expansion
 
@@ -149,23 +147,13 @@ Shortcuts support these variables in commands, URLs, and file paths:
 { "name": "logs", "command": "tail -f ${treePath}/logs/dev.log" }
 ```
 
-### Streaming Setup Output
-
-Setup commands stream their output in real-time to the **Forest** output channel, so you can watch `npm install` progress instead of staring at a spinner.
-
 ### Browser Wait-for-Port
 
 Browser shortcuts targeting `localhost` automatically wait up to 2 minutes for the port to open before launching, with a progress notification. No more refreshing a blank page while the dev server starts.
 
-### Pre-Warm Template
-
-After the first tree runs setup, `node_modules` is saved as a template. Subsequent trees get an instant copy (APFS clonefile on macOS, hardlinks on Linux) before running setup, dramatically speeding up tree creation.
-
 ### Direnv Support
 
-If a `.envrc` file exists in the tree, Forest automatically runs `direnv allow` during setup.
-
-Rebuild the template manually: `Forest: Warm Template` from the command palette.
+If a `.envrc` file exists in the tree, Forest automatically runs `direnv allow` during tree creation.
 
 ### Claude Code Trust
 
@@ -225,14 +213,13 @@ Switch between trees from the sidebar. All processes keep running in background 
 | `Forest: Delete Tree`             | Remove tree, keep branches              |
 | `Forest: Delete Tree + Local`     | Remove tree + local branch              |
 | `Forest: Delete Tree + Branches`  | Remove tree + all branches              |
-| `Forest: Update`                  | Merge from main + refresh deps          |
+| `Forest: Update`                  | Merge from main + re-copy config files  |
 | `Forest: Rebase`                  | Rebase onto main                        |
 | `Forest: List`                    | List all trees                          |
 | `Forest: Open Main`              | Open main repo window                   |
 | `Forest: Open PR`                 | Open PR in browser                      |
 | `Forest: Copy Branch Name`        | Copy current tree's branch to clipboard |
 | `Forest: Copy Setup Prompt`       | Copy AI setup prompt to clipboard       |
-| `Forest: Warm Template`           | Rebuild node_modules template           |
 
 ## Install locally
 

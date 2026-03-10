@@ -22,7 +22,7 @@ Output: `dist/extension.js` (single bundle, `vscode` marked as external).
 **Key flow**: Config → StateManager → Managers → TreeDataProviders → VS Code UI.
 
 ### Config (`src/config.ts`)
-Three-tier merge: defaults → `.forest/config.json` (repo) → `.forest/local.json` (gitignored per-dev). Shortcuts merge by `name` field; type is inferred from fields (`url` → browser, `path` → file, else terminal). `baseBranch` stored without `origin/` prefix (auto-prepended). `linear` auto-enabled when `teams` or `apiKey` present. `github` accepts boolean shorthand. Supports `${repo}`, `${ticketId}`, `${branch}`, `${slug}`, `${treePath}`, `${prNumber}`, `${prUrl}` variable expansion. Top-level `browser` setting is a `string[]` (first item is default, right-click picks from list); values: `simple` | `external` | app name. Per-shortcut `browser` field overrides it. Top-level `terminal` is also `string[]`; values: `integrated` | app name (`iTerm`, `Terminal`, `Ghostty`). Both accept a single string for backward compatibility.
+Three-tier merge: defaults → `.forest/config.json` (repo) → `.forest/local.json` (gitignored per-dev). Shortcuts merge by `name` field; type is inferred from fields (`url` → browser, `path` → file, else terminal). Shortcuts support `onNewTree: true` to auto-open when a tree is first created. `baseBranch` stored without `origin/` prefix (auto-prepended). `linear` auto-enabled when `teams` or `apiKey` present. `github` accepts boolean shorthand. Supports `${repo}`, `${ticketId}`, `${branch}`, `${slug}`, `${treePath}`, `${prNumber}`, `${prUrl}` variable expansion. Top-level `browser` setting is a `string[]` (first item is default, right-click picks from list); values: `simple` | `external` | app name. Per-shortcut `browser` field overrides it. Top-level `terminal` is also `string[]`; values: `integrated` | app name (`iTerm`, `Terminal`, `Ghostty`). Both accept a single string for backward compatibility.
 
 ### State (`src/state.ts`)
 Global state at `~/.forest/state.json`. Trees keyed as `repoPath:ticketId`. File-watch-based cross-window coordination with debounced events. Atomic writes via temp+rename. Write-locked to prevent races.
@@ -31,7 +31,7 @@ Global state at `~/.forest/state.json`. Trees keyed as `repoPath:ticketId`. File
 `ForestContext` is a dependency container passed to all commands — no globals. Contains config, all managers, providers, and current tree.
 
 ### Commands (`src/commands/`)
-Thin wrappers (40-60 lines) around shared logic in `commands/shared.ts`. `createTree()` orchestrates: port allocation → worktree creation → file copy → setup → state save → open window.
+Thin wrappers (40-60 lines) around shared logic in `commands/shared.ts`. `createTree()` orchestrates: worktree creation → file copy → direnv → state save → open window. Shortcuts with `onNewTree` run in the new window via `needsSetup` flag on `TreeState`.
 
 ### Managers (`src/managers/`)
 - **ShortcutManager**: Terminal/browser/file lifecycle. Tracks terminals in `Map<string, vscode.Terminal[]>`. Emits change events for UI. `openWith()` shows a QuickPick to choose from the configured app list. External terminal support for iTerm, Terminal.app, and Ghostty via AppleScript.

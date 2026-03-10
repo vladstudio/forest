@@ -14,6 +14,7 @@ export interface TreeState {
   prUrl?: string;
   mergeNotified?: boolean;
   cleaning?: boolean;
+  needsSetup?: boolean;
 }
 
 export interface ForestState {

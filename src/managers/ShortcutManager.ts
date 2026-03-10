@@ -63,9 +63,8 @@ export class ShortcutManager {
     this.stop(sc);
   }
 
-  async openOnLaunchShortcuts(): Promise<void> {
-    if (!this.currentTree) return;
-    // Adopt existing terminals
+  /** Adopt already-open terminals so state tracking works across window reloads. */
+  adoptTerminals(): void {
     for (const sc of this.config.shortcuts) {
       if (sc.type !== 'terminal') continue;
       const adopted: vscode.Terminal[] = [];
@@ -76,18 +75,15 @@ export class ShortcutManager {
       }
       if (adopted.length > 0) this.terminals.set(sc.name, adopted);
     }
-
-    for (const sc of this.config.shortcuts) {
-      if (!sc.openOnLaunch) continue;
-      const viewCol = typeof sc.openOnLaunch === 'number' && sc.openOnLaunch > 1 ? sc.openOnLaunch as vscode.ViewColumn : undefined;
-      if (sc.type === 'terminal') {
-        const existing = this.terminals.get(sc.name);
-        if (!existing || existing.length === 0) await this.openTerminal(sc, viewCol);
-      } else {
-        this.open(sc, viewCol).catch(() => {});
-      }
-    }
     this._onDidChange.fire();
+  }
+
+  /** Open shortcuts marked with onNewTree. */
+  async openNewTreeShortcuts(): Promise<void> {
+    for (const sc of this.config.shortcuts) {
+      if (!sc.onNewTree) continue;
+      await this.open(sc);
+    }
   }
 
   private async openTerminal(sc: ShortcutConfig & { type: 'terminal' }, location?: vscode.ViewColumn, terminalApp?: string): Promise<void> {

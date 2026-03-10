@@ -5,7 +5,7 @@ import * as os from 'os';
 import { repoHash } from './utils/fs';
 import { resolveMainRepo } from './context';
 
-interface ShortcutBase { name: string; openOnLaunch?: number | false; }
+interface ShortcutBase { name: string; onNewTree?: boolean; }
 interface TerminalShortcut extends ShortcutBase { type: 'terminal'; command?: string; env?: Record<string, string>; }
 interface BrowserShortcut extends ShortcutBase { type: 'browser'; url: string; browser?: 'simple' | 'external' | string; }
 interface FileShortcut extends ShortcutBase { type: 'file'; path: string; }
@@ -28,7 +28,6 @@ export interface AIConfig {
 export interface ForestConfig {
   version: number;
   copy: string[];
-  setup: string | string[];
   shortcuts: ShortcutConfig[];
   linear: { enabled: boolean; apiKey?: string; teams?: string[]; statuses: { issueList: string[]; onNew: string; onShip: string; onCleanup: string; onCancel: string } };
   github: { enabled: boolean };
