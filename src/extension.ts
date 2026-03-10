@@ -74,7 +74,7 @@ export async function activate(context: vscode.ExtensionContext) {
             .then(doc => vscode.window.showTextDocument(doc));
         }
       });
-    }).catch(() => {});
+    }).catch(() => { });
   }
 
   // Watch config files for external edits
@@ -127,7 +127,7 @@ export async function activate(context: vscode.ExtensionContext) {
       for (const entry of fs.readdirSync(treesDir)) {
         if (entry.includes('.removing.')) {
           log.info(`Cleaning stale .removing dir: ${entry}`);
-          await fs.promises.rm(path.join(treesDir, entry), { recursive: true, force: true }).catch(() => {});
+          await fs.promises.rm(path.join(treesDir, entry), { recursive: true, force: true }).catch(() => { });
         }
       }
     }
@@ -178,7 +178,7 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.executeCommand('setContext', 'forest.noTrees', trees.length === 0);
     forestView.badge = trees.length ? { value: trees.length, tooltip: `${trees.length} trees` } : undefined;
   };
-  updateNoTrees().catch(() => {});
+  updateNoTrees().catch(() => { });
 
   const ctx: ForestContext = {
     config, stateManager, shortcutManager,
@@ -276,9 +276,9 @@ export async function activate(context: vscode.ExtensionContext) {
     const label = entries.find(e => e.index === index)?.message ?? `stash@{${index}}`;
     const pick = await vscode.window.showQuickPick(
       [
-        { label: '$(eye) View', id: 'view' },
         { label: '$(cloud-download) Apply and Delete', id: 'apply-delete' },
         { label: '$(cloud-download) Apply and Keep', id: 'apply-keep' },
+        { label: '$(eye) View', id: 'view' },
         { label: '$(trash) Delete', id: 'delete' },
       ],
       { placeHolder: 'Stash action' },
@@ -397,4 +397,4 @@ export async function activate(context: vscode.ExtensionContext) {
   if (logger) context.subscriptions.push(logger);
 }
 
-export function deactivate() {}
+export function deactivate() { }
