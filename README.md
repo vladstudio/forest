@@ -236,6 +236,15 @@ Switch between trees from the sidebar. All processes keep running in background 
 "git.openRepositoryInParentFolders": "always" // git works in worktree subdirs
 ```
 
+To open terminals as editor tabs (instead of the bottom panel), add this keybinding (`Cmd+T`):
+
+```json
+{
+  "key": "cmd+t",
+  "command": "workbench.action.createTerminalEditor"
+}
+```
+
 ## Install locally
 
 ```bash
