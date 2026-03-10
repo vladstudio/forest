@@ -224,6 +224,18 @@ Switch between trees from the sidebar. All processes keep running in background 
 | `Forest: Copy Branch Name`        | Copy current tree's branch to clipboard |
 | `Forest: Copy Setup Prompt`       | Copy AI setup prompt to clipboard       |
 
+## Recommended VS Code Settings
+
+```json
+"window.nativeTabs": true,
+"window.titleBarStyle": "native",
+"window.customTitleBarVisibility": "never",
+"window.title": "${rootName}",                // readable tab labels per worktree
+"window.restoreWindows": "preserve",          // survives restarts
+"window.closeWhenEmpty": true,
+"git.openRepositoryInParentFolders": "always" // git works in worktree subdirs
+```
+
 ## Install locally
 
 ```bash
