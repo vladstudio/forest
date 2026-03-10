@@ -6,9 +6,12 @@ src/**
 test/**
 .gitignore
 .eslintrc.json
+eslint.config.cjs
 **/*.ts
 **/*.map
 !dist/extension.js
+dist/index.html
+dist/assets/**
 node_modules/**
 esbuild.js
 tsconfig.json
@@ -19,3 +22,5 @@ bun.lockb
 bun.lock
 build-local.sh
 forest.svg
+forest-color.svg
+.DS_Store

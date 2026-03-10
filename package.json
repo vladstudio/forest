@@ -9,6 +9,10 @@
     "type": "git",
     "url": "https://github.com/vladstudio/forest"
   },
+  "galleryBanner": {
+    "color": "#1e1e1e",
+    "theme": "dark"
+  },
   "license": "MIT",
   "engines": {
     "vscode": "^1.109.0"
@@ -25,7 +29,8 @@
   ],
   "main": "./dist/extension.js",
   "activationEvents": [
-    "onStartupFinished"
+    "workspaceContains:.forest/config.json",
+    "onView:forest.setup"
   ],
   "scripts": {
     "vscode:prepublish": "bun run package",
@@ -166,7 +171,7 @@
       },
       {
         "command": "forest.deleteTreeAll",
-        "title": "Delete Tree + Branches",
+        "title": "Delete Tree + Branches + Cancel Ticket",
         "category": "Forest",
         "icon": "$(close-all)"
       },
