@@ -261,6 +261,14 @@ export async function activate(context: vscode.ExtensionContext) {
     stashesProvider.refresh();
   });
   reg('forest.stashDrop', (arg: StashItem) => confirmDropStash(arg.label as string, arg.index));
+  const gitContentProvider = new class implements vscode.TextDocumentContentProvider {
+    provideTextDocumentContent(uri: vscode.Uri): Thenable<string> {
+      const params = new URLSearchParams(uri.query);
+      return git.showObject(params.get('repo')!, `${params.get('ref')}:${uri.path.slice(1)}`);
+    }
+  };
+  context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider('forest-git', gitContentProvider));
+
   reg('forest.stashAction', async (index: number) => {
     const wsPath = getWsPath();
     if (!wsPath) return;
@@ -268,13 +276,23 @@ export async function activate(context: vscode.ExtensionContext) {
     const label = entries.find(e => e.index === index)?.message ?? `stash@{${index}}`;
     const pick = await vscode.window.showQuickPick(
       [
+        { label: '$(eye) View', id: 'view' },
         { label: '$(cloud-download) Apply and Delete', id: 'apply-delete' },
         { label: '$(cloud-download) Apply and Keep', id: 'apply-keep' },
         { label: '$(trash) Delete', id: 'delete' },
       ],
       { placeHolder: 'Stash action' },
     );
-    if (pick?.id === 'apply-delete') {
+    if (pick?.id === 'view') {
+      const ref = `stash@{${index}}`;
+      const files = await git.stashShowFiles(repoPath, index);
+      const changes: [string, vscode.Uri, vscode.Uri][] = files.map(f => [
+        f,
+        vscode.Uri.parse(`forest-git://show/${f}?ref=${encodeURIComponent(ref + '^')}&repo=${encodeURIComponent(repoPath)}`),
+        vscode.Uri.parse(`forest-git://show/${f}?ref=${encodeURIComponent(ref)}&repo=${encodeURIComponent(repoPath)}`),
+      ]);
+      await vscode.commands.executeCommand('vscode.changes', `Stash: ${label}`, changes);
+    } else if (pick?.id === 'apply-delete') {
       await git.stashApply(wsPath, index);
       await git.stashDrop(repoPath, index);
       stashesProvider.refresh();

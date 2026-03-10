@@ -99,6 +99,16 @@ export async function stashDrop(repoPath: string, ref: number | string): Promise
   await exec('git', ['stash', 'drop', stashRef(ref)], { cwd: repoPath });
 }
 
+export async function stashShowFiles(repoPath: string, ref: number | string): Promise<string[]> {
+  const { stdout } = await exec('git', ['stash', 'show', stashRef(ref), '--name-only'], { cwd: repoPath });
+  return stdout.trim().split('\n').filter(Boolean);
+}
+
+export async function showObject(repoPath: string, objectRef: string): Promise<string> {
+  const { stdout } = await exec('git', ['show', objectRef], { cwd: repoPath });
+  return stdout;
+}
+
 export async function discardChanges(repoPath: string): Promise<void> {
   await exec('git', ['reset', '--hard', 'HEAD'], { cwd: repoPath });
   await exec('git', ['clean', '-fd'], { cwd: repoPath });
