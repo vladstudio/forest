@@ -78,7 +78,7 @@ To set up Forest, ask Claude (or any AI) to read this README and generate `.fore
 
 1. **Files to copy into trees?** → check which of `.env`, `.env.local`, `.envrc` exist
 2. **Shortcuts?** → what terminals to open (dev server, claude, shell), any browser URLs, any one-time setup commands (e.g. `bun install` with `onNewTree: true`)
-3. **Linear integration?** → yes/no, and team key(s) (e.g. `["ENG", "UX"]`)
+3. **Linear integration?** → yes/no, and team key(s) (e.g. `["ENG", "UX"]`). Get your API key from https://linear.app/settings/account/security
 
 ### Config reference
 
