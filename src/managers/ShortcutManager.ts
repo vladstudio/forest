@@ -181,26 +181,27 @@ export class ShortcutManager {
   }
 
   private resolveVars(value: string, forShell = false): string {
-    if (!this.currentTree) return value;
     const tree = this.currentTree;
-    const ticketId = tree.ticketId ?? '';
-    const slug = ticketId && tree.branch.startsWith(ticketId)
-      ? tree.branch.slice(ticketId.length).replace(/^-/, '')
-      : tree.branch;
-    const prNumber = tree.prUrl?.match(/\/pull\/(\d+)/)?.[1] ?? '';
+    const ticketId = tree?.ticketId ?? '';
+    const branch = tree?.branch ?? '';
+    const slug = ticketId && branch.startsWith(ticketId)
+      ? branch.slice(ticketId.length).replace(/^-/, '')
+      : branch;
+    const prNumber = tree?.prUrl?.match(/\/pull\/(\d+)/)?.[1] ?? '';
     const esc = forShell ? shellEscape : (v: string) => v;
     return value
       .replace(/\$\{ticketId\}/g, esc(ticketId))
-      .replace(/\$\{branch\}/g, esc(tree.branch))
-      .replace(/\$\{repo\}/g, esc(path.basename(tree.repoPath)))
-      .replace(/\$\{treePath\}/g, esc(tree.path ?? ''))
+      .replace(/\$\{branch\}/g, esc(branch))
+      .replace(/\$\{repo\}/g, esc(tree ? path.basename(tree.repoPath) : ''))
+      .replace(/\$\{treePath\}/g, esc(tree?.path ?? ''))
       .replace(/\$\{slug\}/g, esc(slug))
       .replace(/\$\{prNumber\}/g, esc(prNumber))
-      .replace(/\$\{prUrl\}/g, esc(tree.prUrl ?? ''));
+      .replace(/\$\{prUrl\}/g, esc(tree?.prUrl ?? ''));
   }
 
   updateTree(tree: TreeState): void {
     this.currentTree = tree;
+    this._onDidChange.fire();
   }
 
   dispose(): void {

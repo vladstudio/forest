@@ -31,7 +31,7 @@ export function displayName(tree: TreeState): string {
 
 export class StateManager {
   private statePath: string;
-  private _onDidChange = new vscode.EventEmitter<ForestState>();
+  private _onDidChange = new vscode.EventEmitter<{ state: ForestState; isLocal: boolean }>();
   readonly onDidChange = this._onDidChange.event;
   private watcher?: fs.FSWatcher;
   private debounceTimer?: ReturnType<typeof setTimeout>;
@@ -64,7 +64,7 @@ export class StateManager {
             lastContent = content;
             if (content === this.lastWrittenContent) return; // self-write
             log.info('State file changed externally');
-            this._onDidChange.fire(JSON.parse(content));
+            this._onDidChange.fire({ state: JSON.parse(content), isLocal: false });
           }
         } catch (e: any) { log.error(`State watch read failed: ${e.message}`); }
       }, 50);
@@ -133,6 +133,7 @@ export class StateManager {
         const state = await this.load();
         fn(state);
         await this.save(state);
+        this._onDidChange.fire({ state, isLocal: true });
       });
     } finally { release(); }
   }

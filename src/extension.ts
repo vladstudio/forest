@@ -375,7 +375,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // Watch state for changes from other windows
   let previousTrees = stateManager.getTreesForRepo(stateManager.loadSync(), repoPath);
-  stateManager.onDidChange((newState) => {
+  stateManager.onDidChange(({ state: newState, isLocal }) => {
     if (ctx.currentTree) {
       const updated = stateManager.getTree(newState, repoPath, ctx.currentTree.branch);
       if (updated) {
@@ -388,20 +388,22 @@ export async function activate(context: vscode.ExtensionContext) {
         return;
       }
     }
-    // Clean up workspace files for trees removed by other windows.
-    // Worktree/branch cleanup is handled by the window that initiated removal.
     const currentTrees = stateManager.getTreesForRepo(newState, repoPath);
-    const currentBranches = new Set(currentTrees.map(t => t.branch));
-    for (const prev of previousTrees) {
-      if (prev.branch === ctx.currentTree?.branch) continue;
-      if (!currentBranches.has(prev.branch)) {
-        log.info(`Tree removed by other window: ${prev.branch}`);
-        deleteWorkspaceFiles(prev);
+    // Clean up workspace files for trees removed by another window.
+    // Skip for local writes — the initiating command handles its own cleanup.
+    if (!isLocal) {
+      const currentBranches = new Set(currentTrees.map(t => t.branch));
+      for (const prev of previousTrees) {
+        if (prev.branch === ctx.currentTree?.branch) continue;
+        if (!currentBranches.has(prev.branch)) {
+          log.info(`Tree removed by other window: ${prev.branch}`);
+          deleteWorkspaceFiles(prev);
+        }
       }
     }
     previousTrees = currentTrees;
     forestProvider.refresh();
-    updateNoTrees();
+    updateNoTrees().catch(() => {});
   });
 
   context.subscriptions.push(outputChannel, shortcutManager, shortcutsProvider, stashesProvider, statusBarManager, stateManager, forestProvider);
