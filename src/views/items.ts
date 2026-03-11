@@ -94,7 +94,7 @@ function abbreviateAge(age: string): string {
     .replace(/ years? ago/, 'y');
 }
 
-export type TreeContext = 'tree-progress' | 'tree-review' | 'tree-done' | 'tree-cleaning';
+export type TreeContext = 'tree-progress' | 'tree-review' | 'tree-done' | 'tree-closed' | 'tree-cleaning';
 
 export class TreeItemView extends vscode.TreeItem {
   constructor(

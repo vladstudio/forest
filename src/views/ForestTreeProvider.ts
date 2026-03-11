@@ -121,6 +121,7 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
     const inProgress: TreeItemView[] = [];
     const inReview: TreeItemView[] = [];
     const done: TreeItemView[] = [];
+    const closed: TreeItemView[] = [];
 
     trees.forEach((t, i) => {
       const isCurrent = t.path === curPath;
@@ -135,6 +136,8 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
       let ctx: TreeContext;
       if (health?.pr?.state === 'MERGED') {
         ctx = 'tree-done';
+      } else if (health?.pr?.state === 'CLOSED') {
+        ctx = 'tree-closed';
       } else if (health?.pr) {
         ctx = 'tree-review';
       } else {
@@ -144,6 +147,7 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
       const item = new TreeItemView(t, isCurrent, ctx, health);
 
       if (ctx === 'tree-done') done.push(item);
+      else if (ctx === 'tree-closed') closed.push(item);
       else if (ctx === 'tree-review') inReview.push(item);
       else inProgress.push(item);
     });
@@ -163,6 +167,7 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
     if (inProgress.length) groups.push(new StageGroupItem('Trees: In progress', inProgress.length, 'code', inProgress, isCollapsed('Trees: In progress')));
     if (inReview.length) groups.push(new StageGroupItem('Trees: In review', inReview.length, 'git-pull-request', inReview, isCollapsed('Trees: In review')));
     if (done.length) groups.push(new StageGroupItem('Trees: Done', done.length, 'check', done, isCollapsed('Trees: Done')));
+    if (closed.length) groups.push(new StageGroupItem('Trees: Closed', closed.length, 'git-pull-request-closed', closed, isCollapsed('Trees: Closed')));
     if (!trees.length) groups.push(new StageGroupItem('Trees', 0, 'git-branch', [new NoTreesItem()], false));
     const mainIsCurrent = curPath === repoPath;
     return [new MainRepoItem(repoPath, this.config.baseBranch, mainIsCurrent), ...groups];

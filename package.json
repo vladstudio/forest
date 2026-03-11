@@ -311,7 +311,7 @@
         },
         {
           "command": "forest.openPR",
-          "when": "viewItem =~ /tree-review|tree-done/",
+          "when": "viewItem =~ /tree-review|tree-done|tree-closed/",
           "group": "2_ship"
         },
         {
@@ -321,7 +321,7 @@
         },
         {
           "command": "forest.cleanup",
-          "when": "viewItem =~ /^tree-done/",
+          "when": "viewItem =~ /^tree-done/ || viewItem =~ /^tree-closed/",
           "group": "4_danger"
         },
         {
