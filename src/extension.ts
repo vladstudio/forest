@@ -312,10 +312,12 @@ export async function activate(context: vscode.ExtensionContext) {
     }),
   );
 
-  // If this is a tree window, adopt terminals and run onNewTree shortcuts
+  // Adopt existing terminals so shortcut state is tracked across reloads
+  shortcutManager.adoptTerminals();
+
+  // If this is a tree window, run onNewTree shortcuts
   if (currentTree) {
     statusBarManager.show();
-    shortcutManager.adoptTerminals();
     if (currentTree.needsSetup) {
       shortcutManager.openNewTreeShortcuts();
       stateManager.updateTree(repoPath, currentTree.branch, { needsSetup: undefined });

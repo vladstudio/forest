@@ -80,7 +80,7 @@
         {
           "id": "forest.shortcuts",
           "name": "Shortcuts",
-          "when": "forest.active && forest.ghAvailable && forest.isTree"
+          "when": "forest.active && forest.ghAvailable"
         },
         {
           "id": "forest.stashes",
