@@ -380,6 +380,10 @@ export async function activate(context: vscode.ExtensionContext) {
         ctx.currentTree = updated;
         statusBarManager.update(updated);
         shortcutManager.updateTree(updated);
+      } else {
+        // Our tree was removed by another window — close this window
+        vscode.commands.executeCommand('workbench.action.closeWindow');
+        return;
       }
     }
     // Clean up workspace files for trees removed by other windows.
