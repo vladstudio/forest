@@ -152,28 +152,10 @@
         "icon": "$(rocket)"
       },
       {
-        "command": "forest.cleanup",
-        "title": "Cleanup — Delete Branch & Worktree",
-        "category": "Forest",
-        "icon": "$(check-all)"
-      },
-      {
         "command": "forest.deleteTree",
-        "title": "Delete Tree, Keep Branches",
-        "category": "Forest",
-        "icon": "$(archive)"
-      },
-      {
-        "command": "forest.deleteTreeLocal",
-        "title": "Delete Tree + Local Branch",
+        "title": "Delete Tree...",
         "category": "Forest",
         "icon": "$(trash)"
-      },
-      {
-        "command": "forest.deleteTreeAll",
-        "title": "Delete Tree + Branches + Cancel Ticket",
-        "category": "Forest",
-        "icon": "$(close-all)"
       },
       {
         "command": "forest.update",
@@ -320,24 +302,9 @@
           "group": "3_lifecycle"
         },
         {
-          "command": "forest.cleanup",
-          "when": "viewItem =~ /^tree-done/ || viewItem =~ /^tree-closed/",
-          "group": "4_danger"
-        },
-        {
           "command": "forest.deleteTree",
-          "when": "viewItem =~ /^tree-(progress|review)/",
-          "group": "4_danger@1"
-        },
-        {
-          "command": "forest.deleteTreeLocal",
-          "when": "viewItem =~ /^tree-(progress|review)/",
-          "group": "4_danger@2"
-        },
-        {
-          "command": "forest.deleteTreeAll",
-          "when": "viewItem =~ /^tree-(progress|review)/",
-          "group": "4_danger@3"
+          "when": "viewItem =~ /^tree-/",
+          "group": "4_danger"
         },
         {
           "command": "forest.openShortcutWith",

@@ -3,19 +3,14 @@ import type { ForestContext } from '../context';
 import type { TreeState } from '../state';
 import { displayName } from '../state';
 import * as git from '../cli/git';
-import * as gh from '../cli/gh';
 import { getRepoPath } from '../context';
 import { deleteWorkspaceFiles, runStep, updateLinear } from './shared';
 import { log } from '../logger';
 
-function resolveTree(ctx: ForestContext, branchArg?: string): TreeState | undefined {
-  return branchArg
+function requireTree(ctx: ForestContext, branchArg: string | undefined, action: string): TreeState | undefined {
+  const tree = branchArg
     ? ctx.stateManager.getTree(ctx.stateManager.loadSync(), getRepoPath(), branchArg)
     : ctx.currentTree;
-}
-
-function requireTree(ctx: ForestContext, branchArg: string | undefined, action: string): TreeState | undefined {
-  const tree = resolveTree(ctx, branchArg);
   if (!tree) vscode.window.showErrorMessage(`No tree to ${action}. Run from a tree window or select from sidebar.`);
   return tree;
 }
@@ -74,48 +69,6 @@ async function teardownTree(ctx: ForestContext, tree: TreeState, opts: TeardownO
 const stepList = (...items: (string | false | 0 | '' | null | undefined)[]) =>
   (items.filter(Boolean) as string[]).map((s, i) => `${i + 1}. ${s}`).join('\n');
 
-export async function cleanup(ctx: ForestContext, branchArg?: string): Promise<void> {
-  const tree = requireTree(ctx, branchArg, 'clean up');
-  if (!tree) return;
-  const config = ctx.config;
-  const ghEnabled = config.github.enabled && !!tree.path && await gh.isAvailable();
-  const hasLinear = !!tree.ticketId && config.linear.enabled;
-  const willClose = ctx.currentTree?.branch === tree.branch;
-
-  const confirm = await vscode.window.showWarningMessage(
-    `Cleanup ${displayName(tree)}?\n\n${stepList(
-      ghEnabled && 'Squash-merge the PR',
-      hasLinear && `Move ${tree.ticketId} → ${config.linear.statuses.onCleanup}`,
-      'Delete tree + branches',
-      willClose && 'Close this window',
-    )}`,
-    { modal: true }, 'Cleanup',
-  );
-  if (confirm !== 'Cleanup') return;
-
-  if (tree.path && await git.hasUncommittedChanges(tree.path)) {
-    vscode.window.showErrorMessage('Tree has uncommitted changes. Commit or discard first.');
-    return;
-  }
-
-  await vscode.window.withProgress(
-    { location: vscode.ProgressLocation.Notification, title: `Cleaning up ${displayName(tree)}...` },
-    async (progress) => {
-      progress.report({ message: 'Merging...' });
-      if (ghEnabled && !await runStep(ctx, 'Merge PR', () => gh.mergePR(tree.path!))) return;
-
-      progress.report({ message: 'Removing tree...' });
-      // gh merge already deletes the remote branch
-      if (!await teardownTree(ctx, tree, { deleteLocal: true, deleteRemote: !ghEnabled })) return;
-
-      if (tree.ticketId && config.linear.enabled) {
-        progress.report({ message: 'Updating ticket...' });
-        await updateLinear(ctx, tree.ticketId, config.linear.statuses.onCleanup);
-      }
-    },
-  );
-}
-
 /** Cleanup after an already-merged PR — skips merge and confirmation. */
 export async function cleanupMerged(ctx: ForestContext, tree: TreeState): Promise<void> {
   if (tree.path && await git.hasUncommittedChanges(tree.path)) {
@@ -126,66 +79,57 @@ export async function cleanupMerged(ctx: ForestContext, tree: TreeState): Promis
   if (tree.ticketId) await updateLinear(ctx, tree.ticketId, ctx.config.linear.statuses.onCleanup);
 }
 
-/** Delete tree, keep both local and remote branches. */
+interface DeleteOption extends vscode.QuickPickItem {
+  summary: string;
+  deleteLocal: boolean;
+  deleteRemote: boolean;
+  cancelTicket: boolean;
+}
+
 export async function deleteTree(ctx: ForestContext, branchArg?: string): Promise<void> {
-  const tree = requireTree(ctx, branchArg, 'delete');
-  if (!tree) return;
-
-  const willClose = ctx.currentTree?.branch === tree.branch;
-
-  const confirm = await vscode.window.showWarningMessage(
-    `Delete ${displayName(tree)}?\n\n${stepList(
-      'Remove worktree (keep branches)',
-      willClose && 'Close this window',
-    )}`,
-    { modal: true }, 'Delete',
-  );
-  if (confirm !== 'Delete') return;
-
-  await vscode.window.withProgress(
-    { location: vscode.ProgressLocation.Notification, title: `Deleting ${displayName(tree)}...` },
-    async () => {
-      await teardownTree(ctx, tree);
-    },
-  );
-}
-
-/** Delete tree + local branch, keep remote branch. */
-export async function deleteTreeLocal(ctx: ForestContext, branchArg?: string): Promise<void> {
-  const tree = requireTree(ctx, branchArg, 'delete');
-  if (!tree) return;
-
-  const willClose = ctx.currentTree?.branch === tree.branch;
-
-  const confirm = await vscode.window.showWarningMessage(
-    `Delete ${displayName(tree)} + local branch?\n\n${stepList(
-      'Remove worktree + local branch (keep remote)',
-      willClose && 'Close this window',
-    )}`,
-    { modal: true }, 'Delete',
-  );
-  if (confirm !== 'Delete') return;
-
-  await vscode.window.withProgress(
-    { location: vscode.ProgressLocation.Notification, title: `Deleting ${displayName(tree)}...` },
-    async () => {
-      await teardownTree(ctx, tree, { deleteLocal: true });
-    },
-  );
-}
-
-/** Delete tree + all branches, cancel Linear issue. */
-export async function deleteTreeAll(ctx: ForestContext, branchArg?: string): Promise<void> {
   const tree = requireTree(ctx, branchArg, 'delete');
   if (!tree) return;
 
   const hasLinear = !!tree.ticketId && ctx.config.linear.enabled;
   const willClose = ctx.currentTree?.branch === tree.branch;
 
+  const options: DeleteOption[] = [
+    {
+      label: '$(archive) Keep branches',
+      detail: 'Remove worktree only' + (hasLinear ? ' · keep branches & ticket' : ''),
+      summary: 'Remove worktree (keep branches)',
+      deleteLocal: false, deleteRemote: false, cancelTicket: false,
+    },
+    {
+      label: '$(trash) Delete local branch',
+      detail: 'Remove worktree + local branch' + (hasLinear ? ' · keep remote & ticket' : ''),
+      summary: 'Remove worktree + local branch',
+      deleteLocal: true, deleteRemote: false, cancelTicket: false,
+    },
+    {
+      label: '$(close-all) Delete branches',
+      detail: 'Remove worktree + all branches' + (hasLinear ? ' · keep ticket' : ''),
+      summary: 'Remove worktree + all branches',
+      deleteLocal: true, deleteRemote: true, cancelTicket: false,
+    },
+    ...(hasLinear ? [{
+      label: '$(circle-slash) Delete branches · cancel ticket',
+      detail: `Remove worktree + all branches · move ${tree.ticketId} → ${ctx.config.linear.statuses.onCancel}`,
+      summary: 'Remove worktree + all branches',
+      deleteLocal: true, deleteRemote: true, cancelTicket: true,
+    }] : []),
+  ];
+
+  const picked = await vscode.window.showQuickPick(options, {
+    title: `Delete ${displayName(tree)}`,
+    placeHolder: 'Select what to delete',
+  });
+  if (!picked) return;
+
   const confirm = await vscode.window.showWarningMessage(
-    `Delete ${displayName(tree)} + all branches?\n\n${stepList(
-      hasLinear && `Move ${tree.ticketId} → ${ctx.config.linear.statuses.onCancel}`,
-      'Remove worktree + local & remote branches',
+    `Delete ${displayName(tree)}?\n\n${stepList(
+      picked.summary,
+      picked.cancelTicket && `Move ${tree.ticketId} → ${ctx.config.linear.statuses.onCancel}`,
       willClose && 'Close this window',
     )}`,
     { modal: true }, 'Delete',
@@ -196,10 +140,10 @@ export async function deleteTreeAll(ctx: ForestContext, branchArg?: string): Pro
     { location: vscode.ProgressLocation.Notification, title: `Deleting ${displayName(tree)}...` },
     async (progress) => {
       progress.report({ message: 'Removing tree...' });
-      if (!await teardownTree(ctx, tree, { deleteLocal: true, deleteRemote: true })) return;
-      if (tree.ticketId) {
+      if (!await teardownTree(ctx, tree, { deleteLocal: picked.deleteLocal, deleteRemote: picked.deleteRemote })) return;
+      if (picked.cancelTicket) {
         progress.report({ message: 'Updating ticket...' });
-        await updateLinear(ctx, tree.ticketId, ctx.config.linear.statuses.onCancel);
+        await updateLinear(ctx, tree.ticketId!, ctx.config.linear.statuses.onCancel);
       }
     },
   );
