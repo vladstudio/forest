@@ -73,7 +73,7 @@ export async function start(ctx: ForestContext, arg: { ticketId: string; title: 
     .replace('${slug}', slugify(title));
 
   const choice = await vscode.window.showQuickPick([
-    { label: `$(git-branch) New branch: ${defaultBranch}`, id: 'new' },
+    { label: `$(folder) New branch: ${defaultBranch}`, id: 'new' },
     { label: '$(list-tree) Use existing branch', id: 'existing' },
   ], { placeHolder: `Start ${ticketId}: ${title}` });
   if (!choice) return;
@@ -115,7 +115,7 @@ export async function start(ctx: ForestContext, arg: { ticketId: string; title: 
 export async function create(ctx: ForestContext): Promise<void> {
   const choice = await vscode.window.showQuickPick([
     { label: '$(add) New branch', id: 'new' },
-    { label: '$(git-branch) Existing branch', id: 'existing' },
+    { label: '$(folder) Existing branch', id: 'existing' },
   ], { placeHolder: 'Create a new tree' });
   if (!choice) return;
 
@@ -159,9 +159,11 @@ async function createFromNewBranch(ctx: ForestContext): Promise<void> {
   // Pre-fill branch name from format when ticket is known
   let branchOpts: { value?: string } | undefined;
   if (ticketId && title) {
-    branchOpts = { value: config.branchFormat
-      .replace('${ticketId}', ticketId)
-      .replace('${slug}', slugify(title)) };
+    branchOpts = {
+      value: config.branchFormat
+        .replace('${ticketId}', ticketId)
+        .replace('${slug}', slugify(title))
+    };
   }
 
   const branchName = await showBranchInput(branchOpts);

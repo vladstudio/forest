@@ -75,7 +75,7 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
     ]);
     // Backfill prUrl in state when discovered from GitHub
     if (pr?.url && !tree.prUrl) {
-      this.stateManager.updateTree(tree.repoPath, tree.branch, { prUrl: pr.url }).catch(() => {});
+      this.stateManager.updateTree(tree.repoPath, tree.branch, { prUrl: pr.url }).catch(() => { });
     }
     return { behind, age, pr };
   }
@@ -164,11 +164,11 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
     }
 
     if (cleaning.length) groups.push(new StageGroupItem('Trees: Cleaning up', cleaning.length, 'loading~spin', cleaning, false));
-    if (inProgress.length) groups.push(new StageGroupItem('Trees: In progress', inProgress.length, 'code', inProgress, isCollapsed('Trees: In progress')));
+    if (inProgress.length) groups.push(new StageGroupItem('Trees: In progress', inProgress.length, 'target', inProgress, isCollapsed('Trees: In progress')));
     if (inReview.length) groups.push(new StageGroupItem('Trees: In review', inReview.length, 'git-pull-request', inReview, isCollapsed('Trees: In review')));
     if (done.length) groups.push(new StageGroupItem('Trees: Done', done.length, 'check', done, isCollapsed('Trees: Done')));
     if (closed.length) groups.push(new StageGroupItem('Trees: Closed', closed.length, 'git-pull-request-closed', closed, isCollapsed('Trees: Closed')));
-    if (!trees.length) groups.push(new StageGroupItem('Trees', 0, 'git-branch', [new NoTreesItem()], false));
+    if (!trees.length) groups.push(new StageGroupItem('Trees', 0, 'folder', [new NoTreesItem()], false));
     const mainIsCurrent = curPath === repoPath;
     return [new MainRepoItem(repoPath, this.config.baseBranch, mainIsCurrent), ...groups];
   }
