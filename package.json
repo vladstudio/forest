@@ -2,7 +2,7 @@
   "name": "vladstudio-forest",
   "displayName": "Forest — Git Worktrees",
   "description": "Manage parallel feature development with git worktrees",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "publisher": "vladstudio",
   "icon": "forest-color.png",
   "repository": {
