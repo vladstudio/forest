@@ -205,7 +205,6 @@ export async function activate(context: vscode.ExtensionContext) {
     start(ctx, arg instanceof IssueItem ? { ticketId: arg.issue.id, title: arg.issue.title } : arg));
   reg('forest.switch', (arg?: string | TreeItemView) => switchTree(ctx, branchOf(arg)));
   reg('forest.ship', (arg?: TreeItemView) => andRefresh(() => ship(ctx, treeOf(arg)))());
-  reg('forest.shipAutomerge', (arg?: TreeItemView) => andRefresh(() => ship(ctx, treeOf(arg), true))());
   reg('forest.deleteTree', (arg?: string | TreeItemView) => deleteTree(ctx, branchOf(arg)));
   reg('forest.update', (arg?: TreeItemView) => andRefresh(() => update(ctx, treeOf(arg)))());
   reg('forest.rebase', (arg?: TreeItemView) => andRefresh(() => rebase(ctx, treeOf(arg)))());

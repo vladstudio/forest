@@ -9,9 +9,9 @@ import { updateLinear } from './shared';
 import { log } from '../logger';
 
 
-export async function ship(ctx: ForestContext, treeArg?: import('../state').TreeState, automerge = false): Promise<void> {
+export async function ship(ctx: ForestContext, treeArg?: import('../state').TreeState): Promise<void> {
   const tree = treeArg || ctx.currentTree;
-  log.info(`ship: ${tree?.branch ?? '(no tree)'} ticket=${tree?.ticketId ?? '(none)'} automerge=${automerge}`);
+  log.info(`ship: ${tree?.branch ?? '(no tree)'} ticket=${tree?.ticketId ?? '(none)'}`);
   if (!tree) {
     vscode.window.showErrorMessage('Ship must be run from a tree window.');
     return;
@@ -32,21 +32,36 @@ export async function ship(ctx: ForestContext, treeArg?: import('../state').Tree
 
   const ghEnabled = config.github.enabled && await gh.isAvailable();
 
+  // Show picker with automerge option when supported
+  let automerge = false;
+  if (ghEnabled) {
+    const hasAutomerge = await gh.repoHasAutomerge(tree.path);
+    if (hasAutomerge) {
+      const pick = await vscode.window.showQuickPick(
+        ['Create PR', 'Create PR + Automerge'],
+        { placeHolder: 'Ship — Create PR...' },
+      );
+      if (!pick) return;
+      automerge = pick === 'Create PR + Automerge';
+    }
+  }
+
   const name = displayName(tree);
   const prUrl = await vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: `Shipping ${name}...` },
     async (progress) => {
-      // Push
+      // Start push and diff generation in parallel (diff is local, push is network)
       progress.report({ message: 'Pushing branch...' });
-      await git.pushBranch(tree.path!, tree.branch);
+      const pushPromise = git.pushBranch(tree.path!, tree.branch);
+      const prStatusPromise = ghEnabled && !tree.prUrl ? gh.prStatus(tree.path!) : Promise.resolve(null);
+      const diffPromise = config.ai ? git.diffFromBase(tree.path!, config.baseBranch) : Promise.resolve(null);
 
-      // Create PR via gh CLI
       let url: string | null = null;
       if (ghEnabled) {
         if (tree.prUrl) {
           url = tree.prUrl;
         } else {
-          const existing = await gh.prStatus(tree.path!);
+          const existing = await prStatusPromise;
           if (existing?.url) {
             url = existing.url;
           } else {
@@ -58,7 +73,7 @@ export async function ship(ctx: ForestContext, treeArg?: import('../state').Tree
             if (config.ai) {
               try {
                 progress.report({ message: 'Generating PR description...' });
-                const diff = await git.diffFromBase(tree.path!, config.baseBranch);
+                const diff = await diffPromise ?? '';
                 prBody = await generatePRBody(config.ai, diff, prTitle);
               } catch (e: any) {
                 log.error(`AI PR body generation failed: ${e.message}`);
@@ -66,12 +81,16 @@ export async function ship(ctx: ForestContext, treeArg?: import('../state').Tree
               }
             }
 
+            // Ensure push is done before creating PR
+            await pushPromise;
             progress.report({ message: 'Creating PR...' });
             url = await gh.createPR(tree.path!, config.baseBranch, prTitle, prBody);
           }
         }
       }
 
+      // Always ensure push completes (no-op if already awaited above)
+      await pushPromise;
       return url;
     },
   );
