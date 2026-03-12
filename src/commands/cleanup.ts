@@ -1,9 +1,9 @@
 import * as vscode from 'vscode';
 import type { ForestContext } from '../context';
+import { getRepoPath } from '../context';
 import type { TreeState } from '../state';
 import { displayName } from '../state';
 import * as git from '../cli/git';
-import { getRepoPath } from '../context';
 import { deleteWorkspaceFiles, runStep, updateLinear } from './shared';
 import { log } from '../logger';
 
@@ -56,7 +56,7 @@ async function teardownTree(ctx: ForestContext, tree: TreeState, opts: TeardownO
       await vscode.commands.executeCommand('workbench.action.closeWindow');
     }
     return true;
-  } catch (e: any) {
+  } catch (e) {
     if (!removedFromState) {
       await clearCleaning().catch(() => {});
     }
@@ -65,9 +65,6 @@ async function teardownTree(ctx: ForestContext, tree: TreeState, opts: TeardownO
     teardownInProgress.delete(key);
   }
 }
-
-const stepList = (...items: (string | false | 0 | '' | null | undefined)[]) =>
-  (items.filter(Boolean) as string[]).map((s, i) => `${i + 1}. ${s}`).join('\n');
 
 /** Cleanup after an already-merged PR — skips merge and confirmation. */
 export async function cleanupMerged(ctx: ForestContext, tree: TreeState): Promise<void> {
@@ -80,7 +77,6 @@ export async function cleanupMerged(ctx: ForestContext, tree: TreeState): Promis
 }
 
 interface DeleteOption extends vscode.QuickPickItem {
-  summary: string;
   deleteLocal: boolean;
   deleteRemote: boolean;
   cancelTicket: boolean;
@@ -90,54 +86,40 @@ export async function deleteTree(ctx: ForestContext, branchArg?: string): Promis
   const tree = requireTree(ctx, branchArg, 'delete');
   if (!tree) return;
 
+  const name = displayName(tree);
   const hasLinear = !!tree.ticketId && ctx.config.linear.enabled;
-  const willClose = ctx.currentTree?.branch === tree.branch;
 
   const options: DeleteOption[] = [
     {
       label: '$(archive) Keep branches',
       detail: 'Remove worktree only' + (hasLinear ? ' · keep branches & ticket' : ''),
-      summary: 'Remove worktree (keep branches)',
       deleteLocal: false, deleteRemote: false, cancelTicket: false,
     },
     {
       label: '$(trash) Delete local branch',
       detail: 'Remove worktree + local branch' + (hasLinear ? ' · keep remote & ticket' : ''),
-      summary: 'Remove worktree + local branch',
       deleteLocal: true, deleteRemote: false, cancelTicket: false,
     },
     {
       label: '$(close-all) Delete branches',
       detail: 'Remove worktree + all branches' + (hasLinear ? ' · keep ticket' : ''),
-      summary: 'Remove worktree + all branches',
       deleteLocal: true, deleteRemote: true, cancelTicket: false,
     },
     ...(hasLinear ? [{
       label: '$(circle-slash) Delete branches · cancel ticket',
       detail: `Remove worktree + all branches · move ${tree.ticketId} → ${ctx.config.linear.statuses.onCancel}`,
-      summary: 'Remove worktree + all branches',
       deleteLocal: true, deleteRemote: true, cancelTicket: true,
     }] : []),
   ];
 
   const picked = await vscode.window.showQuickPick(options, {
-    title: `Delete ${displayName(tree)}`,
+    title: `Delete ${name}`,
     placeHolder: 'Select what to delete',
   });
   if (!picked) return;
 
-  const confirm = await vscode.window.showWarningMessage(
-    `Delete ${displayName(tree)}?\n\n${stepList(
-      picked.summary,
-      picked.cancelTicket && `Move ${tree.ticketId} → ${ctx.config.linear.statuses.onCancel}`,
-      willClose && 'Close this window',
-    )}`,
-    { modal: true }, 'Delete',
-  );
-  if (confirm !== 'Delete') return;
-
   await vscode.window.withProgress(
-    { location: vscode.ProgressLocation.Notification, title: `Deleting ${displayName(tree)}...` },
+    { location: vscode.ProgressLocation.Notification, title: `Deleting ${name}...` },
     async (progress) => {
       progress.report({ message: 'Removing tree...' });
       if (!await teardownTree(ctx, tree, { deleteLocal: picked.deleteLocal, deleteRemote: picked.deleteRemote })) return;
