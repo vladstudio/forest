@@ -47,11 +47,6 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
     this._onDidChange.fire(undefined);
   }
 
-  refreshIssues(): void {
-    this.issueCache.time = 0;
-    this._onDidChange.fire(undefined);
-  }
-
   private getHealth(tree: TreeState): Promise<TreeHealth> {
     const key = `${tree.repoPath}:${tree.branch}`;
     const cached = this.healthCache.get(key);

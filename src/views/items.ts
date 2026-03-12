@@ -30,10 +30,11 @@ export class MainRepoItem extends vscode.TreeItem {
 
 export class StageGroupItem extends vscode.TreeItem {
   contextValue = 'stageGroup';
-  constructor(label: string, count: number, _icon: string, public readonly children: vscode.TreeItem[], collapsed?: boolean) {
+  constructor(label: string, count: number, icon: string, public readonly children: vscode.TreeItem[], collapsed?: boolean) {
     super(label, collapsed ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.Expanded);
     this.id = `group:${label}`;
     this.description = `${count}`;
+    this.iconPath = new vscode.ThemeIcon(icon);
   }
 }
 

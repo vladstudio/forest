@@ -48,7 +48,7 @@ Standard `TreeDataProvider` pattern. `items.ts` defines all TreeItem subclasses 
 File-based logging to `~/.forest/forest.log`. Rotation at 5 MB. Levels: INFO, WARN, ERROR. Lazy init via `initLogger()` (only when `config.logging` is true).
 
 ### Utilities (`src/utils/`)
-- `exec.ts`: Three execution patterns: `exec()` (safe execFile), `execShell()` (user commands), `execStream()` (long-running with output channel streaming). All have timeouts and max buffer limits.
+- `exec.ts`: Two execution patterns: `exec()` (safe execFile), `execShell()` (user commands). Both have timeouts and max buffer limits.
 - `slug.ts`: `slugify()` for branch name generation, `shellEscape()` for safe shell interpolation.
 - `fs.ts`: `repoHash()` for disambiguating repos with the same basename, `tryUnlinkSync()` for safe file deletion.
 

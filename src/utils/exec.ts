@@ -1,11 +1,11 @@
-import { execFile as cpExecFile, exec as cpExec, spawn } from 'child_process';
+import { execFile as cpExecFile, exec as cpExec } from 'child_process';
 import { promisify } from 'util';
 import { log } from '../logger';
 
 const execFileAsync = promisify(cpExecFile);
 const execAsync = promisify(cpExec);
 
-export interface ExecResult { stdout: string; stderr: string; }
+interface ExecResult { stdout: string; stderr: string; }
 
 /** Safe exec using execFile (no shell). Use for CLI tools with known arguments. */
 export async function exec(
@@ -42,46 +42,6 @@ export async function execShell(
     log.error(`execShell failed: ${command} — ${e.message}`);
     throw e;
   }
-}
-
-const MAX_STREAM_BUFFER = 10 * 1024 * 1024; // 10MB, same as exec/execShell
-
-/** Shell exec with real-time output streaming via onData callback. */
-export function execStream(
-  command: string,
-  opts?: { cwd?: string; timeout?: number; onData?: (chunk: string) => void },
-): Promise<ExecResult> {
-  return new Promise((resolve, reject) => {
-    let child: ReturnType<typeof spawn>;
-    try { child = spawn(command, { shell: true, cwd: opts?.cwd }); } catch (e) { return reject(e); }
-    let stdout = '';
-    let stderr = '';
-    let settled = false;
-    const timer = opts?.timeout ? setTimeout(() => { if (!settled) { settled = true; child.kill('SIGKILL'); reject(new Error('Timeout')); } }, opts.timeout) : undefined;
-    child.stdout?.on('data', (data: Buffer) => {
-      const s = data.toString();
-      if (stdout.length < MAX_STREAM_BUFFER) stdout += s;
-      opts?.onData?.(s);
-    });
-    child.stderr?.on('data', (data: Buffer) => {
-      const s = data.toString();
-      if (stderr.length < MAX_STREAM_BUFFER) stderr += s;
-      opts?.onData?.(s);
-    });
-    child.on('close', (code) => {
-      if (timer) clearTimeout(timer);
-      if (settled) return;
-      settled = true;
-      if (code !== 0) reject(new Error(`Command failed (exit ${code}): ${stderr.trim() || stdout.trim()}`));
-      else resolve({ stdout: stdout.trim(), stderr: stderr.trim() });
-    });
-    child.on('error', (e) => {
-      if (timer) clearTimeout(timer);
-      if (settled) return;
-      settled = true;
-      reject(e);
-    });
-  });
 }
 
 export async function commandExists(name: string): Promise<boolean> {

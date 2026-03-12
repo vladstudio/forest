@@ -13,21 +13,6 @@ export async function isAvailable(): Promise<boolean> {
   return _available;
 }
 
-export async function mergePR(
-  worktreePath: string,
-  opts?: { squash?: boolean; deleteBranch?: boolean },
-): Promise<void> {
-  const flags: string[] = [];
-  if (opts?.squash !== false) flags.push('--squash');
-  if (opts?.deleteBranch !== false) flags.push('--delete-branch');
-  try {
-    await exec('gh', ['pr', 'merge', ...flags], { cwd: worktreePath, timeout: 30_000 });
-  } catch (e: any) {
-    if (/already merged/i.test(e.stderr || e.message || '')) return;
-    throw e;
-  }
-}
-
 export async function prStatus(worktreePath: string): Promise<{ state: string; reviewDecision: string | null; number?: number; url?: string } | null> {
   try {
     const { stdout } = await exec('gh', ['pr', 'view', '--json', 'state,reviewDecision,number,url'], { cwd: worktreePath, timeout: 10_000 });

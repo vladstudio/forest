@@ -70,10 +70,6 @@ export async function stash(repoPath: string, message?: string): Promise<string 
   return ref;
 }
 
-export async function stashPop(worktreePath: string): Promise<void> {
-  await exec('git', ['stash', 'pop'], { cwd: worktreePath });
-}
-
 export async function stashPush(repoPath: string, message: string): Promise<void> {
   await exec('git', ['stash', 'push', '-u', '-m', message], { cwd: repoPath });
 }
@@ -127,7 +123,6 @@ async function revListCount(worktreePath: string, range: string): Promise<number
 }
 
 export const commitsBehind = (wt: string, base: string) => revListCount(wt, `HEAD..${base}`);
-export const commitsAhead = (wt: string, base: string) => revListCount(wt, `${base}..HEAD`);
 
 export async function diffFromBase(worktreePath: string, baseRef: string): Promise<string> {
   const { stdout } = await exec('git', ['diff', baseRef + '...HEAD'], { cwd: worktreePath, timeout: 30_000 });
