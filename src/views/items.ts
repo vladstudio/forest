@@ -127,7 +127,7 @@ export class TreeItemView extends vscode.TreeItem {
     } else if (isCurrent) {
       this.iconPath = new vscode.ThemeIcon('arrow-right', new vscode.ThemeColor('charts.green'));
     } else {
-      this.iconPath = new vscode.ThemeIcon('folder');
+      this.iconPath = new vscode.ThemeIcon('symbol-folder');
     }
 
     this.tooltip = [
