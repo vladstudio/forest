@@ -82,12 +82,12 @@ interface DeleteOption extends vscode.QuickPickItem {
   cancelTicket: boolean;
 }
 
-export async function deleteTree(ctx: ForestContext, branchArg?: string): Promise<void> {
+export async function deleteTree(ctx: ForestContext, branchArg?: string, isDone?: boolean): Promise<void> {
   const tree = requireTree(ctx, branchArg, 'delete');
   if (!tree) return;
 
   const name = displayName(tree);
-  const hasLinear = !!tree.ticketId && ctx.config.linear.enabled;
+  const hasLinear = !!tree.ticketId && ctx.config.linear.enabled && !isDone;
 
   const options: DeleteOption[] = [
     {

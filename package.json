@@ -218,6 +218,12 @@
         "icon": "$(link-external)"
       },
       {
+        "command": "forest.openTicket",
+        "title": "View Linear Ticket",
+        "category": "Forest",
+        "icon": "$(link-external)"
+      },
+      {
         "command": "forest.stashPush",
         "title": "Stash Changes",
         "category": "Forest",
@@ -277,7 +283,7 @@
         },
         {
           "command": "forest.ship",
-          "when": "viewItem == tree-progress-current",
+          "when": "viewItem =~ /^tree-progress-current/",
           "group": "2_ship"
         },
         {
@@ -286,8 +292,13 @@
           "group": "2_ship"
         },
         {
+          "command": "forest.openTicket",
+          "when": "viewItem =~ /-ticket/",
+          "group": "2_ship"
+        },
+        {
           "command": "forest.update",
-          "when": "viewItem == tree-progress-current || viewItem == tree-review-current",
+          "when": "viewItem =~ /^tree-progress-current/ || viewItem =~ /^tree-review-current/",
           "group": "3_lifecycle"
         },
         {

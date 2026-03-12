@@ -205,7 +205,8 @@ export async function activate(context: vscode.ExtensionContext) {
     start(ctx, arg instanceof IssueItem ? { ticketId: arg.issue.id, title: arg.issue.title } : arg));
   reg('forest.switch', (arg?: string | TreeItemView) => switchTree(ctx, branchOf(arg)));
   reg('forest.ship', (arg?: TreeItemView) => andRefresh(() => ship(ctx, treeOf(arg)))());
-  reg('forest.deleteTree', (arg?: string | TreeItemView) => deleteTree(ctx, branchOf(arg)));
+  reg('forest.deleteTree', (arg?: string | TreeItemView) =>
+    deleteTree(ctx, branchOf(arg), arg instanceof TreeItemView && /tree-done|tree-closed/.test(arg.contextValue ?? '')));
   reg('forest.update', (arg?: TreeItemView) => andRefresh(() => update(ctx, treeOf(arg)))());
   reg('forest.rebase', (arg?: TreeItemView) => andRefresh(() => rebase(ctx, treeOf(arg)))());
   reg('forest.list', () => list(ctx));
@@ -222,6 +223,12 @@ export async function activate(context: vscode.ExtensionContext) {
   reg('forest.openPR', (arg?: TreeItemView) => {
     const tree = treeOf(arg) ?? ctx.currentTree;
     if (tree?.prUrl) vscode.env.openExternal(vscode.Uri.parse(tree.prUrl));
+  });
+  reg('forest.openTicket', async (arg?: TreeItemView) => {
+    const tree = treeOf(arg) ?? ctx.currentTree;
+    if (!tree?.ticketId) return;
+    const issue = await linear.getIssue(tree.ticketId);
+    if (issue?.url) vscode.env.openExternal(vscode.Uri.parse(issue.url));
   });
   const unwrap = (arg: any) => arg instanceof ShortcutItem ? arg.shortcut : arg;
   reg('forest.openShortcut', (arg: any) => shortcutManager.open(unwrap(arg)));

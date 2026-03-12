@@ -139,7 +139,8 @@ export class TreeItemView extends vscode.TreeItem {
     ].filter(Boolean).join('\n');
 
     // Suffix gates mutating menu items (update/ship/delete) to the owning window only
-    this.contextValue = isCurrent ? `${ctx}-current` : ctx;
+    const base = isCurrent ? `${ctx}-current` : ctx;
+    this.contextValue = tree.ticketId ? `${base}-ticket` : base;
 
     if (!isCurrent && tree.path && ctx !== 'tree-cleaning') {
       this.command = { command: 'forest.switch', title: 'Switch', arguments: [tree.branch] };
