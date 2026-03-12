@@ -367,7 +367,7 @@
         {
           "command": "forest.stashDrop",
           "when": "false"
-        },
+        }
       ]
     },
     "keybindings": []
