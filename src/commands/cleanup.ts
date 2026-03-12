@@ -90,10 +90,15 @@ export async function deleteTree(ctx: ForestContext, branchArg?: string, isDone?
   const hasLinear = !!tree.ticketId && ctx.config.linear.enabled && !isDone;
 
   const options: DeleteOption[] = [
+    ...(hasLinear ? [{
+      label: '$(circle-slash) Delete branches · cancel ticket',
+      detail: `Remove worktree + all branches · move ${tree.ticketId} → ${ctx.config.linear.statuses.onCancel}`,
+      deleteLocal: true, deleteRemote: true, cancelTicket: true,
+    }] : []),
     {
-      label: '$(archive) Keep branches',
-      detail: 'Remove worktree only' + (hasLinear ? ' · keep branches & ticket' : ''),
-      deleteLocal: false, deleteRemote: false, cancelTicket: false,
+      label: '$(close-all) Delete branches',
+      detail: 'Remove worktree + all branches' + (hasLinear ? ' · keep ticket' : ''),
+      deleteLocal: true, deleteRemote: true, cancelTicket: false,
     },
     {
       label: '$(trash) Delete local branch',
@@ -101,15 +106,10 @@ export async function deleteTree(ctx: ForestContext, branchArg?: string, isDone?
       deleteLocal: true, deleteRemote: false, cancelTicket: false,
     },
     {
-      label: '$(close-all) Delete branches',
-      detail: 'Remove worktree + all branches' + (hasLinear ? ' · keep ticket' : ''),
-      deleteLocal: true, deleteRemote: true, cancelTicket: false,
+      label: '$(archive) Keep branches',
+      detail: 'Remove worktree only' + (hasLinear ? ' · keep branches & ticket' : ''),
+      deleteLocal: false, deleteRemote: false, cancelTicket: false,
     },
-    ...(hasLinear ? [{
-      label: '$(circle-slash) Delete branches · cancel ticket',
-      detail: `Remove worktree + all branches · move ${tree.ticketId} → ${ctx.config.linear.statuses.onCancel}`,
-      deleteLocal: true, deleteRemote: true, cancelTicket: true,
-    }] : []),
   ];
 
   const picked = await vscode.window.showQuickPick(options, {
