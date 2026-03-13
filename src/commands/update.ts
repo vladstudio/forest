@@ -40,3 +40,41 @@ async function syncTree(ctx: ForestContext, treeArg: TreeState | undefined, mode
 
 export const update = (ctx: ForestContext, treeArg?: TreeState) => syncTree(ctx, treeArg, 'merge');
 export const rebase = (ctx: ForestContext, treeArg?: TreeState) => syncTree(ctx, treeArg, 'rebase');
+
+export async function pull(ctx: ForestContext, treeArg?: TreeState): Promise<void> {
+  const tree = treeArg || ctx.currentTree;
+  if (!tree) { vscode.window.showErrorMessage('Pull must be run from a tree window.'); return; }
+  if (!tree.path) { vscode.window.showErrorMessage('Cannot pull: tree has no worktree path.'); return; }
+
+  await vscode.window.withProgress(
+    { location: vscode.ProgressLocation.Notification, title: `Pulling ${displayName(tree)}...` },
+    async () => {
+      try {
+        await git.pull(tree.path!);
+      } catch (e: any) {
+        vscode.window.showErrorMessage(`Pull failed: ${e.message}`);
+        return;
+      }
+      showTimedNotification('Pulled.');
+    },
+  );
+}
+
+export async function push(ctx: ForestContext, treeArg?: TreeState): Promise<void> {
+  const tree = treeArg || ctx.currentTree;
+  if (!tree) { vscode.window.showErrorMessage('Push must be run from a tree window.'); return; }
+  if (!tree.path) { vscode.window.showErrorMessage('Cannot push: tree has no worktree path.'); return; }
+
+  await vscode.window.withProgress(
+    { location: vscode.ProgressLocation.Notification, title: `Pushing ${displayName(tree)}...` },
+    async () => {
+      try {
+        await git.pushBranch(tree.path!, tree.branch);
+      } catch (e: any) {
+        vscode.window.showErrorMessage(`Push failed: ${e.message}`);
+        return;
+      }
+      showTimedNotification('Pushed.');
+    },
+  );
+}

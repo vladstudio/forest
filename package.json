@@ -158,6 +158,18 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "forest.pull",
+        "title": "Pull",
+        "category": "Forest",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "forest.push",
+        "title": "Push",
+        "category": "Forest",
+        "icon": "$(cloud-upload)"
+      },
+      {
         "command": "forest.list",
         "title": "List All Trees",
         "category": "Forest",
@@ -298,6 +310,16 @@
         },
         {
           "command": "forest.update",
+          "when": "viewItem =~ /^tree-progress-current/ || viewItem =~ /^tree-review-current/",
+          "group": "3_lifecycle"
+        },
+        {
+          "command": "forest.pull",
+          "when": "viewItem =~ /^tree-progress-current/ || viewItem =~ /^tree-review-current/",
+          "group": "3_lifecycle"
+        },
+        {
+          "command": "forest.push",
           "when": "viewItem =~ /^tree-progress-current/ || viewItem =~ /^tree-review-current/",
           "group": "3_lifecycle"
         },

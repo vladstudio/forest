@@ -51,6 +51,11 @@ export async function pushBranch(worktreePath: string, branch: string): Promise<
   await exec('git', ['push', '-u', 'origin', branch], { cwd: worktreePath });
 }
 
+export async function pull(worktreePath: string): Promise<void> {
+  log.info(`pull: ${worktreePath}`);
+  await exec('git', ['pull'], { cwd: worktreePath, timeout: 60_000 });
+}
+
 export async function pullMerge(worktreePath: string, baseRef: string): Promise<void> {
   await exec('git', ['fetch', 'origin'], { cwd: worktreePath });
   await exec('git', ['merge', baseRef], { cwd: worktreePath, timeout: 60_000 });

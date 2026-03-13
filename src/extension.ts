@@ -15,7 +15,7 @@ import { create, start } from './commands/create';
 import { switchTree } from './commands/switch';
 import { ship } from './commands/ship';
 import { cleanupMerged, deleteTree } from './commands/cleanup';
-import { update, rebase } from './commands/update';
+import { update, rebase, pull, push } from './commands/update';
 import { list } from './commands/list';
 import { deleteWorkspaceFiles } from './commands/shared';
 import * as git from './cli/git';
@@ -209,6 +209,8 @@ export async function activate(context: vscode.ExtensionContext) {
     deleteTree(ctx, branchOf(arg), arg instanceof TreeItemView && /tree-done|tree-closed/.test(arg.contextValue ?? '')));
   reg('forest.update', (arg?: TreeItemView) => andRefresh(() => update(ctx, treeOf(arg)))());
   reg('forest.rebase', (arg?: TreeItemView) => andRefresh(() => rebase(ctx, treeOf(arg)))());
+  reg('forest.pull', (arg?: TreeItemView) => andRefresh(() => pull(ctx, treeOf(arg)))());
+  reg('forest.push', (arg?: TreeItemView) => andRefresh(() => push(ctx, treeOf(arg)))());
   reg('forest.list', () => list(ctx));
   reg('forest.openMain', () => vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(repoPath), { forceNewWindow: true }));
   reg('forest.refresh', () => forestProvider.refresh());
