@@ -7,7 +7,7 @@ import { resolveMainRepo } from './context';
 
 interface ShortcutBase { name: string; onNewTree?: boolean; }
 interface TerminalShortcut extends ShortcutBase { type: 'terminal'; command?: string; env?: Record<string, string>; }
-interface BrowserShortcut extends ShortcutBase { type: 'browser'; url: string; browser?: 'simple' | 'external' | string; }
+interface BrowserShortcut extends ShortcutBase { type: 'browser'; url: string; browser?: 'integrated' | 'external' | string; }
 interface FileShortcut extends ShortcutBase { type: 'file'; path: string; }
 export type ShortcutConfig = TerminalShortcut | BrowserShortcut | FileShortcut;
 
@@ -48,7 +48,7 @@ const DEFAULTS: Partial<ForestConfig> = {
   branchFormat: '${ticketId}-${slug}',
   baseBranch: 'main',
   maxTrees: 10,
-  browser: ['simple'],
+  browser: ['integrated'],
   terminal: ['integrated'],
   logging: true,
 };

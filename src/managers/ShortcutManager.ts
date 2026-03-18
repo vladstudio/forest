@@ -145,7 +145,7 @@ export class ShortcutManager {
   private async openUrl(url: string, browser: string, viewColumn?: vscode.ViewColumn): Promise<void> {
     if (browser === 'external') {
       vscode.env.openExternal(vscode.Uri.parse(url));
-    } else if (browser === 'simple') {
+    } else if (browser === 'integrated') {
       try {
         await vscode.commands.executeCommand('simpleBrowser.api.open', vscode.Uri.parse(url), {
           viewColumn: viewColumn ?? vscode.ViewColumn.Beside, preserveFocus: true,
