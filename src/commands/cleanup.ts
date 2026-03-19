@@ -41,12 +41,8 @@ async function teardownTree(ctx: ForestContext, tree: TreeState, opts: TeardownO
       }
     }
     if (opts.deleteLocal) {
-      const deleted = await runStep(ctx, 'Delete branch', () => git.deleteBranch(tree.repoPath, tree.branch, { skipRemote: !opts.deleteRemote }));
-      if (!deleted) {
-        // Branch deletion is destructive too; don't forget the tree on partial failure.
-        await clearCleaning();
-        return false;
-      }
+      // Non-fatal: worktree is already gone so always clean up state regardless
+      await runStep(ctx, 'Delete branch', () => git.deleteBranch(tree.repoPath, tree.branch, { skipRemote: !opts.deleteRemote }));
     }
     await ctx.stateManager.removeTree(tree.repoPath, tree.branch);
     removedFromState = true;

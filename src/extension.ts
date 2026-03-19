@@ -82,13 +82,17 @@ export async function activate(context: vscode.ExtensionContext) {
     new vscode.RelativePattern(path.join(repoPath, '.forest'), '{config,local}.json'),
   );
   let configDebounce: ReturnType<typeof setTimeout> | undefined;
+  let configNotificationVisible = false;
   const onConfigChange = () => {
     clearTimeout(configDebounce);
     configDebounce = setTimeout(() => {
+      if (configNotificationVisible) return;
+      configNotificationVisible = true;
       vscode.window.showInformationMessage(
         'Forest config changed. Reload to apply?',
         'Reload Window',
       ).then(action => {
+        configNotificationVisible = false;
         if (action === 'Reload Window') vscode.commands.executeCommand('workbench.action.reloadWindow');
       });
     }, 500);

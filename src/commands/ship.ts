@@ -39,7 +39,7 @@ export async function ship(ctx: ForestContext, treeArg?: import('../state').Tree
     if (hasAutomerge) {
       const pick = await vscode.window.showQuickPick(
         ['Create PR + Automerge', 'Create PR'],
-        { placeHolder: 'Ship — Create PR...' },
+        { placeHolder: 'Ship — Push & Create PR...' },
       );
       if (!pick) return;
       automerge = pick === 'Create PR + Automerge';
