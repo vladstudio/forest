@@ -77,7 +77,7 @@ async function postWorktreeSetup(config: ForestConfig, repoPath: string, treePat
 }
 
 /** Sanitize branch name for use as filename. */
-function sanitizeBranch(branch: string): string {
+function sanitizeBranchForPath(branch: string): string {
   return branch
     .replace(/\.\./g, '')
     .replace(/\//g, '--')
@@ -87,7 +87,7 @@ function sanitizeBranch(branch: string): string {
 function resolveTreePath(repoPath: string, branch: string, ticketId?: string): string {
   const treesDir = getTreesDir(repoPath);
   fs.mkdirSync(treesDir, { recursive: true });
-  return path.join(treesDir, ticketId ?? sanitizeBranch(branch));
+  return path.join(treesDir, ticketId ?? sanitizeBranchForPath(branch));
 }
 
 async function checkMaxTrees(stateManager: StateManager, repoPath: string, max: number): Promise<void> {
@@ -190,12 +190,12 @@ export async function createTree(opts: {
 export function workspaceFilePath(tree: Pick<TreeState, 'repoPath' | 'branch' | 'ticketId'>): string {
   // Include repo identity so identical branch/ticket names across repos do not collide.
   const repoName = path.basename(tree.repoPath);
-  const fileName = `${repoName}-${repoHash(tree.repoPath)}-${tree.ticketId ?? sanitizeBranch(tree.branch)}.code-workspace`;
+  const fileName = `${repoName}-${repoHash(tree.repoPath)}-${tree.ticketId ?? sanitizeBranchForPath(tree.branch)}.code-workspace`;
   return path.join(os.homedir(), '.forest', 'workspaces', fileName);
 }
 
 function legacyWorkspaceFilePath(tree: Pick<TreeState, 'branch' | 'ticketId'>): string {
-  return path.join(os.homedir(), '.forest', 'workspaces', `${tree.ticketId ?? sanitizeBranch(tree.branch)}.code-workspace`);
+  return path.join(os.homedir(), '.forest', 'workspaces', `${tree.ticketId ?? sanitizeBranchForPath(tree.branch)}.code-workspace`);
 }
 
 export function deleteWorkspaceFiles(tree: Pick<TreeState, 'repoPath' | 'branch' | 'ticketId'>): void {

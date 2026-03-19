@@ -236,6 +236,12 @@
         "icon": "$(link-external)"
       },
       {
+        "command": "forest.linkTicket",
+        "title": "Attach Linear Ticket…",
+        "category": "Forest",
+        "icon": "$(link)"
+      },
+      {
         "command": "forest.stashPush",
         "title": "Stash Changes",
         "category": "Forest",
@@ -296,6 +302,11 @@
         {
           "command": "forest.openTicket",
           "when": "viewItem =~ /-ticket/",
+          "group": "1_navigation"
+        },
+        {
+          "command": "forest.linkTicket",
+          "when": "viewItem =~ /^tree-(progress|review|done|closed)/ && !(viewItem =~ /-ticket/) && forest.linearEnabled",
           "group": "1_navigation"
         },
         {
@@ -387,6 +398,10 @@
         },
         {
           "command": "forest.revealInFinder",
+          "when": "false"
+        },
+        {
+          "command": "forest.linkTicket",
           "when": "false"
         },
         {

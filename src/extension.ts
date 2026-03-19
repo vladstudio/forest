@@ -12,6 +12,7 @@ import { ForestTreeProvider } from './views/ForestTreeProvider';
 import { ShortcutsTreeProvider } from './views/ShortcutsTreeProvider';
 import { StashesTreeProvider } from './views/StashesTreeProvider';
 import { create, start } from './commands/create';
+import { linkTicket } from './commands/linkTicket';
 import { switchTree } from './commands/switch';
 import { ship } from './commands/ship';
 import { cleanupMerged, deleteTree } from './commands/cleanup';
@@ -236,6 +237,10 @@ export async function activate(context: vscode.ExtensionContext) {
     const issue = await linear.getIssue(tree.ticketId);
     if (issue?.url) vscode.env.openExternal(vscode.Uri.parse(issue.url));
   });
+  reg('forest.linkTicket', (arg?: TreeItemView) => andRefresh(async () => {
+    const branch = branchOf(arg);
+    if (branch) await linkTicket(ctx, branch);
+  })());
   const unwrap = (arg: any) => arg instanceof ShortcutItem ? arg.shortcut : arg;
   reg('forest.openShortcut', (arg: any) => shortcutManager.open(unwrap(arg)));
   reg('forest.openShortcutWith', (arg: any) => shortcutManager.openWith(unwrap(arg)));
@@ -329,7 +334,7 @@ export async function activate(context: vscode.ExtensionContext) {
     statusBarManager.show();
     if (currentTree.needsSetup) {
       shortcutManager.openNewTreeShortcuts();
-      stateManager.updateTree(repoPath, currentTree.branch, { needsSetup: undefined });
+      await stateManager.updateTree(repoPath, currentTree.branch, { needsSetup: undefined });
     }
     vscode.commands.executeCommand('forest.trees.focus');
   }
@@ -383,7 +388,7 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push({ dispose: () => clearInterval(healthId) });
 
   // Watch state for changes from other windows
-  let previousTrees = stateManager.getTreesForRepo(stateManager.loadSync(), repoPath);
+  let previousTrees = stateManager.getTreesForRepo(postPruneState, repoPath);
   stateManager.onDidChange(({ state: newState, isLocal }) => {
     if (ctx.currentTree) {
       const updated = stateManager.getTree(newState, repoPath, ctx.currentTree.branch);

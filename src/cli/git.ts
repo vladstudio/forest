@@ -70,7 +70,7 @@ export async function stash(repoPath: string, message?: string): Promise<string 
   await exec('git', ['stash', 'push', '-u', ...(message ? ['-m', message] : [])], { cwd: repoPath });
   if (!message) return;
   const { stdout } = await exec('git', ['stash', 'list', '--format=%gd%x00%gs'], { cwd: repoPath });
-  const ref = stdout.split('\n').map(line => line.split('\0')).find(([, m]) => m === message)?.[0];
+  const ref = stdout.split('\n').map(line => line.split('\0')).find(([, m]) => m?.replace(/^On [^:]+:\s*/, '') === message)?.[0];
   if (!ref) throw new Error('Could not find created stash');
   return ref;
 }

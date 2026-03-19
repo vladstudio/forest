@@ -261,7 +261,7 @@ async function createFromExistingBranch(ctx: ForestContext): Promise<void> {
   }
 }
 
-async function pickIssue(ctx: ForestContext): Promise<{ ticketId: string; title: string } | null | undefined> {
+export async function pickIssue(ctx: ForestContext): Promise<{ ticketId: string; title: string } | null | undefined> {
   const issues = await linear.listMyIssues(ctx.config.linear.statuses.issueList, ctx.config.linear.teams);
   const state = await ctx.stateManager.load();
   const existingTickets = new Set(
@@ -280,7 +280,7 @@ async function pickIssue(ctx: ForestContext): Promise<{ ticketId: string; title:
   return { ticketId: pick.issueId, title: pick.issueTitle };
 }
 
-async function createIssue(ctx: ForestContext): Promise<{ ticketId: string; title: string } | null> {
+export async function createIssue(ctx: ForestContext): Promise<{ ticketId: string; title: string } | null> {
   const config = ctx.config;
   const issueTitle = await vscode.window.showInputBox({ prompt: 'Issue title', placeHolder: '' });
   if (!issueTitle) return null;
