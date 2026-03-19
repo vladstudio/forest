@@ -80,10 +80,7 @@ export class ShortcutManager {
 
   /** Open shortcuts marked with onNewTree. */
   async openNewTreeShortcuts(): Promise<void> {
-    for (const sc of this.config.shortcuts) {
-      if (!sc.onNewTree) continue;
-      await this.open(sc);
-    }
+    await Promise.all(this.config.shortcuts.filter(s => s.onNewTree).map(s => this.open(s)));
   }
 
   private async openTerminal(sc: ShortcutConfig & { type: 'terminal' }, location?: vscode.ViewColumn, terminalApp?: string): Promise<void> {

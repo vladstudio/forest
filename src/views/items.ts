@@ -4,6 +4,7 @@ import type { LinearIssue } from '../cli/linear';
 import type { TreeState } from '../state';
 import type { ShortcutConfig } from '../config';
 import { displayName } from '../state';
+import { shortBaseBranch } from '../utils/slug';
 import type { TreeHealth } from './ForestTreeProvider';
 
 export class NoTreesItem extends vscode.TreeItem {
@@ -18,7 +19,7 @@ export class NoTreesItem extends vscode.TreeItem {
 export class MainRepoItem extends vscode.TreeItem {
   contextValue = 'mainRepo';
   constructor(repoPath: string, baseBranch: string, isCurrent?: boolean) {
-    const branch = baseBranch.replace(/^origin\//, '');
+    const branch = shortBaseBranch(baseBranch);
     super(branch, vscode.TreeItemCollapsibleState.None);
     this.description = path.basename(repoPath);
     this.iconPath = isCurrent
@@ -97,6 +98,8 @@ function abbreviateAge(age: string): string {
 export type TreeContext = 'tree-progress' | 'tree-review' | 'tree-done' | 'tree-closed' | 'tree-cleaning';
 
 export class TreeItemView extends vscode.TreeItem {
+  readonly isDoneOrClosed: boolean;
+
   constructor(
     public readonly tree: TreeState,
     isCurrent: boolean,
@@ -142,6 +145,7 @@ export class TreeItemView extends vscode.TreeItem {
     // Suffix gates mutating menu items (update/ship/delete) to the owning window only
     const base = isCurrent ? `${ctx}-current` : ctx;
     this.contextValue = tree.ticketId ? `${base}-ticket` : base;
+    this.isDoneOrClosed = ctx === 'tree-done' || ctx === 'tree-closed';
 
     if (!isCurrent && tree.path && ctx !== 'tree-cleaning') {
       this.command = { command: 'forest.switch', title: 'Switch', arguments: [tree.branch] };

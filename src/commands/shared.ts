@@ -13,6 +13,31 @@ import { execShell } from '../utils/exec';
 import { getRepoPath } from '../context';
 import { log } from '../logger';
 
+/** Resolve tree from arg or current context, showing an error if not found or missing path. */
+export function requireTree(ctx: ForestContext, arg: TreeState | string | undefined, action: string): (TreeState & { path: string }) | undefined {
+  const tree = typeof arg === 'string'
+    ? ctx.stateManager.getTree(ctx.stateManager.loadSync(), getRepoPath(), arg)
+    : arg ?? ctx.currentTree;
+  if (!tree) { vscode.window.showErrorMessage(`No tree to ${action}. Run from a tree window or select from sidebar.`); return undefined; }
+  if (!tree.path) { vscode.window.showErrorMessage(`Cannot ${action}: tree has no worktree path.`); return undefined; }
+  return tree as TreeState & { path: string };
+}
+
+/** Filter out issues that already have trees in the given repo. */
+export function filterUnlinkedIssues<T extends { id: string }>(
+  issues: T[],
+  stateManager: StateManager,
+  state: import('../state').ForestState,
+  repoPath: string,
+): T[] {
+  const existingTickets = new Set(
+    stateManager.getTreesForRepo(state, repoPath)
+      .filter(t => t.ticketId)
+      .map(t => t.ticketId),
+  );
+  return issues.filter(i => !existingTickets.has(i.id));
+}
+
 /** Run an async step, log to output channel, show error notification on failure. */
 export async function runStep(ctx: ForestContext, label: string, fn: () => Promise<void>): Promise<boolean> {
   try {
@@ -54,9 +79,11 @@ export function copyConfigFiles(config: ForestConfig, repoPath: string, treePath
   for (const file of config.copy) {
     const src = path.join(repoPath, file);
     const dst = path.join(treePath, file);
-    if (fs.existsSync(src)) {
+    try {
       fs.mkdirSync(path.dirname(dst), { recursive: true });
       fs.copyFileSync(src, dst);
+    } catch (e: any) {
+      if (e.code !== 'ENOENT') throw e;
     }
   }
 }
@@ -90,8 +117,7 @@ function resolveTreePath(repoPath: string, branch: string, ticketId?: string): s
   return path.join(treesDir, ticketId ?? sanitizeBranchForPath(branch));
 }
 
-async function checkMaxTrees(stateManager: StateManager, repoPath: string, max: number): Promise<void> {
-  const state = await stateManager.load();
+function checkMaxTrees(stateManager: StateManager, state: import('../state').ForestState, repoPath: string, max: number): void {
   const active = stateManager.getTreesForRepo(state, repoPath).filter(t => t.path);
   if (active.length >= max) throw new Error(`Max trees (${max}) reached. Clean up some trees first.`);
 }
@@ -133,7 +159,7 @@ export async function createTree(opts: {
       throw new Error(`Tree for branch "${branch}" already exists`);
     }
 
-    await checkMaxTrees(stateManager, repoPath, config.maxTrees);
+    checkMaxTrees(stateManager, state, repoPath, config.maxTrees);
     const treePath = resolveTreePath(repoPath, branch, ticketId);
 
     const hasNewTreeShortcuts = config.shortcuts.some(s => s.onNewTree);

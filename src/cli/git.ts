@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { exec } from '../utils/exec';
+import { shortBaseBranch } from '../utils/slug';
 import { log } from '../logger';
 
 const stashRef = (ref: number | string) => typeof ref === 'number' ? `stash@{${ref}}` : ref;
@@ -11,7 +12,7 @@ export async function createWorktree(
 ): Promise<void> {
   log.info(`createWorktree: ${branch} at ${worktreePath} (base: ${baseRef})`);
   await Promise.all([
-    exec('git', ['fetch', 'origin', baseRef.replace(/^origin\//, '')], { cwd: repoPath }),
+    exec('git', ['fetch', 'origin', shortBaseBranch(baseRef)], { cwd: repoPath }),
     exec('git', ['worktree', 'prune'], { cwd: repoPath }),
   ]);
   await exec('git', ['-c', 'checkout.workers=0', 'worktree', 'add', worktreePath, '-b', branch, baseRef], { cwd: repoPath });
@@ -66,9 +67,8 @@ export async function pullRebase(worktreePath: string, baseRef: string): Promise
   await exec('git', ['rebase', baseRef], { cwd: worktreePath, timeout: 60_000 });
 }
 
-export async function stash(repoPath: string, message?: string): Promise<string | undefined> {
-  await exec('git', ['stash', 'push', '-u', ...(message ? ['-m', message] : [])], { cwd: repoPath });
-  if (!message) return;
+export async function stash(repoPath: string, message: string): Promise<string> {
+  await exec('git', ['stash', 'push', '-u', '-m', message], { cwd: repoPath });
   const { stdout } = await exec('git', ['stash', 'list', '--format=%gd%x00%gs'], { cwd: repoPath });
   const ref = stdout.split('\n').map(line => line.split('\0')).find(([, m]) => m?.replace(/^On [^:]+:\s*/, '') === message)?.[0];
   if (!ref) throw new Error('Could not find created stash');
@@ -164,8 +164,13 @@ export async function checkoutWorktree(
 export async function listBranches(repoPath: string, baseBranch: string): Promise<string[]> {
   await exec('git', ['fetch', 'origin'], { cwd: repoPath });
 
+  const [{ stdout: wtOut }, { stdout: localOut }, { stdout: remoteOut }] = await Promise.all([
+    exec('git', ['worktree', 'list', '--porcelain'], { cwd: repoPath }),
+    exec('git', ['branch', '--format=%(refname:short)'], { cwd: repoPath }),
+    exec('git', ['for-each-ref', '--format=%(refname:short)', 'refs/remotes/origin/'], { cwd: repoPath }),
+  ]);
+
   // Get branches checked out in non-main worktrees (main repo's branch is okay — we'll detach it)
-  const { stdout: wtOut } = await exec('git', ['worktree', 'list', '--porcelain'], { cwd: repoPath });
   const wtBranches = new Set<string>();
   let wtIndex = 0; // first entry (index 0) is always the main worktree
   for (const line of wtOut.split('\n')) {
@@ -174,21 +179,14 @@ export async function listBranches(repoPath: string, baseBranch: string): Promis
   }
 
   // Local branches
-  const { stdout: localOut } = await exec('git', ['branch', '--format=%(refname:short)'], { cwd: repoPath });
   const allBranches = new Set(localOut.split('\n').map(b => b.trim()).filter(Boolean));
-
-  // Remote branches not already local
-  const { stdout: remoteOut } = await exec('git', [
-    'for-each-ref', '--format=%(refname:short)', 'refs/remotes/origin/',
-  ], { cwd: repoPath });
   for (const line of remoteOut.split('\n').filter(Boolean)) {
     if (line === 'origin/HEAD') continue;
     const name = line.replace('origin/', '');
     if (!allBranches.has(name)) allBranches.add(name);
   }
 
-  // Strip "origin/" from baseBranch for comparison
-  const base = baseBranch.replace(/^origin\//, '');
+  const base = shortBaseBranch(baseBranch);
   return [...allBranches]
     .filter(b => b !== base && !wtBranches.has(b))
     .sort();

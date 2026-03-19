@@ -14,15 +14,15 @@ export async function switchTree(ctx: ForestContext, branchArg?: string): Promis
   if (!branch) {
     const trees = ctx.stateManager.getTreesForRepo(state, getRepoPath()).filter(t => t.path);
     if (!trees.length) { vscode.window.showInformationMessage('No trees to switch to.'); return; }
-    const pick = await vscode.window.showQuickPick(
+    const pick = await vscode.window.showQuickPick<vscode.QuickPickItem & { id: string }>(
       trees.map(t => ({ label: displayName(t), description: t.branch, id: t.branch })),
       { placeHolder: 'Select a tree' },
-    ) as any;
+    );
     if (!pick) return;
     branch = pick.id;
   }
 
-  const tree = ctx.stateManager.getTree(await ctx.stateManager.load(), getRepoPath(), branch!);
+  const tree = ctx.stateManager.getTree(state, getRepoPath(), branch!);
   if (!tree) { vscode.window.showErrorMessage(`Tree for branch "${branch}" not found.`); return; }
   if (!tree.path) { vscode.window.showErrorMessage('Tree has no worktree path.'); return; }
 

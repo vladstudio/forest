@@ -22,6 +22,7 @@ import { deleteWorkspaceFiles } from './commands/shared';
 import * as git from './cli/git';
 import * as gh from './cli/gh';
 import * as linear from './cli/linear';
+import { shortBaseBranch } from './utils/slug';
 import { initLogger, log } from './logger';
 
 const emptyProvider: vscode.TreeDataProvider<never> = {
@@ -149,7 +150,40 @@ export async function activate(context: vscode.ExtensionContext) {
     return stateManager.load();
   };
 
-  const postPruneState = await pruneOrphans();
+  /** Recover worktrees that exist on disk but are missing from state. */
+  const recoverOrphanWorktrees = async (state: import('./state').ForestState): Promise<import('./state').ForestState> => {
+    const treesDir = getTreesDir(repoPath);
+    if (!fs.existsSync(treesDir)) return state;
+    const knownPaths = new Set(
+      stateManager.getTreesForRepo(state, repoPath).map(t => t.path).filter(Boolean),
+    );
+    for (const entry of fs.readdirSync(treesDir)) {
+      if (entry.startsWith('.')) continue;
+      const dirPath = path.join(treesDir, entry);
+      if (!fs.statSync(dirPath).isDirectory()) continue;
+      if (knownPaths.has(dirPath)) continue;
+      // Check if it's a valid git worktree
+      const gitFile = path.join(dirPath, '.git');
+      if (!fs.existsSync(gitFile)) continue;
+      try {
+        // Read branch from git worktree HEAD
+        const gitContent = fs.readFileSync(gitFile, 'utf8').trim();
+        const gitdir = path.resolve(dirPath, gitContent.replace('gitdir: ', ''));
+        const head = fs.readFileSync(path.join(gitdir, 'HEAD'), 'utf8').trim();
+        const branch = head.startsWith('ref: refs/heads/') ? head.replace('ref: refs/heads/', '') : '';
+        if (!branch) continue;
+        log.warn(`Recovering orphan worktree: ${branch} at ${dirPath}`);
+        outputChannel.appendLine(`[Forest] Recovered orphan worktree: ${branch} at ${dirPath}`);
+        await stateManager.addTree(repoPath, {
+          branch, repoPath, path: dirPath,
+          createdAt: new Date(fs.statSync(dirPath).birthtimeMs).toISOString(),
+        });
+      } catch { /* not a valid worktree, skip */ }
+    }
+    return stateManager.load();
+  };
+
+  const postPruneState = await recoverOrphanWorktrees(await pruneOrphans());
 
   // Detect if current workspace is a tree (reuse state after pruning)
   const curPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -211,7 +245,7 @@ export async function activate(context: vscode.ExtensionContext) {
   reg('forest.switch', (arg?: string | TreeItemView) => switchTree(ctx, branchOf(arg)));
   reg('forest.ship', (arg?: TreeItemView) => andRefresh(() => ship(ctx, treeOf(arg)))());
   reg('forest.deleteTree', (arg?: string | TreeItemView) =>
-    deleteTree(ctx, branchOf(arg), arg instanceof TreeItemView && /tree-done|tree-closed/.test(arg.contextValue ?? '')));
+    deleteTree(ctx, branchOf(arg), arg instanceof TreeItemView && arg.isDoneOrClosed));
   reg('forest.update', (arg?: TreeItemView) => andRefresh(() => update(ctx, treeOf(arg)))());
   reg('forest.rebase', (arg?: TreeItemView) => andRefresh(() => rebase(ctx, treeOf(arg)))());
   reg('forest.pull', (arg?: TreeItemView) => andRefresh(() => pull(ctx, treeOf(arg)))());
@@ -237,10 +271,10 @@ export async function activate(context: vscode.ExtensionContext) {
     const issue = await linear.getIssue(tree.ticketId);
     if (issue?.url) vscode.env.openExternal(vscode.Uri.parse(issue.url));
   });
-  reg('forest.linkTicket', (arg?: TreeItemView) => andRefresh(async () => {
+  reg('forest.linkTicket', (arg?: TreeItemView) => {
     const branch = branchOf(arg);
-    if (branch) await linkTicket(ctx, branch);
-  })());
+    if (branch) return andRefresh(() => linkTicket(ctx, branch))();
+  });
   const unwrap = (arg: any) => arg instanceof ShortcutItem ? arg.shortcut : arg;
   reg('forest.openShortcut', (arg: any) => shortcutManager.open(unwrap(arg)));
   reg('forest.openShortcutWith', (arg: any) => shortcutManager.openWith(unwrap(arg)));
@@ -264,7 +298,7 @@ export async function activate(context: vscode.ExtensionContext) {
       vscode.window.showInformationMessage('No uncommitted changes to stash.');
       return;
     }
-    const branch = ctx.currentTree?.branch ?? config.baseBranch.replace(/^origin\//, '');
+    const branch = ctx.currentTree?.branch ?? shortBaseBranch(config.baseBranch);
     const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
     await git.stashPush(wsPath, `${branch} @ ${time}`);
     stashesProvider.refresh();
@@ -356,22 +390,27 @@ export async function activate(context: vscode.ExtensionContext) {
     if (!(await gh.isAvailable())) return;
     const s = await stateManager.load();
     const trees = stateManager.getTreesForRepo(s, repoPath);
-    for (const tree of trees) {
-      if (!tree.prUrl || !tree.path || tree.mergeNotified) continue;
+    const candidates = trees.filter(tree => {
+      if (!tree.prUrl || !tree.path || tree.mergeNotified) return false;
+      return ctx.currentTree?.branch === tree.branch || !ctx.currentTree;
+    });
+    if (!candidates.length) return;
+    const mergedResults = await Promise.allSettled(
+      candidates.map(tree => gh.prIsMerged(tree.repoPath, tree.branch).then(merged => ({ tree, merged }))),
+    );
+    for (const result of mergedResults) {
+      if (result.status !== 'fulfilled' || !result.value.merged) continue;
+      const tree = result.value.tree;
       const isOwnWindow = ctx.currentTree?.branch === tree.branch;
-      const isMainWindow = !ctx.currentTree;
-      if (!isOwnWindow && !isMainWindow) continue;
-      if (await gh.prIsMerged(tree.repoPath, tree.branch)) {
-        log.info(`PR merged detected: ${tree.branch}`);
-        await stateManager.updateTree(tree.repoPath, tree.branch, { mergeNotified: true });
-        const name = tree.ticketId ?? tree.branch;
-        const detail = [tree.ticketId && config.linear.enabled && `move ${tree.ticketId} → ${config.linear.statuses.onCleanup}`, 'remove worktree + branch', isOwnWindow && 'close window'].filter(Boolean).join(', ');
-        const action = await vscode.window.showInformationMessage(
-          `${name} PR was merged. Cleanup will ${detail}.`,
-          'Cleanup', 'Dismiss',
-        );
-        if (action === 'Cleanup') await cleanupMerged(ctx, tree);
-      }
+      log.info(`PR merged detected: ${tree.branch}`);
+      await stateManager.updateTree(tree.repoPath, tree.branch, { mergeNotified: true });
+      const name = tree.ticketId ?? tree.branch;
+      const detail = [tree.ticketId && config.linear.enabled && `move ${tree.ticketId} → ${config.linear.statuses.onCleanup}`, 'remove worktree + branch', isOwnWindow && 'close window'].filter(Boolean).join(', ');
+      const action = await vscode.window.showInformationMessage(
+        `${name} PR was merged. Cleanup will ${detail}.`,
+        'Cleanup', 'Dismiss',
+      );
+      if (action === 'Cleanup') await cleanupMerged(ctx, tree);
     }
   }, 5 * 60 * 1000));
 

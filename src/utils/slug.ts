@@ -1,3 +1,8 @@
+/** Strip the "origin/" prefix from a base branch name. */
+export function shortBaseBranch(baseBranch: string): string {
+  return baseBranch.replace(/^origin\//, '');
+}
+
 export function slugify(title: string): string {
   return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 50) || 'untitled';
 }

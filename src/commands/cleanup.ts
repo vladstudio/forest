@@ -1,19 +1,10 @@
 import * as vscode from 'vscode';
 import type { ForestContext } from '../context';
-import { getRepoPath } from '../context';
 import type { TreeState } from '../state';
 import { displayName } from '../state';
 import * as git from '../cli/git';
-import { deleteWorkspaceFiles, runStep, updateLinear } from './shared';
+import { deleteWorkspaceFiles, requireTree, runStep, updateLinear } from './shared';
 import { log } from '../logger';
-
-function requireTree(ctx: ForestContext, branchArg: string | undefined, action: string): TreeState | undefined {
-  const tree = branchArg
-    ? ctx.stateManager.getTree(ctx.stateManager.loadSync(), getRepoPath(), branchArg)
-    : ctx.currentTree;
-  if (!tree) vscode.window.showErrorMessage(`No tree to ${action}. Run from a tree window or select from sidebar.`);
-  return tree;
-}
 
 const teardownInProgress = new Set<string>();
 

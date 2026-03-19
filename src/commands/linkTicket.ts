@@ -16,7 +16,8 @@ export async function linkTicket(ctx: ForestContext, branch: string): Promise<vo
 
   if (choice.id === 'select') {
     const result = await pickIssue(ctx);
-    if (!result) return;
+    if (result === undefined) return;
+    if (result === null) return;
     ticketId = result.ticketId;
     title = result.title;
   } else {

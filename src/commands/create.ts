@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import type { ForestContext } from '../context';
 import * as git from '../cli/git';
 import * as linear from '../cli/linear';
-import { createTree, updateLinear, pickTeam, promptUncommittedChanges } from './shared';
+import { createTree, filterUnlinkedIssues, updateLinear, pickTeam, promptUncommittedChanges } from './shared';
 import { slugify } from '../utils/slug';
 import { getRepoPath } from '../context';
 
@@ -261,21 +261,21 @@ async function createFromExistingBranch(ctx: ForestContext): Promise<void> {
   }
 }
 
+interface IssuePickItem extends vscode.QuickPickItem {
+  issueId: string;
+  issueTitle: string;
+}
+
 export async function pickIssue(ctx: ForestContext): Promise<{ ticketId: string; title: string } | null | undefined> {
   const issues = await linear.listMyIssues(ctx.config.linear.statuses.issueList, ctx.config.linear.teams);
   const state = await ctx.stateManager.load();
-  const existingTickets = new Set(
-    ctx.stateManager.getTreesForRepo(state, getRepoPath())
-      .filter(t => t.ticketId)
-      .map(t => t.ticketId),
-  );
-  const available = issues.filter(i => !existingTickets.has(i.id));
+  const available = filterUnlinkedIssues(issues, ctx.stateManager, state, getRepoPath());
   if (!available.length) { vscode.window.showInformationMessage('No unlinked issues found.'); return null; }
 
-  const pick = await vscode.window.showQuickPick(
+  const pick = await vscode.window.showQuickPick<IssuePickItem>(
     available.map(i => ({ label: `${i.id}  ${i.title}`, description: i.state, issueId: i.id, issueTitle: i.title })),
     { placeHolder: 'Select an issue' },
-  ) as any;
+  );
   if (!pick) return undefined;
   return { ticketId: pick.issueId, title: pick.issueTitle };
 }
@@ -285,10 +285,10 @@ export async function createIssue(ctx: ForestContext): Promise<{ ticketId: strin
   const issueTitle = await vscode.window.showInputBox({ prompt: 'Issue title', placeHolder: '' });
   if (!issueTitle) return null;
 
-  const priorityPick = await vscode.window.showQuickPick(
+  const priorityPick = await vscode.window.showQuickPick<vscode.QuickPickItem & { value: number }>(
     [{ label: '$(dash) No priority', value: 0 }, { label: 'Urgent', value: 1 }, { label: 'High', value: 2 }, { label: 'Normal', value: 3 }, { label: 'Low', value: 4 }],
     { placeHolder: 'Priority' },
-  ) as any;
+  );
   if (!priorityPick) return null;
 
   const team = await pickTeam(config.linear.teams);

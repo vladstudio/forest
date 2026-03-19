@@ -3,7 +3,7 @@ import type { ForestContext } from '../context';
 import type { TreeState } from '../state';
 import { displayName } from '../state';
 import * as git from '../cli/git';
-import { copyConfigFiles } from './shared';
+import { copyConfigFiles, requireTree } from './shared';
 
 function showTimedNotification(message: string, ms = 2000): void {
   vscode.window.withProgress(
@@ -13,14 +13,13 @@ function showTimedNotification(message: string, ms = 2000): void {
 }
 
 async function syncTree(ctx: ForestContext, treeArg: TreeState | undefined, mode: 'merge' | 'rebase'): Promise<void> {
-  const tree = treeArg || ctx.currentTree;
   const label = mode === 'merge' ? 'Update' : 'Rebase';
-  if (!tree) { vscode.window.showErrorMessage(`${label} must be run from a tree window.`); return; }
-  if (!tree.path) { vscode.window.showErrorMessage(`Cannot ${mode}: tree has no worktree path.`); return; }
+  const tree = requireTree(ctx, treeArg, label.toLowerCase());
+  if (!tree) return;
   const config = ctx.config;
 
   await vscode.window.withProgress(
-    { location: vscode.ProgressLocation.Notification, title: `${label === 'Update' ? 'Updating' : 'Rebasing'} ${displayName(tree)}...` },
+    { location: vscode.ProgressLocation.Notification, title: `${mode === 'merge' ? 'Updating' : 'Rebasing'} ${displayName(tree)}...` },
     async (progress) => {
       progress.report({ message: mode === 'merge' ? 'Pulling latest...' : 'Rebasing onto main...' });
       try {
@@ -41,40 +40,29 @@ async function syncTree(ctx: ForestContext, treeArg: TreeState | undefined, mode
 export const update = (ctx: ForestContext, treeArg?: TreeState) => syncTree(ctx, treeArg, 'merge');
 export const rebase = (ctx: ForestContext, treeArg?: TreeState) => syncTree(ctx, treeArg, 'rebase');
 
-export async function pull(ctx: ForestContext, treeArg?: TreeState): Promise<void> {
-  const tree = treeArg || ctx.currentTree;
-  if (!tree) { vscode.window.showErrorMessage('Pull must be run from a tree window.'); return; }
-  if (!tree.path) { vscode.window.showErrorMessage('Cannot pull: tree has no worktree path.'); return; }
+async function gitAction(
+  ctx: ForestContext, treeArg: TreeState | undefined,
+  opts: { action: string; label: string; gitFn: (tree: TreeState) => Promise<void> },
+): Promise<void> {
+  const tree = requireTree(ctx, treeArg, opts.action);
+  if (!tree) return;
 
   await vscode.window.withProgress(
-    { location: vscode.ProgressLocation.Notification, title: `Pulling ${displayName(tree)}...` },
+    { location: vscode.ProgressLocation.Notification, title: `${opts.label}ing ${displayName(tree)}...` },
     async () => {
       try {
-        await git.pull(tree.path!);
+        await opts.gitFn(tree);
       } catch (e: any) {
-        vscode.window.showErrorMessage(`Pull failed: ${e.message}`);
+        vscode.window.showErrorMessage(`${opts.label} failed: ${e.message}`);
         return;
       }
-      showTimedNotification('Pulled.');
+      showTimedNotification(`${opts.label}ed.`);
     },
   );
 }
 
-export async function push(ctx: ForestContext, treeArg?: TreeState): Promise<void> {
-  const tree = treeArg || ctx.currentTree;
-  if (!tree) { vscode.window.showErrorMessage('Push must be run from a tree window.'); return; }
-  if (!tree.path) { vscode.window.showErrorMessage('Cannot push: tree has no worktree path.'); return; }
+export const pull = (ctx: ForestContext, treeArg?: TreeState) =>
+  gitAction(ctx, treeArg, { action: 'pull', label: 'Pull', gitFn: t => git.pull(t.path!) });
 
-  await vscode.window.withProgress(
-    { location: vscode.ProgressLocation.Notification, title: `Pushing ${displayName(tree)}...` },
-    async () => {
-      try {
-        await git.pushBranch(tree.path!, tree.branch);
-      } catch (e: any) {
-        vscode.window.showErrorMessage(`Push failed: ${e.message}`);
-        return;
-      }
-      showTimedNotification('Pushed.');
-    },
-  );
-}
+export const push = (ctx: ForestContext, treeArg?: TreeState) =>
+  gitAction(ctx, treeArg, { action: 'push', label: 'Push', gitFn: t => git.pushBranch(t.path!, t.branch) });

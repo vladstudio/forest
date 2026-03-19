@@ -3,6 +3,7 @@ import { writeFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { exec, commandExists } from '../utils/exec';
+import { shortBaseBranch } from '../utils/slug';
 import { log } from '../logger';
 
 let _available: boolean | null = null;
@@ -57,7 +58,7 @@ export async function enableAutomerge(worktreePath: string): Promise<void> {
 
 export async function createPR(worktreePath: string, baseBranch: string, title: string, body?: string): Promise<string | null> {
   log.info(`createPR: "${title}" → ${baseBranch}`);
-  const base = baseBranch.replace(/^origin\//, '');
+  const base = shortBaseBranch(baseBranch);
   const args = ['pr', 'create', '--base', base, '--title', title];
   let bodyFile: string | undefined;
   if (body) {

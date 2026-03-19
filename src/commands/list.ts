@@ -15,6 +15,6 @@ export async function list(ctx: ForestContext): Promise<void> {
     id: t.branch,
   }));
 
-  const pick = await vscode.window.showQuickPick(items, { placeHolder: 'All trees' }) as any;
+  const pick = await vscode.window.showQuickPick<vscode.QuickPickItem & { id: string }>(items, { placeHolder: 'All trees' });
   if (pick) await vscode.commands.executeCommand('forest.switch', pick.id);
 }

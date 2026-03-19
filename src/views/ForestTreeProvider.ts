@@ -8,6 +8,7 @@ import { getRepoPath } from '../context';
 import * as git from '../cli/git';
 import * as gh from '../cli/gh';
 import * as linear from '../cli/linear';
+import { filterUnlinkedIssues } from '../commands/shared';
 
 export interface TreeHealth {
   behind: number;
@@ -83,13 +84,7 @@ export class ForestTreeProvider implements vscode.TreeDataProvider<ForestElement
       this.issueCache.time = Date.now();
     }
 
-    // Filter out issues that already have trees (by ticketId)
-    const existingTickets = new Set(
-      this.stateManager.getTreesForRepo(state, getRepoPath())
-        .filter(t => t.ticketId)
-        .map(t => t.ticketId),
-    );
-    return this.issueCache.issues.filter(i => !existingTickets.has(i.id));
+    return filterUnlinkedIssues(this.issueCache.issues, this.stateManager, state, getRepoPath());
   }
 
   async getChildren(element?: ForestElement): Promise<ForestElement[]> {

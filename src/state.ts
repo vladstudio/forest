@@ -72,7 +72,7 @@ export class StateManager {
   }
 
   async load(): Promise<ForestState> {
-    try { return JSON.parse(fs.readFileSync(this.statePath, 'utf8')) as ForestState; } catch (e: any) {
+    try { return JSON.parse(await fs.promises.readFile(this.statePath, 'utf8')) as ForestState; } catch (e: any) {
       if (e.code === 'ENOENT') {
         const empty: ForestState = { version: 1, trees: {} };
         await this.save(empty);

@@ -5,21 +5,14 @@ import * as git from '../cli/git';
 import * as gh from '../cli/gh';
 
 import { generatePRBody } from '../cli/ai';
-import { updateLinear } from './shared';
+import { requireTree, updateLinear } from './shared';
 import { log } from '../logger';
 
 
 export async function ship(ctx: ForestContext, treeArg?: import('../state').TreeState): Promise<void> {
-  const tree = treeArg || ctx.currentTree;
+  const tree = requireTree(ctx, treeArg, 'ship');
   log.info(`ship: ${tree?.branch ?? '(no tree)'} ticket=${tree?.ticketId ?? '(none)'}`);
-  if (!tree) {
-    vscode.window.showErrorMessage('Ship must be run from a tree window.');
-    return;
-  }
-  if (!tree.path) {
-    vscode.window.showErrorMessage('Cannot ship: tree has no worktree path.');
-    return;
-  }
+  if (!tree) return;
   const config = ctx.config;
 
   // Check uncommitted changes
