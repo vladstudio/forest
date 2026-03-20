@@ -1,2 +1,3 @@
 #!/bin/bash
-bun run package && bunx @vscode/vsce package && code --install-extension forest-0.1.0.vsix && echo "Installed. Reload VS Code windows to activate."
+VERSION=$(node -p "require('./package.json').version")
+bun run package && bunx @vscode/vsce package && code --install-extension "vladstudio-forest-${VERSION}.vsix" --force && echo "Installed v${VERSION}. Reload VS Code windows to activate."
