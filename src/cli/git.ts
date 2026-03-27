@@ -75,39 +75,12 @@ export async function stash(repoPath: string, message: string): Promise<string> 
   return ref;
 }
 
-export async function stashPush(repoPath: string, message: string): Promise<void> {
-  await exec('git', ['stash', 'push', '-u', '-m', message], { cwd: repoPath });
-}
-
-export interface StashEntry { index: number; message: string }
-
-export async function stashList(repoPath: string): Promise<StashEntry[]> {
-  try {
-    const { stdout } = await exec('git', ['stash', 'list', '--format=%gs'], { cwd: repoPath });
-    if (!stdout.trim()) return [];
-    return stdout.trim().split('\n').map((line, index) => ({
-      index,
-      message: line.replace(/^On [^:]+:\s*/, ''),
-    }));
-  } catch { return []; }
-}
-
 export async function stashApply(repoPath: string, ref: number | string): Promise<void> {
   await exec('git', ['stash', 'apply', stashRef(ref)], { cwd: repoPath });
 }
 
 export async function stashDrop(repoPath: string, ref: number | string): Promise<void> {
   await exec('git', ['stash', 'drop', stashRef(ref)], { cwd: repoPath });
-}
-
-export async function stashShowFiles(repoPath: string, ref: number | string): Promise<string[]> {
-  const { stdout } = await exec('git', ['stash', 'show', stashRef(ref), '--name-only'], { cwd: repoPath });
-  return stdout.trim().split('\n').filter(Boolean);
-}
-
-export async function showObject(repoPath: string, objectRef: string): Promise<string> {
-  const { stdout } = await exec('git', ['show', objectRef], { cwd: repoPath });
-  return stdout;
 }
 
 export async function discardChanges(repoPath: string): Promise<void> {

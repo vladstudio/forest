@@ -82,11 +82,6 @@
           "id": "forest.shortcuts",
           "name": "Shortcuts",
           "when": "forest.active && forest.ghAvailable"
-        },
-        {
-          "id": "forest.stashes",
-          "name": "Stashes",
-          "when": "forest.active && forest.ghAvailable"
         }
       ]
     },
@@ -236,29 +231,6 @@
         "title": "Attach Linear Ticket…",
         "category": "Forest",
         "icon": "$(link)"
-      },
-      {
-        "command": "forest.stashPush",
-        "title": "Stash Changes",
-        "category": "Forest",
-        "icon": "$(add)"
-      },
-      {
-        "command": "forest.stashApply",
-        "title": "Apply Stash",
-        "category": "Forest",
-        "icon": "$(cloud-download)"
-      },
-      {
-        "command": "forest.stashDrop",
-        "title": "Delete Stash",
-        "category": "Forest",
-        "icon": "$(trash)"
-      },
-      {
-        "command": "forest.stashAction",
-        "title": "Stash Action",
-        "category": "Forest"
       }
     ],
     "menus": {
@@ -271,11 +243,6 @@
         {
           "command": "forest.create",
           "when": "view == forest.trees",
-          "group": "navigation"
-        },
-        {
-          "command": "forest.stashPush",
-          "when": "view == forest.stashes",
           "group": "navigation"
         }
       ],
@@ -304,16 +271,6 @@
           "command": "forest.restartShortcut",
           "when": "viewItem == shortcut-terminal-running",
           "group": "2_actions"
-        },
-        {
-          "command": "forest.stashApply",
-          "when": "viewItem == stash",
-          "group": "1_stash"
-        },
-        {
-          "command": "forest.stashDrop",
-          "when": "viewItem == stash",
-          "group": "2_danger"
         }
       ],
       "commandPalette": [
@@ -343,18 +300,6 @@
         },
         {
           "command": "forest.linkTicket",
-          "when": "false"
-        },
-        {
-          "command": "forest.stashAction",
-          "when": "false"
-        },
-        {
-          "command": "forest.stashApply",
-          "when": "false"
-        },
-        {
-          "command": "forest.stashDrop",
           "when": "false"
         }
       ]

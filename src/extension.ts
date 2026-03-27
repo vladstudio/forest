@@ -3,14 +3,12 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { loadConfig, getTreesDir } from './config';
 import { ShortcutItem } from './views/items';
-import type { StashItem } from './views/items';
 import { StateManager } from './state';
 import { ForestContext, getRepoPath } from './context';
 import { ShortcutManager } from './managers/ShortcutManager';
 import { StatusBarManager } from './managers/StatusBarManager';
 import { ForestWebviewProvider } from './views/ForestWebviewProvider';
 import { ShortcutsTreeProvider } from './views/ShortcutsTreeProvider';
-import { StashesTreeProvider } from './views/StashesTreeProvider';
 import { start } from './commands/create';
 import { linkTicket } from './commands/linkTicket';
 import { switchTree } from './commands/switch';
@@ -22,7 +20,6 @@ import { deleteWorkspaceFiles, focusOrOpenWindow } from './commands/shared';
 import * as git from './cli/git';
 import * as gh from './cli/gh';
 import * as linear from './cli/linear';
-import { shortBaseBranch } from './utils/slug';
 import { initLogger, log } from './logger';
 
 const emptyProvider: vscode.TreeDataProvider<never> = {
@@ -196,11 +193,9 @@ export async function activate(context: vscode.ExtensionContext) {
   const statusBarManager = new StatusBarManager(currentTree);
   const forestProvider = new ForestWebviewProvider(stateManager, config);
   const shortcutsProvider = new ShortcutsTreeProvider(config, shortcutManager);
-  const stashesProvider = new StashesTreeProvider(repoPath);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider('forest.trees', forestProvider),
     vscode.window.registerTreeDataProvider('forest.shortcuts', shortcutsProvider),
-    vscode.window.registerTreeDataProvider('forest.stashes', stashesProvider),
   );
 
   // Update noTrees context
@@ -268,82 +263,10 @@ export async function activate(context: vscode.ExtensionContext) {
   reg('forest.stopShortcut', (arg: any) => shortcutManager.stop(unwrap(arg)));
   reg('forest.restartShortcut', (arg: any) => shortcutManager.restart(unwrap(arg)));
 
-  // Stash commands
-  const getWsPath = () => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  const confirmDropStash = async (label: string, index: number) => {
-    const confirm = await vscode.window.showWarningMessage(
-      `Delete stash "${label}"?`, { modal: true }, 'Delete',
-    );
-    if (confirm !== 'Delete') return;
-    await git.stashDrop(repoPath, index);
-    stashesProvider.refresh();
-  };
-  reg('forest.stashPush', async () => {
-    const wsPath = getWsPath();
-    if (!wsPath) return;
-    if (!(await git.hasUncommittedChanges(wsPath))) {
-      vscode.window.showInformationMessage('No uncommitted changes to stash.');
-      return;
-    }
-    const branch = ctx.currentTree?.branch ?? shortBaseBranch(config.baseBranch);
-    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-    await git.stashPush(wsPath, `${branch} @ ${time}`);
-    stashesProvider.refresh();
-  });
-  reg('forest.stashApply', async (arg: StashItem) => {
-    const wsPath = getWsPath();
-    if (!wsPath) return;
-    await git.stashApply(wsPath, arg.index);
-    stashesProvider.refresh();
-  });
-  reg('forest.stashDrop', (arg: StashItem) => confirmDropStash(arg.label as string, arg.index));
-  const gitContentProvider = new class implements vscode.TextDocumentContentProvider {
-    provideTextDocumentContent(uri: vscode.Uri): Thenable<string> {
-      const params = new URLSearchParams(uri.query);
-      return git.showObject(params.get('repo')!, `${params.get('ref')}:${uri.path.slice(1)}`);
-    }
-  };
-  context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider('forest-git', gitContentProvider));
-
-  reg('forest.stashAction', async (index: number) => {
-    const wsPath = getWsPath();
-    if (!wsPath) return;
-    const entries = await git.stashList(repoPath);
-    const label = entries.find(e => e.index === index)?.message ?? `stash@{${index}}`;
-    const pick = await vscode.window.showQuickPick(
-      [
-        { label: '$(cloud-download) Apply and Delete', id: 'apply-delete' },
-        { label: '$(cloud-download) Apply and Keep', id: 'apply-keep' },
-        { label: '$(eye) View', id: 'view' },
-        { label: '$(trash) Delete', id: 'delete' },
-      ],
-      { placeHolder: 'Stash action' },
-    );
-    if (pick?.id === 'view') {
-      const ref = `stash@{${index}}`;
-      const files = await git.stashShowFiles(repoPath, index);
-      const changes: [string, vscode.Uri, vscode.Uri][] = files.map(f => [
-        f,
-        vscode.Uri.parse(`forest-git://show/${f}?ref=${encodeURIComponent(ref + '^')}&repo=${encodeURIComponent(repoPath)}`),
-        vscode.Uri.parse(`forest-git://show/${f}?ref=${encodeURIComponent(ref)}&repo=${encodeURIComponent(repoPath)}`),
-      ]);
-      await vscode.commands.executeCommand('vscode.changes', `Stash: ${label}`, changes);
-    } else if (pick?.id === 'apply-delete') {
-      await git.stashApply(wsPath, index);
-      await git.stashDrop(repoPath, index);
-      stashesProvider.refresh();
-    } else if (pick?.id === 'apply-keep') {
-      await git.stashApply(wsPath, index);
-      stashesProvider.refresh();
-    } else if (pick?.id === 'delete') {
-      await confirmDropStash(label, index);
-    }
-  });
-
-  // Refresh all sections when window gains focus (cross-window coordination)
+  // Refresh when window gains focus (cross-window coordination)
   context.subscriptions.push(
     vscode.window.onDidChangeWindowState(e => {
-      if (e.focused) { forestProvider.refresh(); stashesProvider.refresh(); }
+      if (e.focused) { forestProvider.refresh(); }
     }),
   );
 
@@ -446,7 +369,7 @@ export async function activate(context: vscode.ExtensionContext) {
     updateNoTrees().catch(() => {});
   });
 
-  context.subscriptions.push(outputChannel, shortcutManager, shortcutsProvider, stashesProvider, statusBarManager, stateManager, forestProvider);
+  context.subscriptions.push(outputChannel, shortcutManager, shortcutsProvider, statusBarManager, stateManager, forestProvider);
   if (logger) context.subscriptions.push(logger);
 }
 
