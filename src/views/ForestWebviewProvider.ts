@@ -347,8 +347,8 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
         if (!tree || !tree.path) return;
         const bdiff = await git.diffFromBase(tree.path, this.config.baseBranch);
         if (!bdiff.trim()) { vscode.window.showInformationMessage('No changes from base branch.'); return; }
-        const doc = await vscode.workspace.openTextDocument({ content: bdiff, language: 'diff' });
-        vscode.window.showTextDocument(doc, { preview: true });
+        // Open SCM view - user can then click on individual files to see branch diff
+        await vscode.commands.executeCommand('workbench.view.scm');
         break;
       }
 
@@ -557,8 +557,9 @@ a[data-cmd]:hover { opacity: 0.7; }
 .mod { color: var(--vscode-gitDecoration-modifiedResourceForeground, #e2c08d); }
 .icon { display: inline-flex; align-items: center; }
 .icon svg { width: 14px; height: 14px; fill: currentColor; }
+.icon svg[stroke] { fill: none; }
 button { cursor: pointer; font-family: var(--vscode-font-family); border: none; border-radius: 3px; }
-.btn { background: none; color: var(--vscode-foreground); padding: 2px 4px; font-size: 12px; border: 1px solid var(--vscode-activityBar-border, rgba(128,128,128,0.3)); opacity: 0.9; white-space: nowrap; display: inline-flex; align-items: center; justify-contenet: center; gap: 2px; min-height: 20px; text-align: center; }
+.btn { background: none; color: var(--vscode-foreground); padding: 2px 4px; font-size: 12px; border: 1px solid var(--vscode-activityBar-border, rgba(128,128,128,0.3)); opacity: 0.9; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 2px; min-height: 20px; text-align: center; }
 .btn:hover { opacity: 1; background: var(--vscode-toolbar-hoverBackground); }
 .btn.faint { opacity: 0.45; }
 .btn.faint:hover { opacity: 0.8; }
