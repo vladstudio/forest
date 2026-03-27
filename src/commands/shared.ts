@@ -158,6 +158,9 @@ export async function createTree(opts: {
     if (stateManager.getTree(state, repoPath, branch)) {
       throw new Error(`Tree for branch "${branch}" already exists`);
     }
+    if (!existingBranch && await git.branchExists(repoPath, branch)) {
+      throw new Error(`Branch "${branch}" already exists. Use "Select branch" instead.`);
+    }
 
     checkMaxTrees(stateManager, state, repoPath, config.maxTrees);
     const treePath = resolveTreePath(repoPath, branch, ticketId);

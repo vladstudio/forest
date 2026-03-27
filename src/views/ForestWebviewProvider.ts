@@ -4,7 +4,7 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import type { ForestConfig } from '../config';
 import type { ForestContext } from '../context';
-import type { StateManager, TreeState } from '../state';
+import { displayName, type StateManager, type TreeState } from '../state';
 import { getRepoPath } from '../context';
 import * as git from '../cli/git';
 import * as gh from '../cli/gh';
@@ -12,6 +12,7 @@ import * as linear from '../cli/linear';
 import * as ai from '../cli/ai';
 import { shortBaseBranch, slugify } from '../utils/slug';
 import { copyConfigFiles, createTree, ensureWorkspaceFile, focusOrOpenWindow, updateLinear } from '../commands/shared';
+import { executeDeletePlan, type DeletePlan } from '../commands/cleanup';
 import { pickIssue } from '../commands/create';
 import { log } from '../logger';
 
@@ -94,6 +95,39 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
         branchFormat: this.config.branchFormat,
       },
     });
+  }
+
+  async showDeleteForm(branchArg?: string): Promise<boolean> {
+    if (!this.view?.visible || !this.ctx) return false;
+    const repoPath = getRepoPath();
+    const branch = branchArg ?? this.ctx.currentTree?.branch;
+    if (!branch) return false;
+
+    const state = await this.stateManager.load();
+    const tree = this.stateManager.getTree(state, repoPath, branch);
+    if (!tree?.path) return false;
+
+    const pr = this.config.github.enabled ? await gh.prStatus(tree.path).catch(() => null) : null;
+    const defaultLinearAction = pr?.state === 'MERGED' ? 'cleanup' : 'cancel';
+    this.postMessage({
+      type: 'showDeleteForm',
+      init: {
+        key: `${tree.repoPath}:${tree.branch}`,
+        name: displayName(tree),
+        branch: tree.branch,
+        ticketId: tree.ticketId ?? null,
+        ticketTitle: tree.title ?? null,
+        linearEnabled: this.config.linear.enabled && !!tree.ticketId,
+        prState: pr?.state ?? null,
+        prNumber: pr?.number ?? null,
+        defaultBranches: 'all',
+        defaultLinearAction,
+        defaultPrAction: pr?.state === 'OPEN' ? 'close' : 'none',
+        cancelStatusName: this.config.linear.statuses.onCancel,
+        cleanupStatusName: this.config.linear.statuses.onCleanup,
+      },
+    });
+    return true;
   }
 
   private postMessage(msg: Record<string, unknown>): void {
@@ -232,6 +266,11 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
+    if (command === 'deleteForm:submit') {
+      await this.handleDeleteSubmit(msg);
+      return;
+    }
+
     if (!key) return;
     const colonIdx = key.indexOf(':');
     const repoPath = key.slice(0, colonIdx);
@@ -357,7 +396,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
         break;
 
       case 'delete':
-        vscode.commands.executeCommand('forest.deleteTree', branch, msg.isDoneOrClosed ?? false);
+        await this.showDeleteForm(branch);
         break;
 
       case 'openPR':
@@ -453,6 +492,39 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  private async handleDeleteSubmit(msg: Record<string, any>): Promise<void> {
+    if (!this.ctx || !msg.key) return;
+    const ctx = this.ctx;
+    const key = String(msg.key);
+    const colonIdx = key.indexOf(':');
+    if (colonIdx < 0) return;
+    const repoPath = key.slice(0, colonIdx);
+    const branch = key.slice(colonIdx + 1);
+    const state = await this.stateManager.load();
+    const tree = this.stateManager.getTree(state, repoPath, branch);
+
+    if (!tree?.path) {
+      this.postMessage({ type: 'deleteResult', success: false, error: 'Tree path is missing.' });
+      return;
+    }
+
+    try {
+      const plan: DeletePlan = {
+        branches: msg.branches,
+        linear: msg.linear,
+        pr: msg.pr,
+      };
+      const success = await executeDeletePlan(ctx, tree as TreeState & { path: string }, plan);
+      this.postMessage({
+        type: 'deleteResult',
+        success,
+        error: success ? null : 'Delete was interrupted. Check notifications for details.',
+      });
+    } catch (e: any) {
+      this.postMessage({ type: 'deleteResult', success: false, error: e.message });
+    }
+  }
+
   private getHtml(): string {
     const nonce = crypto.randomBytes(16).toString('base64');
     return `<!DOCTYPE html>
@@ -513,6 +585,17 @@ button { cursor: pointer; font-family: var(--vscode-font-family); border: none; 
 .btn-cancel { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); padding: 6px 12px; font-size: 12px; }
 .btn-cancel:hover { background: var(--vscode-button-secondaryHoverBackground); }
 .btn-toggle.active { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); opacity: 1; }
+.form-title { display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; margin-bottom: 6px; }
+.form-copy { color: var(--vscode-descriptionForeground); font-size: 11px; line-height: 1.45; }
+.radio-group { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.radio-option { display: flex; gap: 8px; padding: 8px; border: 1px solid var(--vscode-activityBar-border, rgba(128,128,128,0.2)); border-radius: 4px; background: transparent; cursor: pointer; }
+.radio-option:hover { background: var(--vscode-list-hoverBackground, rgba(128,128,128,0.08)); }
+.radio-option input { margin: 2px 0 0; accent-color: var(--vscode-button-background); }
+.radio-option input:focus, .radio-option input:focus-visible { outline: none; box-shadow: none; }
+.radio-option:focus-within { outline: none; }
+.radio-option.disabled { opacity: 0.6; cursor: default; }
+.radio-body { min-width: 0; flex: 1; }
+.radio-title { font-size: 12px; }
 </style>
 </head>
 <body>
@@ -523,6 +606,8 @@ let mode = 'list';
 let latestData = null;
 let formInit = null;
 let formState = null;
+let deleteInit = null;
+let deleteState = null;
 
 function defaultFormState(init) {
   return {
@@ -542,6 +627,17 @@ function defaultFormState(init) {
   };
 }
 
+function defaultDeleteState(init) {
+  return {
+    key: init.key,
+    branches: init.defaultBranches,
+    linear: init.defaultLinearAction,
+    pr: init.defaultPrAction,
+    submitting: false,
+    error: null,
+  };
+}
+
 window.addEventListener('message', e => {
   const msg = e.data;
   switch (msg.type) {
@@ -555,15 +651,21 @@ window.addEventListener('message', e => {
       formState = defaultFormState(msg.init);
       renderCurrentMode();
       break;
+    case 'showDeleteForm':
+      mode = 'delete';
+      deleteInit = msg.init;
+      deleteState = defaultDeleteState(msg.init);
+      renderCurrentMode();
+      break;
     case 'branchPickResult':
-      if (msg.branch) {
+      if (formState && msg.branch) {
         formState.branchMode = 'existing';
         formState.existingBranch = msg.branch;
       }
       renderCurrentMode();
       break;
     case 'issuePickResult':
-      if (msg.issue) {
+      if (formState && msg.issue) {
         formState.ticketMode = 'existing';
         formState.ticketId = msg.issue.ticketId;
         formState.ticketTitle = msg.issue.title;
@@ -572,13 +674,26 @@ window.addEventListener('message', e => {
       renderCurrentMode();
       break;
     case 'createResult':
-      formState.submitting = false;
-      if (msg.success) {
-        mode = 'list';
-      } else {
-        formState.error = msg.error;
+      if (formState) {
+        formState.submitting = false;
+        if (msg.success) {
+          mode = 'list';
+        } else {
+          formState.error = msg.error;
+        }
+        renderCurrentMode();
       }
-      renderCurrentMode();
+      break;
+    case 'deleteResult':
+      if (deleteState) {
+        deleteState.submitting = false;
+        if (msg.success) {
+          mode = 'list';
+        } else {
+          deleteState.error = msg.error;
+        }
+        renderCurrentMode();
+      }
       break;
   }
 });
@@ -611,6 +726,19 @@ document.getElementById('root').addEventListener('click', e => {
       team: formState.team,
       carryChanges: formState.carryChanges,
       branchManuallyEdited: formState.branchManuallyEdited,
+    });
+    return;
+  }
+  if (btn.dataset.cmd === 'deleteForm:submit' && deleteState) {
+    deleteState.submitting = true;
+    deleteState.error = null;
+    renderDeleteForm();
+    vscode.postMessage({
+      command: 'deleteForm:submit',
+      key: deleteState.key,
+      branches: deleteState.branches,
+      linear: deleteState.linear,
+      pr: deleteState.pr,
     });
     return;
   }
@@ -651,16 +779,28 @@ const icons = {
   trash: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM96,40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96Zm96,168H64V64H192ZM112,104v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Zm48,0v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Z"/></svg>',
   link: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><path d="M240,88.23a54.43,54.43,0,0,1-16,37L189.25,160a54.27,54.27,0,0,1-38.63,16h-.05A54.63,54.63,0,0,1,96,119.84a8,8,0,0,1,16,.45A38.62,38.62,0,0,0,150.58,160h0a38.39,38.39,0,0,0,27.31-11.31l34.75-34.75a38.63,38.63,0,0,0-54.63-54.63l-11,11A8,8,0,0,1,135.7,59l11-11A54.65,54.65,0,0,1,224,48,54.86,54.86,0,0,1,240,88.23ZM109,185.66l-11,11A38.41,38.41,0,0,1,70.6,208h0a38.63,38.63,0,0,1-27.29-65.94L78,107.31A38.63,38.63,0,0,1,144,135.71a8,8,0,0,0,16,.45A54.86,54.86,0,0,0,144,96a54.65,54.65,0,0,0-77.27,0L32,130.75A54.62,54.62,0,0,0,70.56,224h0a54.28,54.28,0,0,0,38.64-16l11-11A8,8,0,0,0,109,185.66Z"/></svg>',
   gitBranch: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><path d="M232,64a32,32,0,1,0-40,31v17a8,8,0,0,1-8,8H96a23.84,23.84,0,0,0-8,1.38V95a32,32,0,1,0-16,0v66a32,32,0,1,0,16,0V144a8,8,0,0,1,8-8h88a24,24,0,0,0,24-24V95A32.06,32.06,0,0,0,232,64ZM64,64A16,16,0,1,1,80,80,16,16,0,0,1,64,64ZM96,192a16,16,0,1,1-16-16A16,16,0,0,1,96,192ZM200,80a16,16,0,1,1,16-16A16,16,0,0,1,200,80Z"/></svg>',
-  linear: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 14" fill="none"><mask id="lm" fill="white"><path d="M11.2426 11.2426C11.6332 11.6332 12.2731 11.6368 12.6041 11.1946C13.505 9.99105 14 8.52105 14 7C14 5.14349 13.2625 3.36301 11.9497 2.05026C10.637 0.737503 8.85652 4.74079e-06 7 4.53054e-06C5.47896 4.35829e-06 4.00895 0.495053 2.8054 1.39592C2.36326 1.72687 2.36684 2.36684 2.75736 2.75736L7 7L11.2426 11.2426Z"/></mask><path d="M11.2426 11.2426C11.6332 11.6332 12.2731 11.6368 12.6041 11.1946C13.505 9.99105 14 8.52105 14 7C14 5.14349 13.2625 3.36301 11.9497 2.05026C10.637 0.737503 8.85652 4.74079e-06 7 4.53054e-06C5.47896 4.35829e-06 4.00895 0.495053 2.8054 1.39592C2.36326 1.72687 2.36684 2.36684 2.75736 2.75736L7 7L11.2426 11.2426Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" mask="url(#lm)"/><path d="M1.25 3.75L10.25 12.75M0.75 6.25L7.75 13.25M1.25 9.75L4.25 12.75" stroke="currentColor" stroke-linecap="round"/></svg>',
+  linear: '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12.6569 7C12.6569 8.16442 12.2978 9.29182 11.6411 10.2342C11.3254 10.6873 10.6834 10.6834 10.2929 10.2929L7 7L3.70711 3.70711C3.31658 3.31658 3.31266 2.67462 3.76578 2.35887C4.70819 1.70215 5.83559 1.34315 7 1.34315C8.50029 1.34315 9.93913 1.93913 11 3C12.0609 4.06087 12.6569 5.49971 12.6569 7Z" stroke="black" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 5L9 12M1.5 7.5L6.5 12.5M2 11L3 12" stroke="black" stroke-linecap="round"/></svg>',
 };
 const ic = name => '<span class="icon">' + icons[name] + '</span>';
 
 function renderCurrentMode() {
   if (mode === 'create' && formState) {
     renderCreateForm();
+  } else if (mode === 'delete' && deleteState) {
+    renderDeleteForm();
   } else if (latestData) {
     renderList(latestData);
   }
+}
+
+function radioOption(name, value, currentValue, title, disabled) {
+  return '<label class="radio-option' + (disabled ? ' disabled' : '') + '">' +
+    '<input type="radio" name="' + h(name) + '" value="' + h(value) + '"' +
+    (currentValue === value ? ' checked' : '') +
+    (disabled ? ' disabled' : '') +
+    '>' +
+    '<span class="radio-body"><div class="radio-title">' + h(title) + '</div></span>' +
+  '</label>';
 }
 
 function renderList(d) {
@@ -722,6 +862,63 @@ function treeCard(t, d) {
     ticket + changes +
     '<div class="row">' + lastRow + '</div>' +
   '</div>';
+}
+
+function renderDeleteForm() {
+  const ds = deleteState;
+  const init = deleteInit;
+  const dis = ds.submitting;
+  let out = '<div class="form">';
+
+  if (ds.error) {
+    out += '<div class="form-error">' + h(ds.error) + '</div>';
+  }
+
+  out += '<div class="form-section">';
+  out += '<div class="form-title">' + ic('trash') + ' Delete ' + h(init.name) + '</div>';
+  out += '<div class="form-copy">Choose what should happen to the worktree, branches, ticket, and pull request.</div>';
+  out += '</div>';
+
+  out += '<div class="form-section">';
+  out += '<div class="form-title">' + ic('gitBranch') + ' Branches</div>';
+  out += '<div class="radio-group">';
+  out += radioOption('delete-branches', 'all', ds.branches, 'Delete local + remote', dis);
+  out += radioOption('delete-branches', 'local', ds.branches, 'Delete local only', dis);
+  out += radioOption('delete-branches', 'keep', ds.branches, 'Keep branches', dis);
+  out += '</div></div>';
+
+  if (init.linearEnabled) {
+    out += '<div class="form-section">';
+    out += '<div class="form-title">' + ic('linear') + ' Linear</div>';
+    out += '<div class="radio-group">';
+    out += radioOption('delete-linear', 'cancel', ds.linear, 'Move to canceled', dis);
+    out += radioOption('delete-linear', 'cleanup', ds.linear, 'Move to done', dis);
+    out += radioOption('delete-linear', 'none', ds.linear, 'Do nothing', dis);
+    out += '</div></div>';
+  }
+
+  if (init.prState === 'OPEN') {
+    out += '<div class="form-section">';
+    out += '<div class="form-title">Pull Request</div>';
+    out += '<div class="radio-group">';
+    out += radioOption('delete-pr', 'close', ds.pr, 'Close PR', dis);
+    out += radioOption('delete-pr', 'none', ds.pr, 'Do nothing', dis);
+    out += '</div></div>';
+  } else if (init.prState === 'MERGED' || init.prState === 'CLOSED') {
+    out += '<div class="form-section">';
+    out += '<div class="form-title">Pull Request</div>';
+    out += '<div class="form-copy">PR #' + h(init.prNumber || '?') + ' is already ' + h(init.prState.toLowerCase()) + '.</div>';
+    out += '</div>';
+  }
+
+  out += '<div class="form-actions">';
+  out += '<button class="btn-create" id="deleteSubmitBtn" data-cmd="deleteForm:submit"' + (dis ? ' disabled' : '') + '>' + (dis ? 'Deleting\\u2026' : 'Delete tree') + '</button>';
+  out += '<button class="btn-cancel" data-form="cancel"' + (dis ? ' disabled' : '') + '>Cancel</button>';
+  out += '</div>';
+
+  out += '</div>';
+  document.getElementById('root').innerHTML = out;
+  setupDeleteListeners();
 }
 
 function renderCreateForm() {
@@ -822,6 +1019,27 @@ function renderCreateForm() {
   out += '</div>';
   document.getElementById('root').innerHTML = out;
   setupFormListeners();
+}
+
+function setupDeleteListeners() {
+  var branchRadios = document.querySelectorAll('input[name="delete-branches"]');
+  branchRadios.forEach(function(input) {
+    input.addEventListener('change', function(e) {
+      deleteState.branches = e.target.value;
+    });
+  });
+  var linearRadios = document.querySelectorAll('input[name="delete-linear"]');
+  linearRadios.forEach(function(input) {
+    input.addEventListener('change', function(e) {
+      deleteState.linear = e.target.value;
+    });
+  });
+  var prRadios = document.querySelectorAll('input[name="delete-pr"]');
+  prRadios.forEach(function(input) {
+    input.addEventListener('change', function(e) {
+      deleteState.pr = e.target.value;
+    });
+  });
 }
 
 function setupFormListeners() {

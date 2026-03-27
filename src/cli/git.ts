@@ -168,6 +168,12 @@ export async function checkoutWorktree(
   await exec('git', ['-c', 'checkout.workers=0', 'worktree', 'add', worktreePath, branch], { cwd: repoPath });
 }
 
+export async function branchExists(repoPath: string, branch: string): Promise<boolean> {
+  await exec('git', ['fetch', 'origin', branch], { cwd: repoPath }).catch(() => {});
+  const { stdout } = await exec('git', ['for-each-ref', '--format=%(refname:short)', `refs/heads/${branch}`, `refs/remotes/origin/${branch}`], { cwd: repoPath });
+  return stdout.trim().length > 0;
+}
+
 /** List local branches suitable for worktree checkout, excluding base branch and those already in worktrees. */
 export async function listBranches(repoPath: string, baseBranch: string): Promise<string[]> {
   await exec('git', ['fetch', 'origin'], { cwd: repoPath });

@@ -78,3 +78,8 @@ export async function createPR(worktreePath: string, baseBranch: string, title: 
     if (bodyFile) try { unlinkSync(bodyFile); } catch {}
   }
 }
+
+export async function closePR(repoPath: string, branch: string): Promise<void> {
+  log.info(`closePR: ${branch}`);
+  await exec('gh', ['pr', 'close', branch], { cwd: repoPath, timeout: 30_000 });
+}

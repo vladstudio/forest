@@ -10,6 +10,7 @@ export interface IForestProvider {
   refresh(): void;
   refreshTrees(): void;
   showCreateForm(): void;
+  showDeleteForm(branch?: string): Promise<boolean>;
   dispose(): void;
 }
 

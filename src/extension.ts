@@ -17,7 +17,6 @@ import { cleanupMerged, deleteTree } from './commands/cleanup';
 import { update, rebase, pull, push } from './commands/update';
 import { list } from './commands/list';
 import { deleteWorkspaceFiles, focusOrOpenWindow } from './commands/shared';
-import * as git from './cli/git';
 import * as gh from './cli/gh';
 import * as linear from './cli/linear';
 import { initLogger, log } from './logger';
