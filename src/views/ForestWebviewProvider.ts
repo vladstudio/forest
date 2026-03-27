@@ -336,10 +336,10 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
 
       case 'workingDiff': {
         if (!tree || !tree.path) return;
-        const wdiff = await git.workingDiff(tree.path);
-        if (!wdiff.trim()) { vscode.window.showInformationMessage('No working changes.'); return; }
-        const doc = await vscode.workspace.openTextDocument({ content: wdiff, language: 'diff' });
-        vscode.window.showTextDocument(doc, { preview: true });
+        const hasChanges = await git.hasUncommittedChanges(tree.path);
+        if (!hasChanges) { vscode.window.showInformationMessage('No working changes.'); return; }
+        // Open SCM view to show native diff
+        await vscode.commands.executeCommand('workbench.view.scm');
         break;
       }
 
@@ -777,6 +777,7 @@ const icons = {
   link: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><path d="M240,88.23a54.43,54.43,0,0,1-16,37L189.25,160a54.27,54.27,0,0,1-38.63,16h-.05A54.63,54.63,0,0,1,96,119.84a8,8,0,0,1,16,.45A38.62,38.62,0,0,0,150.58,160h0a38.39,38.39,0,0,0,27.31-11.31l34.75-34.75a38.63,38.63,0,0,0-54.63-54.63l-11,11A8,8,0,0,1,135.7,59l11-11A54.65,54.65,0,0,1,224,48,54.86,54.86,0,0,1,240,88.23ZM109,185.66l-11,11A38.41,38.41,0,0,1,70.6,208h0a38.63,38.63,0,0,1-27.29-65.94L78,107.31A38.63,38.63,0,0,1,144,135.71a8,8,0,0,0,16,.45A54.86,54.86,0,0,0,144,96a54.65,54.65,0,0,0-77.27,0L32,130.75A54.62,54.62,0,0,0,70.56,224h0a54.28,54.28,0,0,0,38.64-16l11-11A8,8,0,0,0,109,185.66Z"/></svg>',
   gitBranch: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><path d="M232,64a32,32,0,1,0-40,31v17a8,8,0,0,1-8,8H96a23.84,23.84,0,0,0-8,1.38V95a32,32,0,1,0-16,0v66a32,32,0,1,0,16,0V144a8,8,0,0,1,8-8h88a24,24,0,0,0,24-24V95A32.06,32.06,0,0,0,232,64ZM64,64A16,16,0,1,1,80,80,16,16,0,0,1,64,64ZM96,192a16,16,0,1,1-16-16A16,16,0,0,1,96,192ZM200,80a16,16,0,1,1,16-16A16,16,0,0,1,200,80Z"/></svg>',
   linear: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><rect width="256" height="256" fill="none"/><polyline points="88 136 112 160 168 104" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/><rect x="40" y="40" width="176" height="176" rx="8" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/></svg>',
+  checkbox: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><rect x="40" y="40" width="176" height="176" rx="8" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/><polyline points="88 136 112 160 168 104" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/></svg>',
 };
 const ic = name => '<span class="icon">' + icons[name] + '</span>';
 
@@ -827,7 +828,7 @@ function treeCard(t, d) {
   if (d.linearEnabled) {
     if (t.ticketId) {
       const lbl = t.ticketId + (t.ticketTitle ? ': ' + t.ticketTitle : '');
-      ticket = '<div class="row"><a class="ticket" data-cmd="openTicket" title="' + h(lbl) + '">' + h(lbl) + '</a><button class="btn faint" data-cmd="detachTicket">detach</button></div>';
+      ticket = '<div class="row">' + ic('checkbox') + '<a class="ticket" data-cmd="openTicket" title="' + h(lbl) + '">' + h(lbl) + '</a><button class="btn faint" data-cmd="detachTicket">detach</button></div>';
     } else {
       ticket = '<div class="row"><button class="btn faint" data-cmd="linkTicket" style="flex:1">' + ic('link') + ' No ticket</button></div>';
     }
