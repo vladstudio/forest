@@ -11,7 +11,7 @@ import { StatusBarManager } from './managers/StatusBarManager';
 import { ForestWebviewProvider } from './views/ForestWebviewProvider';
 import { ShortcutsTreeProvider } from './views/ShortcutsTreeProvider';
 import { StashesTreeProvider } from './views/StashesTreeProvider';
-import { create, start } from './commands/create';
+import { start } from './commands/create';
 import { linkTicket } from './commands/linkTicket';
 import { switchTree } from './commands/switch';
 import { ship } from './commands/ship';
@@ -215,6 +215,7 @@ export async function activate(context: vscode.ExtensionContext) {
     config, stateManager, shortcutManager,
     statusBarManager, forestProvider, outputChannel, currentTree,
   };
+  forestProvider.setContext(ctx);
 
   // Register commands — wrap all handlers so unhandled errors become visible
   const reg = (id: string, fn: (...args: any[]) => any) =>
@@ -231,7 +232,7 @@ export async function activate(context: vscode.ExtensionContext) {
     branch ? stateManager.getTree(stateManager.loadSync(), getRepoPath(), branch) : undefined;
   const andRefresh = <T>(fn: () => Promise<T>) => async () => { await fn(); forestProvider.refreshTrees(); };
 
-  reg('forest.create', () => create(ctx));
+  reg('forest.create', () => ctx.forestProvider.showCreateForm());
   reg('forest.start', (arg: { ticketId: string; title: string }) => start(ctx, arg));
   reg('forest.switch', (branch?: string) => switchTree(ctx, branch));
   reg('forest.ship', (branch?: string) => andRefresh(() => ship(ctx, lookupTree(branch)))());

@@ -9,6 +9,7 @@ import type { StatusBarManager } from './managers/StatusBarManager';
 export interface IForestProvider {
   refresh(): void;
   refreshTrees(): void;
+  showCreateForm(): void;
   dispose(): void;
 }
 
