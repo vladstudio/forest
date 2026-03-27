@@ -95,7 +95,7 @@ export class ShortcutManager {
     const env: Record<string, string> = {};
     if (sc.env) {
       for (const [k, v] of Object.entries(sc.env)) {
-        env[k] = this.resolveVars(v);
+        env[k] = v;
       }
     }
     const terminal = vscode.window.createTerminal({
@@ -106,7 +106,7 @@ export class ShortcutManager {
     });
     terminal.show(false);
     vscode.commands.executeCommand('workbench.action.terminal.focus');
-    if (sc.command) terminal.sendText(this.resolveVars(sc.command, true));
+    if (sc.command) terminal.sendText(sc.command);
     list.push(terminal);
     this.terminals.set(sc.name, list);
     this._onDidChange.fire();
@@ -115,7 +115,7 @@ export class ShortcutManager {
   private openExternalTerminal(sc: ShortcutConfig & { type: 'terminal' }, app: string): void {
     const cwd = this.currentTree?.path ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!cwd) return;
-    const cmd = sc.command ? this.resolveVars(sc.command, true) : undefined;
+    const cmd = sc.command;
     const lowerApp = app.toLowerCase();
 
     if (lowerApp === 'iterm' || lowerApp === 'iterm2') {
@@ -134,8 +134,8 @@ export class ShortcutManager {
   }
 
   private async openBrowser(sc: ShortcutConfig & { type: 'browser' }, viewColumn?: vscode.ViewColumn, browser?: string): Promise<void> {
-    const url = this.resolveVars(sc.url);
-    if (!url) { vscode.window.showWarningMessage(`Cannot open "${sc.name}": URL resolved to empty (variable not set).`); return; }
+    const url = sc.url.trim();
+    if (!url) { vscode.window.showWarningMessage(`Cannot open "${sc.name}": URL is empty.`); return; }
     this.openUrl(url, browser ?? sc.browser ?? this.config.browser[0], viewColumn);
   }
 
@@ -161,8 +161,7 @@ export class ShortcutManager {
   private async openFile(sc: ShortcutConfig & { type: 'file' }): Promise<void> {
     const base = this.currentTree?.path ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!base) return;
-    const resolved = this.resolveVars(sc.path);
-    const filePath = path.isAbsolute(resolved) ? resolved : path.join(base, resolved);
+    const filePath = path.isAbsolute(sc.path) ? sc.path : path.join(base, sc.path);
     await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath));
   }
 
@@ -175,25 +174,6 @@ export class ShortcutManager {
       this._onDidChange.fire();
       break;
     }
-  }
-
-  private resolveVars(value: string, forShell = false): string {
-    const tree = this.currentTree;
-    const ticketId = tree?.ticketId ?? '';
-    const branch = tree?.branch ?? '';
-    const slug = ticketId && branch.startsWith(ticketId)
-      ? branch.slice(ticketId.length).replace(/^-/, '')
-      : branch;
-    const prNumber = tree?.prUrl?.match(/\/pull\/(\d+)/)?.[1] ?? '';
-    const esc = forShell ? shellEscape : (v: string) => v;
-    return value
-      .replace(/\$\{ticketId\}/g, esc(ticketId))
-      .replace(/\$\{branch\}/g, esc(branch))
-      .replace(/\$\{repo\}/g, esc(tree ? path.basename(tree.repoPath) : ''))
-      .replace(/\$\{treePath\}/g, esc(tree?.path ?? ''))
-      .replace(/\$\{slug\}/g, esc(slug))
-      .replace(/\$\{prNumber\}/g, esc(prNumber))
-      .replace(/\$\{prUrl\}/g, esc(tree?.prUrl ?? ''));
   }
 
   updateTree(tree: TreeState): void {

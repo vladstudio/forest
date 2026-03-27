@@ -97,9 +97,7 @@ To set up Forest, ask Claude (or any AI) to read this README and generate `.fore
 | `browser`      | no       | `["integrated"]`      | Browser app list. First item is the default; right-click a shortcut to pick another. Values: `integrated` (VS Code integrated browser), `external` (system default), or an app name (e.g. `"Firefox"`)                                                                                                                            |
 | `terminal`     | no       | `["integrated"]`      | Terminal app list. First item is the default; right-click to pick another. Values: `integrated` (VS Code terminal), or an external app (`iTerm`, `Terminal`, `Ghostty`). External terminals receive the shortcut command automatically                                                                                     |
 
-**Shortcut types** are inferred from fields: `url` → browser, `path` → file, otherwise → terminal (explicit `type` still accepted). Shortcuts support `onNewTree: true` to auto-open when a tree is first created (e.g. for dependency installation). Terminals also accept `command` and `env`. Browser shortcuts accept a per-shortcut `browser` override (same values as the top-level `browser` setting). Both `browser` and `terminal` accept a single string for backward compatibility.
-
-**Variable expansion in shortcuts:** `${ticketId}`, `${branch}`, `${slug}`, `${repo}`, `${treePath}`, `${prNumber}`, `${prUrl}`.
+**Shortcut types** are inferred from fields: `url` → browser, `path` → file, otherwise → terminal (explicit `type` still accepted). Shortcuts support `onNewTree: true` to auto-open when a tree is first created (e.g. for dependency installation). Terminals also accept `command` and `env`. Browser shortcuts accept a per-shortcut `browser` override (same values as the top-level `browser` setting). Shortcut values are treated literally: Forest does not expand `${...}` placeholders inside shortcut commands, URLs, env vars, or file paths. Both `browser` and `terminal` accept a single string for backward compatibility.
 
 **`local.json`** (gitignored) merges over `config.json` — use for per-dev AI keys and overrides.
 
@@ -131,26 +129,6 @@ When a PR is merged, you get a notification: *"ENG-1234 PR was merged. Clean up?
 ### Update (Rebase + Refresh)
 
 `Update` fetches and merges (or rebases) your tree on the base branch and re-copies config files. If the merge/rebase fails, it shows an error.
-
-### Shortcut Variable Expansion
-
-Shortcuts support these variables in commands, URLs, and file paths:
-
-| Variable      | Description                       | Example value                             |
-| ------------- | --------------------------------- | ----------------------------------------- |
-| `${ticketId}` | Linear ticket ID                  | `ENG-123`                                 |
-| `${branch}`   | Full branch name                  | `ENG-123-fix-login`                       |
-| `${slug}`     | Branch name without ticket prefix | `fix-login`                               |
-| `${repo}`     | Repository name                   | `my-app`                                  |
-| `${treePath}` | Absolute path to the worktree     | `/Users/you/.forest/trees/my-app/ENG-123` |
-| `${prNumber}` | PR number (after ship)            | `42`                                      |
-| `${prUrl}`    | PR URL (after ship)               | `https://github.com/org/repo/pull/42`     |
-
-```json
-{ "name": "Linear", "url": "https://linear.app/team/issue/${ticketId}" },
-{ "name": "PR", "url": "${prUrl}" },
-{ "name": "logs", "command": "tail -f ${treePath}/logs/dev.log" }
-```
 
 ### Direnv Support
 
