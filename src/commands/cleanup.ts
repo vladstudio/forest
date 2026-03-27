@@ -4,7 +4,7 @@ import type { TreeState } from '../state';
 import { displayName } from '../state';
 import * as git from '../cli/git';
 import * as gh from '../cli/gh';
-import { deleteWorkspaceFiles, requireTree, runStep, updateLinear } from './shared';
+import { deleteWorkspaceFiles, ensureTreeIdle, requireTree, runStep, updateLinear } from './shared';
 import { log } from '../logger';
 
 const teardownInProgress = new Set<string>();
@@ -56,6 +56,7 @@ async function teardownTree(ctx: ForestContext, tree: TreeState, opts: TeardownO
 
 /** Cleanup after an already-merged PR — skips merge and confirmation. */
 export async function cleanupMerged(ctx: ForestContext, tree: TreeState): Promise<void> {
+  if (!await ensureTreeIdle(ctx, tree)) return;
   if (tree.path && await git.hasUncommittedChanges(tree.path)) {
     vscode.window.showWarningMessage('Tree has uncommitted changes. Commit or discard first.');
     return;
@@ -162,6 +163,7 @@ export async function executeDeletePlan(
   tree: TreeState & { path: string },
   plan: DeletePlan,
 ): Promise<boolean> {
+  if (!await ensureTreeIdle(ctx, tree)) return false;
   const name = displayName(tree);
 
   return vscode.window.withProgress(
@@ -191,10 +193,7 @@ export async function executeDeletePlan(
 export async function deleteTree(ctx: ForestContext, branchArg?: string, isDone?: boolean): Promise<void> {
   const tree = requireTree(ctx, branchArg, 'delete');
   if (!tree) return;
-  if (tree.busyOperation) {
-    vscode.window.showInformationMessage(`${displayName(tree)} is already ${tree.busyOperation}.`);
-    return;
-  }
+  if (!await ensureTreeIdle(ctx, tree)) return;
 
   if (ctx.forestProvider.showDeleteForm && await ctx.forestProvider.showDeleteForm(tree.branch)) return;
 

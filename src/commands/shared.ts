@@ -5,8 +5,7 @@ import * as os from 'os';
 import { repoHash, tryUnlinkSync } from '../utils/fs';
 import { type ForestConfig, getTreesDir } from '../config';
 import type { ForestContext } from '../context';
-import type { TreeState, StateManager } from '../state';
-import { displayName } from '../state';
+import { TREE_OPERATION_HEARTBEAT_MS, displayName, type TreeState, type StateManager } from '../state';
 import * as git from '../cli/git';
 import * as linear from '../cli/linear';
 import { exec, execShell } from '../utils/exec';
@@ -23,6 +22,20 @@ export function requireTree(ctx: ForestContext, arg: TreeState | string | undefi
   return tree as TreeState & { path: string };
 }
 
+export async function getBlockingTreeOperation(ctx: ForestContext, tree: Pick<TreeState, 'repoPath' | 'branch'>): Promise<string | undefined> {
+  const latest = ctx.stateManager.getTree(await ctx.stateManager.load(), tree.repoPath, tree.branch);
+  if (!latest) return undefined;
+  if (latest.cleaning) return 'cleaning up';
+  return latest.busyOperation;
+}
+
+export async function ensureTreeIdle(ctx: ForestContext, tree: TreeState): Promise<boolean> {
+  const active = await getBlockingTreeOperation(ctx, tree);
+  if (!active) return true;
+  vscode.window.showInformationMessage(`${displayName(tree)} is already ${active}.`);
+  return false;
+}
+
 export async function withTreeOperation<T>(
   ctx: ForestContext,
   tree: TreeState & { path: string },
@@ -35,9 +48,16 @@ export async function withTreeOperation<T>(
     return undefined;
   }
 
+  const heartbeat = setInterval(() => {
+    ctx.stateManager.touchTreeOperation(tree.repoPath, tree.branch, busyOperation).catch((e: any) => {
+      log.warn(`touchTreeOperation failed for ${tree.branch}: ${e.message}`);
+    });
+  }, TREE_OPERATION_HEARTBEAT_MS);
+
   try {
     return await fn();
   } finally {
+    clearInterval(heartbeat);
     await ctx.stateManager.clearTreeOperation(tree.repoPath, tree.branch, busyOperation).catch(() => {});
   }
 }

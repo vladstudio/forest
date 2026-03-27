@@ -15,8 +15,12 @@ export interface TreeState {
   mergeNotified?: boolean;
   cleaning?: boolean;
   busyOperation?: string;
+  busyHeartbeatAt?: string;
   needsSetup?: boolean;
 }
+
+export const TREE_OPERATION_HEARTBEAT_MS = 15_000;
+export const TREE_OPERATION_STALE_MS = 45_000;
 
 export interface ForestState {
   version: 1;
@@ -158,9 +162,18 @@ export class StateManager {
     });
   }
 
+  private isTreeOperationStale(tree: TreeState, now: number): boolean {
+    if (!tree.busyOperation) return false;
+    const heartbeat = tree.busyHeartbeatAt ? Date.parse(tree.busyHeartbeatAt) : NaN;
+    if (!Number.isFinite(heartbeat)) return true;
+    return now - heartbeat > TREE_OPERATION_STALE_MS;
+  }
+
   async tryStartTreeOperation(repoPath: string, branch: string, busyOperation: string): Promise<{ started: boolean; active?: string }> {
     let started = false;
     let active: string | undefined;
+    const now = Date.now();
+    const heartbeatAt = new Date(now).toISOString();
     await this.modify(state => {
       const k = this.key(repoPath, branch);
       const tree = state.trees[k];
@@ -169,14 +182,25 @@ export class StateManager {
         active = 'cleaning up';
         return;
       }
-      if (tree.busyOperation) {
+      if (tree.busyOperation && !this.isTreeOperationStale(tree, now)) {
         active = tree.busyOperation;
         return;
       }
-      state.trees[k] = { ...tree, busyOperation };
+      state.trees[k] = { ...tree, busyOperation, busyHeartbeatAt: heartbeatAt };
       started = true;
     });
     return { started, active };
+  }
+
+  async touchTreeOperation(repoPath: string, branch: string, busyOperation?: string): Promise<void> {
+    const heartbeatAt = new Date().toISOString();
+    await this.modify(state => {
+      const k = this.key(repoPath, branch);
+      const tree = state.trees[k];
+      if (!tree?.busyOperation) return;
+      if (busyOperation && tree.busyOperation !== busyOperation) return;
+      state.trees[k] = { ...tree, busyHeartbeatAt: heartbeatAt };
+    });
   }
 
   async clearTreeOperation(repoPath: string, branch: string, busyOperation?: string): Promise<void> {
@@ -185,8 +209,23 @@ export class StateManager {
       const tree = state.trees[k];
       if (!tree?.busyOperation) return;
       if (busyOperation && tree.busyOperation !== busyOperation) return;
-      state.trees[k] = { ...tree, busyOperation: undefined };
+      state.trees[k] = { ...tree, busyOperation: undefined, busyHeartbeatAt: undefined };
     });
+  }
+
+  async clearStaleTreeOperations(repoPath?: string): Promise<Array<{ branch: string; busyOperation: string }>> {
+    const cleared: Array<{ branch: string; busyOperation: string }> = [];
+    const now = Date.now();
+    await this.modify(state => {
+      for (const tree of Object.values(state.trees)) {
+        if (repoPath && tree.repoPath !== repoPath) continue;
+        if (!tree.busyOperation || !this.isTreeOperationStale(tree, now)) continue;
+        cleared.push({ branch: tree.branch, busyOperation: tree.busyOperation });
+        tree.busyOperation = undefined;
+        tree.busyHeartbeatAt = undefined;
+      }
+    });
+    return cleared;
   }
 
   getTreesForRepo(state: ForestState, repoPath: string): TreeState[] {

@@ -112,12 +112,12 @@ export async function activate(context: vscode.ExtensionContext) {
   // cleaning:true + path exists  → teardown never ran; clear the flag so the user can retry.
   // cleaning:true + path missing → handled by pruneOrphans below (orphan removal).
   {
+    const clearedBusy = await stateManager.clearStaleTreeOperations(repoPath);
+    for (const tree of clearedBusy) {
+      log.info(`Clearing stale busy flag: ${tree.branch} (${tree.busyOperation})`);
+    }
     const s = await stateManager.load();
     for (const tree of stateManager.getTreesForRepo(s, repoPath)) {
-      if (tree.busyOperation) {
-        log.info(`Clearing stale busy flag: ${tree.branch} (${tree.busyOperation})`);
-        await stateManager.updateTree(tree.repoPath, tree.branch, { busyOperation: undefined });
-      }
       if (tree.cleaning && tree.path && fs.existsSync(tree.path)) {
         log.info(`Clearing stale cleaning flag: ${tree.branch}`);
         await stateManager.updateTree(tree.repoPath, tree.branch, { cleaning: undefined });

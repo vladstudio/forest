@@ -11,7 +11,7 @@ import * as gh from '../cli/gh';
 import * as linear from '../cli/linear';
 import * as ai from '../cli/ai';
 import { shortBaseBranch, slugify } from '../utils/slug';
-import { copyConfigFiles, createTree, ensureWorkspaceFile, focusOrOpenWindow, updateLinear, withTreeOperation } from '../commands/shared';
+import { copyConfigFiles, createTree, ensureTreeIdle, ensureWorkspaceFile, focusOrOpenWindow, getBlockingTreeOperation, updateLinear, withTreeOperation } from '../commands/shared';
 import { executeDeletePlan, type DeletePlan } from '../commands/cleanup';
 import { pickIssue } from '../commands/create';
 import { log } from '../logger';
@@ -115,6 +115,11 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
     const state = await this.stateManager.load();
     const tree = this.stateManager.getTree(state, repoPath, branch);
     if (!tree?.path) return false;
+    const active = await getBlockingTreeOperation(this.ctx, tree);
+    if (active) {
+      vscode.window.showInformationMessage(`${displayName(tree)} is already ${active}.`);
+      return true;
+    }
 
     const pr = this.config.github.enabled ? await gh.prStatus(tree.path).catch(() => null) : null;
     const defaultLinearAction = pr?.state === 'MERGED' ? 'cleanup' : 'cancel';
@@ -604,6 +609,10 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
 
     if (!tree?.path) {
       this.postMessage({ type: 'deleteResult', success: false, error: 'Tree path is missing.' });
+      return;
+    }
+    if (!await ensureTreeIdle(ctx, tree)) {
+      this.postMessage({ type: 'deleteResult', success: false, error: `${displayName(tree)} is busy with another Git operation.` });
       return;
     }
 
