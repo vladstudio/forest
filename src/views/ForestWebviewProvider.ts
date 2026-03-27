@@ -558,15 +558,12 @@ a[data-cmd]:hover { opacity: 0.7; }
 .icon { display: inline-flex; align-items: center; }
 .icon svg { width: 14px; height: 14px; fill: currentColor; }
 button { cursor: pointer; font-family: var(--vscode-font-family); border: none; border-radius: 3px; }
-.btn { background: none; color: var(--vscode-foreground); padding: 1px 5px; font-size: 11px; border: 1px solid var(--vscode-activityBar-border, rgba(128,128,128,0.3)); opacity: 0.75; white-space: nowrap; display: inline-flex; align-items: center; gap: 2px; }
+.btn { background: none; color: var(--vscode-foreground); padding: 2px 4px; font-size: 12px; border: 1px solid var(--vscode-activityBar-border, rgba(128,128,128,0.3)); opacity: 0.9; white-space: nowrap; display: inline-flex; align-items: center; justify-contenet: center; gap: 2px; min-height: 20px; text-align: center; }
 .btn:hover { opacity: 1; background: var(--vscode-toolbar-hoverBackground); }
 .btn.faint { opacity: 0.45; }
 .btn.faint:hover { opacity: 0.8; }
 .btn.danger { color: var(--vscode-errorForeground, #f44736) !important; }
-.btn-main { flex: 1; background: var(--vscode-button-background); color: var(--vscode-button-foreground); padding: 4px 8px; font-size: 12px; }
-.btn-main:hover { background: var(--vscode-button-hoverBackground); }
-.btn-pr { flex: 1; background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); padding: 4px 8px; font-size: 12px; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.btn-pr:hover { background: var(--vscode-button-secondaryHoverBackground); }
+.fill { flex: 1; }
 .form { padding: 8px; }
 .form-section { margin-bottom: 14px; }
 .form-row { display: flex; align-items: center; gap: 4px; margin-bottom: 6px; }
@@ -848,8 +845,8 @@ function treeCard(t, d) {
   const isDone = t.prState === 'MERGED' || t.prState === 'CLOSED';
   const doneFlag = isDone ? '1' : '0';
   const lastRow = (isDone || t.prNumber)
-    ? '<button class="btn-pr" data-cmd="openPR">PR#' + (t.prNumber || '?') + '</button><button class="btn danger" data-cmd="delete" data-done="' + doneFlag + '" title="Delete tree">' + ic('trash') + '</button>'
-    : '<button class="btn-main" data-cmd="ship">Ship</button><button class="btn danger" data-cmd="delete" data-done="0" title="Delete tree">' + ic('trash') + '</button>';
+    ? '<button class="btn fill" data-cmd="openPR">PR#' + (t.prNumber || '?') + '</button><button class="btn danger" data-cmd="delete" data-done="' + doneFlag + '" title="Delete tree">' + ic('trash') + '</button>'
+    : '<button class="btn fill" data-cmd="ship">Ship - Push and Create PR</button><button class="btn danger" data-cmd="delete" data-done="0" title="Delete tree">' + ic('trash') + '</button>';
   return '<div class="card current" data-key="' + h(t.key) + '">' +
     '<div class="row"><span class="branch" title="' + h(t.branch) + '">' + branchLabel + '</span></div>' +
     '<div class="row">' +
