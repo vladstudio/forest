@@ -11,7 +11,7 @@ import * as gh from '../cli/gh';
 import * as linear from '../cli/linear';
 import * as ai from '../cli/ai';
 import { shortBaseBranch, slugify } from '../utils/slug';
-import { copyConfigFiles, createTree, updateLinear } from '../commands/shared';
+import { copyConfigFiles, createTree, ensureWorkspaceFile, focusOrOpenWindow, updateLinear } from '../commands/shared';
 import { pickIssue } from '../commands/create';
 import { log } from '../logger';
 
@@ -197,7 +197,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
     const { command, key } = msg;
 
     if (command === 'switchToMain') {
-      vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(getRepoPath()), { forceNewWindow: true });
+      focusOrOpenWindow(vscode.Uri.file(getRepoPath()));
       return;
     }
 
@@ -292,7 +292,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
         break;
 
       case 'switch':
-        if (tree?.path) vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(tree.path), { forceNewWindow: true });
+        if (tree?.path) focusOrOpenWindow(vscode.Uri.file(ensureWorkspaceFile(tree)));
         break;
 
       case 'workingDiff': {

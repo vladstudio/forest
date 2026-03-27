@@ -18,7 +18,7 @@ import { ship } from './commands/ship';
 import { cleanupMerged, deleteTree } from './commands/cleanup';
 import { update, rebase, pull, push } from './commands/update';
 import { list } from './commands/list';
-import { deleteWorkspaceFiles } from './commands/shared';
+import { deleteWorkspaceFiles, focusOrOpenWindow } from './commands/shared';
 import * as git from './cli/git';
 import * as gh from './cli/gh';
 import * as linear from './cli/linear';
@@ -242,7 +242,7 @@ export async function activate(context: vscode.ExtensionContext) {
   reg('forest.pull', () => andRefresh(() => pull(ctx))());
   reg('forest.push', () => andRefresh(() => push(ctx))());
   reg('forest.list', () => list(ctx));
-  reg('forest.openMain', () => vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(repoPath), { forceNewWindow: true }));
+  reg('forest.openMain', () => focusOrOpenWindow(vscode.Uri.file(repoPath)));
   reg('forest.refresh', () => forestProvider.refresh());
   reg('forest.copyBranch', () => {
     if (ctx.currentTree) vscode.env.clipboard.writeText(ctx.currentTree.branch);

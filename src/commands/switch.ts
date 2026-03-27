@@ -5,7 +5,7 @@ import type { ForestContext } from '../context';
 import { displayName } from '../state';
 import { getRepoPath } from '../context';
 import { execShell } from '../utils/exec';
-import { ensureWorkspaceFile } from './shared';
+import { ensureWorkspaceFile, focusOrOpenWindow } from './shared';
 
 export async function switchTree(ctx: ForestContext, branchArg?: string): Promise<void> {
   let branch = branchArg;
@@ -32,5 +32,5 @@ export async function switchTree(ctx: ForestContext, branchArg?: string): Promis
   }
 
   const wsFile = ensureWorkspaceFile(tree);
-  await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(wsFile), { forceNewWindow: true });
+  await focusOrOpenWindow(vscode.Uri.file(wsFile));
 }

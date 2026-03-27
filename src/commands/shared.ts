@@ -9,7 +9,7 @@ import type { TreeState, StateManager } from '../state';
 import { displayName } from '../state';
 import * as git from '../cli/git';
 import * as linear from '../cli/linear';
-import { execShell } from '../utils/exec';
+import { exec, execShell } from '../utils/exec';
 import { getRepoPath } from '../context';
 import { log } from '../logger';
 
@@ -249,4 +249,16 @@ export function ensureWorkspaceFile(tree: TreeState): string {
     tryUnlinkSync(legacyPath);
   }
   return wsPath;
+}
+
+/** On macOS, `open -a` deduplicates windows natively. Falls back to forceNewWindow elsewhere. */
+export async function focusOrOpenWindow(uri: vscode.Uri): Promise<void> {
+  if (process.platform === 'darwin') {
+    try {
+      const appPath = process.execPath.replace(/\/Contents\/.*$/, '');
+      await exec('open', ['-a', appPath, uri.fsPath], { timeout: 10_000 });
+      return;
+    } catch { /* fall through */ }
+  }
+  await vscode.commands.executeCommand('vscode.openFolder', uri, { forceNewWindow: true });
 }
