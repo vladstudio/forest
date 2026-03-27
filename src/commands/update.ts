@@ -3,7 +3,7 @@ import type { ForestContext } from '../context';
 import type { TreeState } from '../state';
 import { displayName } from '../state';
 import * as git from '../cli/git';
-import { copyConfigFiles, requireTree } from './shared';
+import { copyConfigFiles, requireTree, withTreeOperation } from './shared';
 
 function showTimedNotification(message: string, ms = 2000): void {
   vscode.window.withProgress(
@@ -18,22 +18,27 @@ async function syncTree(ctx: ForestContext, treeArg: TreeState | undefined, mode
   if (!tree) return;
   const config = ctx.config;
 
-  await vscode.window.withProgress(
-    { location: vscode.ProgressLocation.Notification, title: `${mode === 'merge' ? 'Updating' : 'Rebasing'} ${displayName(tree)}...` },
-    async (progress) => {
-      progress.report({ message: mode === 'merge' ? 'Pulling latest...' : 'Rebasing onto main...' });
-      try {
-        await (mode === 'merge' ? git.pullMerge : git.pullRebase)(tree.path!, config.baseBranch);
-      } catch (e: any) {
-        vscode.window.showErrorMessage(`${label} failed: ${e.message}. Resolve conflicts manually.`);
-        return;
-      }
+  await withTreeOperation(
+    ctx,
+    tree,
+    mode === 'merge' ? 'updating' : 'rebasing',
+    () => vscode.window.withProgress(
+      { location: vscode.ProgressLocation.Notification, title: `${mode === 'merge' ? 'Updating' : 'Rebasing'} ${displayName(tree)}...` },
+      async (progress) => {
+        progress.report({ message: mode === 'merge' ? 'Pulling latest...' : 'Rebasing onto main...' });
+        try {
+          await (mode === 'merge' ? git.pullMerge : git.pullRebase)(tree.path!, config.baseBranch);
+        } catch (e: any) {
+          vscode.window.showErrorMessage(`${label} failed: ${e.message}. Resolve conflicts manually.`);
+          return;
+        }
 
-      progress.report({ message: 'Copying files...' });
-      copyConfigFiles(config, tree.repoPath, tree.path!);
+        progress.report({ message: 'Copying files...' });
+        copyConfigFiles(config, tree.repoPath, tree.path!);
 
-      showTimedNotification(`Tree ${mode === 'merge' ? 'updated' : 'rebased'}.`);
-    },
+        showTimedNotification(`Tree ${mode === 'merge' ? 'updated' : 'rebased'}.`);
+      },
+    ),
   );
 }
 
@@ -42,27 +47,32 @@ export const rebase = (ctx: ForestContext, treeArg?: TreeState) => syncTree(ctx,
 
 async function gitAction(
   ctx: ForestContext, treeArg: TreeState | undefined,
-  opts: { action: string; label: string; gitFn: (tree: TreeState) => Promise<void> },
+  opts: { action: string; label: string; busyOperation: string; gitFn: (tree: TreeState) => Promise<void> },
 ): Promise<void> {
   const tree = requireTree(ctx, treeArg, opts.action);
   if (!tree) return;
 
-  await vscode.window.withProgress(
-    { location: vscode.ProgressLocation.Notification, title: `${opts.label}ing ${displayName(tree)}...` },
-    async () => {
-      try {
-        await opts.gitFn(tree);
-      } catch (e: any) {
-        vscode.window.showErrorMessage(`${opts.label} failed: ${e.message}`);
-        return;
-      }
-      showTimedNotification(`${opts.label}ed.`);
-    },
+  await withTreeOperation(
+    ctx,
+    tree,
+    opts.busyOperation,
+    () => vscode.window.withProgress(
+      { location: vscode.ProgressLocation.Notification, title: `${opts.label}ing ${displayName(tree)}...` },
+      async () => {
+        try {
+          await opts.gitFn(tree);
+        } catch (e: any) {
+          vscode.window.showErrorMessage(`${opts.label} failed: ${e.message}`);
+          return;
+        }
+        showTimedNotification(`${opts.label}ed.`);
+      },
+    ),
   );
 }
 
 export const pull = (ctx: ForestContext, treeArg?: TreeState) =>
-  gitAction(ctx, treeArg, { action: 'pull', label: 'Pull', gitFn: t => git.pull(t.path!) });
+  gitAction(ctx, treeArg, { action: 'pull', label: 'Pull', busyOperation: 'pulling', gitFn: t => git.pull(t.path!) });
 
 export const push = (ctx: ForestContext, treeArg?: TreeState) =>
-  gitAction(ctx, treeArg, { action: 'push', label: 'Push', gitFn: t => git.pushBranch(t.path!, t.branch) });
+  gitAction(ctx, treeArg, { action: 'push', label: 'Push', busyOperation: 'pushing', gitFn: t => git.pushBranch(t.path!, t.branch) });

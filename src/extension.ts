@@ -114,6 +114,10 @@ export async function activate(context: vscode.ExtensionContext) {
   {
     const s = await stateManager.load();
     for (const tree of stateManager.getTreesForRepo(s, repoPath)) {
+      if (tree.busyOperation) {
+        log.info(`Clearing stale busy flag: ${tree.branch} (${tree.busyOperation})`);
+        await stateManager.updateTree(tree.repoPath, tree.branch, { busyOperation: undefined });
+      }
       if (tree.cleaning && tree.path && fs.existsSync(tree.path)) {
         log.info(`Clearing stale cleaning flag: ${tree.branch}`);
         await stateManager.updateTree(tree.repoPath, tree.branch, { cleaning: undefined });

@@ -11,7 +11,7 @@ import * as gh from '../cli/gh';
 import * as linear from '../cli/linear';
 import * as ai from '../cli/ai';
 import { shortBaseBranch, slugify } from '../utils/slug';
-import { copyConfigFiles, createTree, ensureWorkspaceFile, focusOrOpenWindow, updateLinear } from '../commands/shared';
+import { copyConfigFiles, createTree, ensureWorkspaceFile, focusOrOpenWindow, updateLinear, withTreeOperation } from '../commands/shared';
 import { executeDeletePlan, type DeletePlan } from '../commands/cleanup';
 import { pickIssue } from '../commands/create';
 import { log } from '../logger';
@@ -30,6 +30,7 @@ interface TreeCardData {
   localChanges: { added: number; removed: number; modified: number } | null;
   isCurrent: boolean;
   cleaning: boolean;
+  busyOperation?: string;
 }
 
 interface WebviewData {
@@ -41,6 +42,14 @@ interface WebviewData {
   groups: Array<{ label: string; trees: TreeCardData[] }>;
 }
 
+function gitRefUri(filePath: string, ref: string): vscode.Uri {
+  const fileUri = vscode.Uri.file(filePath);
+  return fileUri.with({
+    scheme: 'git',
+    query: JSON.stringify({ path: fileUri.fsPath, ref }),
+  });
+}
+
 /** Maps a TreeState to the base fields shared by all card states. */
 function baseCard(t: TreeState, isCurrent: boolean): TreeCardData {
   return {
@@ -48,7 +57,7 @@ function baseCard(t: TreeState, isCurrent: boolean): TreeCardData {
     branch: t.branch, path: t.path,
     ticketId: t.ticketId, ticketTitle: t.title,
     behind: 0, ahead: 0, localChanges: null,
-    isCurrent, cleaning: false,
+    isCurrent, cleaning: false, busyOperation: t.busyOperation,
   };
 }
 
@@ -203,6 +212,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
       const card = cardResults[i];
       if (!card) return;
       card.isCurrent = isCurrent;
+      card.busyOperation = t.busyOperation;
       const s = card.prState;
       if (s === 'MERGED') done.push(card);
       else if (s === 'CLOSED') closed.push(card);
@@ -225,6 +235,86 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
       linearEnabled: this.config.linear.enabled,
       groups,
     };
+  }
+
+  private async openBaseDiff(tree: TreeState): Promise<void> {
+    if (!tree.path) return;
+    const { mergeBase, changes } = await git.diffFilesFromBase(tree.path, this.config.baseBranch);
+    await this.openRefDiff(tree, {
+      title: 'branch diff',
+      leftRef: mergeBase,
+      rightRef: 'HEAD',
+      changes,
+      emptyMessage: `No branch changes from ${shortBaseBranch(this.config.baseBranch)}.`,
+      sourcePath: `${tree.path}/${mergeBase}...HEAD`,
+    });
+  }
+
+  private async openMainDiff(tree: TreeState): Promise<void> {
+    if (!tree.path) return;
+    const changes = await git.diffFilesBetweenRefs(tree.path, this.config.baseBranch, 'HEAD');
+    await this.openRefDiff(tree, {
+      title: 'main diff',
+      leftRef: this.config.baseBranch,
+      rightRef: 'HEAD',
+      changes,
+      emptyMessage: `No differences between ${shortBaseBranch(this.config.baseBranch)} and this branch.`,
+      sourcePath: `${tree.path}/${this.config.baseBranch}..HEAD`,
+    });
+  }
+
+  private async openRefDiff(
+    tree: TreeState,
+    opts: {
+      title: string;
+      leftRef: string;
+      rightRef: string;
+      changes: git.DiffFileChange[];
+      emptyMessage: string;
+      sourcePath: string;
+    },
+  ): Promise<void> {
+    if (!tree.path) return;
+    if (!opts.changes.length) {
+      vscode.window.showInformationMessage(opts.emptyMessage);
+      return;
+    }
+
+    const resources = opts.changes.map(change => {
+      switch (change.status) {
+        case 'A':
+          return {
+            originalUri: undefined,
+            modifiedUri: gitRefUri(path.join(tree.path!, change.path), opts.rightRef),
+          };
+        case 'D':
+          return {
+            originalUri: gitRefUri(path.join(tree.path!, change.path), opts.leftRef),
+            modifiedUri: undefined,
+          };
+        case 'R':
+        case 'C':
+          return {
+            originalUri: gitRefUri(path.join(tree.path!, change.originalPath!), opts.leftRef),
+            modifiedUri: gitRefUri(path.join(tree.path!, change.path), opts.rightRef),
+          };
+        default:
+          return {
+            originalUri: gitRefUri(path.join(tree.path!, change.path), opts.leftRef),
+            modifiedUri: gitRefUri(path.join(tree.path!, change.path), opts.rightRef),
+          };
+      }
+    });
+
+    try {
+      await vscode.commands.executeCommand('_workbench.openMultiDiffEditor', {
+        multiDiffSourceUri: vscode.Uri.from({ scheme: 'forest-ref-compare', path: opts.sourcePath }),
+        title: opts.title,
+        resources,
+      });
+    } catch {
+      await vscode.commands.executeCommand('workbench.view.scm');
+    }
   }
 
   private async handleMessage(msg: Record<string, any>): Promise<void> {
@@ -277,29 +367,36 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
     const branch = key.slice(colonIdx + 1);
     const state = await this.stateManager.load();
     const tree = this.stateManager.getTree(state, repoPath, branch);
+    const ctx = this.ctx;
 
-    const withProgress = async (title: string, fn: () => Promise<void>) => {
-      await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title },
-        async () => { try { await fn(); } catch (e: any) { vscode.window.showErrorMessage(`Forest: ${e.message}`); } },
+    const withProgress = async (busyOperation: string, title: string, fn: () => Promise<void>) => {
+      if (!ctx || !tree?.path) return;
+      await withTreeOperation(
+        ctx,
+        tree as TreeState & { path: string },
+        busyOperation,
+        () => vscode.window.withProgress(
+          { location: vscode.ProgressLocation.Notification, title },
+          async () => { try { await fn(); } catch (e: any) { vscode.window.showErrorMessage(`Forest: ${e.message}`); } },
+        ),
       );
       this.refresh();
     };
 
     switch (command) {
       case 'pull':
-        if (!tree || !tree.path) return;
-        await withProgress('Pulling...', () => git.pull(tree.path!));
+        if (!tree?.path) return;
+        await withProgress('pulling', 'Pulling...', () => git.pull(tree.path!));
         break;
 
       case 'push':
-        if (!tree || !tree.path) return;
-        await withProgress('Pushing...', () => git.pushBranch(tree.path!, tree.branch));
+        if (!tree?.path) return;
+        await withProgress('pushing', 'Pushing...', () => git.pushBranch(tree.path!, tree.branch));
         break;
 
       case 'mergeFromMain':
-        if (!tree || !tree.path) return;
-        await withProgress('Merging from main...', async () => {
+        if (!tree?.path) return;
+        await withProgress('merging', 'Merging from main...', async () => {
           await git.pullMerge(tree.path!, this.config.baseBranch);
           copyConfigFiles(this.config, tree.repoPath, tree.path!);
         });
@@ -338,17 +435,19 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
         if (!tree || !tree.path) return;
         const hasChanges = await git.hasUncommittedChanges(tree.path);
         if (!hasChanges) { vscode.window.showInformationMessage('No working changes.'); return; }
-        // Open SCM view to show native diff
-        await vscode.commands.executeCommand('workbench.view.scm');
+        await vscode.commands.executeCommand('git.viewChanges', vscode.Uri.file(tree.path));
         break;
       }
 
       case 'branchDiff': {
         if (!tree || !tree.path) return;
-        const bdiff = await git.diffFromBase(tree.path, this.config.baseBranch);
-        if (!bdiff.trim()) { vscode.window.showInformationMessage('No changes from base branch.'); return; }
-        // Open SCM view - user can then click on individual files to see branch diff
-        await vscode.commands.executeCommand('workbench.view.scm');
+        await this.openBaseDiff(tree);
+        break;
+      }
+
+      case 'mainDiff': {
+        if (!tree || !tree.path) return;
+        await this.openMainDiff(tree);
         break;
       }
 
@@ -374,7 +473,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
           ignoreFocusOut: true,
         });
         if (!confirmed) return;
-        await withProgress('Committing...', () => git.commitAll(tree.path!, confirmed));
+        await withProgress('committing', 'Committing...', () => git.commitAll(tree.path!, confirmed));
         break;
       }
 
@@ -385,7 +484,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
           { placeHolder: 'What to discard?' },
         );
         if (!pick) return;
-        await withProgress('Discarding...', () =>
+        await withProgress('discarding', 'Discarding...', () =>
           pick.id === 'unstaged' ? git.discardUnstaged(tree.path!) : git.discardChanges(tree.path!),
         );
         break;
@@ -560,9 +659,10 @@ a[data-cmd]:hover { opacity: 0.7; }
 .icon svg[stroke] { fill: none; }
 button { cursor: pointer; font-family: var(--vscode-font-family); border: none; border-radius: 3px; }
 .btn { background: none; color: var(--vscode-foreground); padding: 2px 4px; font-size: 12px; border: 1px solid var(--vscode-activityBar-border, rgba(128,128,128,0.3)); opacity: 0.9; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 2px; min-height: 20px; text-align: center; }
-.btn:hover { opacity: 1; background: var(--vscode-toolbar-hoverBackground); }
+.btn:hover:not(:disabled) { opacity: 1; background: var(--vscode-toolbar-hoverBackground); }
+.btn:disabled { opacity: 0.5; cursor: default; }
 .btn.faint { opacity: 0.45; }
-.btn.faint:hover { opacity: 0.8; }
+.btn.faint:hover:not(:disabled) { opacity: 0.8; }
 .btn.danger { color: var(--vscode-errorForeground, #f44736) !important; }
 .fill { flex: 1; }
 .form { padding: 8px; }
@@ -746,6 +846,7 @@ document.getElementById('root').addEventListener('click', e => {
 });
 
 const h = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const dis = v => v ? ' disabled' : '';
 
 function sanitizeBranch(v) {
   return v.replace(/[<>:"|?*\\x00-\\x1f\\s~^\\\\]+/g, '-').replace(/\\.{2,}/g, '-').replace(/\\/\\//g, '/').replace(/-+/g, '-').replace(/^[-./]+|[-./]+$/g, '');
@@ -771,6 +872,8 @@ function autoFillBranch() {
 const icons = {
   house: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><path d="M219.31,108.68l-80-80a16,16,0,0,0-22.62,0l-80,80A15.87,15.87,0,0,0,32,120v96a8,8,0,0,0,8,8h64a8,8,0,0,0,8-8V160h32v56a8,8,0,0,0,8,8h64a8,8,0,0,0,8-8V120A15.87,15.87,0,0,0,219.31,108.68ZM208,208H160V152a8,8,0,0,0-8-8H104a8,8,0,0,0-8,8v56H48V120l80-80,80,80Z"/></svg>',
   folderOpen: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><path d="M245,110.64A16,16,0,0,0,232,104H216V88a16,16,0,0,0-16-16H130.67L102.94,51.2a16.14,16.14,0,0,0-9.6-3.2H40A16,16,0,0,0,24,64V208h0a8,8,0,0,0,8,8H211.1a8,8,0,0,0,7.59-5.47l28.49-85.47A16.05,16.05,0,0,0,245,110.64ZM93.34,64,123.2,86.4A8,8,0,0,0,128,88h72v16H69.77a16,16,0,0,0-15.18,10.94L40,158.7V64Zm112,136H43.1l26.67-80H232Z"/></svg>',
+  diff: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><rect width="256" height="256" fill="none"/><path d="M200,168V110.63a16,16,0,0,0-4.69-11.32L144,48" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/><polyline points="144 96 144 48 192 48" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/><path d="M56,88v57.37a16,16,0,0,0,4.69,11.32L112,208" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/><polyline points="112 160 112 208 64 208" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/><circle cx="56" cy="64" r="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/><circle cx="200" cy="192" r="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/></svg>',
+  x: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><rect width="256" height="256" fill="none"/><line x1="200" y1="56" x2="56" y2="200" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/><line x1="200" y1="200" x2="56" y2="56" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/></svg>',
   copy: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><path d="M216,32H88a8,8,0,0,0-8,8V80H40a8,8,0,0,0-8,8V216a8,8,0,0,0,8,8H168a8,8,0,0,0,8-8V176h40a8,8,0,0,0,8-8V40A8,8,0,0,0,216,32ZM160,208H48V96H160Zm48-48H176V88a8,8,0,0,0-8-8H96V48H208Z"/></svg>',
   arrowDown: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><path d="M205.66,149.66l-72,72a8,8,0,0,1-11.32,0l-72-72a8,8,0,0,1,11.32-11.32L120,196.69V40a8,8,0,0,1,16,0V196.69l58.34-58.35a8,8,0,0,1,11.32,11.32Z"/></svg>',
   arrowUp: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><path d="M205.66,117.66a8,8,0,0,1-11.32,0L136,59.31V216a8,8,0,0,1-16,0V59.31L61.66,117.66a8,8,0,0,1-11.32-11.32l72-72a8,8,0,0,1,11.32,0l72,72A8,8,0,0,1,205.66,117.66Z"/></svg>',
@@ -823,7 +926,9 @@ function treeCard(t, d) {
   const branchLabel = ic('gitBranch') + ' ' + h(t.branch);
   if (t.cleaning) return '<div class="card" data-key="' + h(t.key) + '"><div class="row"><span class="branch">' + branchLabel + '</span><span class="dim">cleaning up\\u2026</span></div></div>';
   if (!t.isCurrent) return '<div class="card" data-key="' + h(t.key) + '"><div class="row"><a class="branch" data-cmd="switch" title="' + h(t.branch) + '">' + branchLabel + '</a></div></div>';
-  const behind = t.behind > 0 ? '<button class="btn" data-cmd="mergeFromMain" title="Merge ' + t.behind + ' commits from main">main \\u2193' + t.behind + '</button>' : '';
+  const gitDisabled = !!t.busyOperation;
+  const busy = t.busyOperation ? '<span class="dim">' + h(t.busyOperation) + '\\u2026</span>' : '';
+  const behind = t.behind > 0 ? '<button class="btn" data-cmd="mergeFromMain" title="Merge ' + t.behind + ' commits from main"' + dis(gitDisabled) + '>main \\u2193' + t.behind + '</button>' : '';
   const pushLabel = t.ahead > 0 ? ic('arrowUp') + t.ahead : ic('arrowUp');
   let ticket = '';
   if (d.linearEnabled) {
@@ -839,23 +944,24 @@ function treeCard(t, d) {
     const lc = t.localChanges;
     const stats = [lc.added ? '<span class="add">+' + lc.added + '</span>' : '', lc.removed ? '<span class="del">-' + lc.removed + '</span>' : '', lc.modified ? '<span class="mod">~' + lc.modified + '</span>' : ''].filter(Boolean).join(' ');
     changes = '<div class="row"><span class="stats">' + stats + '</span>' +
-      '<button class="btn" data-cmd="workingDiff">diff</button>' +
-      '<button class="btn" data-cmd="branchDiff">branch diff</button>' +
-      (d.hasAI ? '<button class="btn" data-cmd="commit">commit</button>' : '') +
-      '<button class="btn danger" data-cmd="discard">discard</button></div>';
+      '<button class="btn" data-cmd="workingDiff" title="Diff working changes"' + dis(gitDisabled) + '>' + ic('diff') + '</button>' +
+      '<button class="btn" data-cmd="branchDiff" title="Diff branch changes"' + dis(gitDisabled) + '>' + ic('diff') + ' branch</button>' +
+      '<button class="btn" data-cmd="mainDiff" title="Diff main against branch"' + dis(gitDisabled) + '>' + ic('diff') + ' main</button>' +
+      (d.hasAI ? '<button class="btn" data-cmd="commit"' + dis(gitDisabled) + '>commit</button>' : '') +
+      '<button class="btn danger" data-cmd="discard" title="Discard changes"' + dis(gitDisabled) + '>' + ic('x') + '</button></div>';
   }
   const isDone = t.prState === 'MERGED' || t.prState === 'CLOSED';
   const doneFlag = isDone ? '1' : '0';
   const lastRow = (isDone || t.prNumber)
-    ? '<button class="btn fill" data-cmd="openPR">PR#' + (t.prNumber || '?') + '</button><button class="btn danger" data-cmd="delete" data-done="' + doneFlag + '" title="Delete tree">' + ic('trash') + '</button>'
-    : '<button class="btn fill" data-cmd="ship">Ship - Push and Create PR</button><button class="btn danger" data-cmd="delete" data-done="0" title="Delete tree">' + ic('trash') + '</button>';
+    ? '<button class="btn fill" data-cmd="openPR">PR#' + (t.prNumber || '?') + '</button><button class="btn danger" data-cmd="delete" data-done="' + doneFlag + '" title="Delete tree"' + dis(gitDisabled) + '>' + ic('trash') + '</button>'
+    : '<button class="btn fill" data-cmd="ship"' + dis(gitDisabled) + '>Ship - Push and Create PR</button><button class="btn danger" data-cmd="delete" data-done="0" title="Delete tree"' + dis(gitDisabled) + '>' + ic('trash') + '</button>';
   return '<div class="card current" data-key="' + h(t.key) + '">' +
-    '<div class="row"><span class="branch" title="' + h(t.branch) + '">' + branchLabel + '</span></div>' +
+    '<div class="row"><span class="branch" title="' + h(t.branch) + '">' + branchLabel + '</span>' + busy + '</div>' +
     '<div class="row">' +
       '<button class="btn" data-cmd="revealInFinder" title="Reveal in Finder">' + ic('folderOpen') + '</button>' +
       '<button class="btn" data-cmd="copyBranch" title="Copy branch name">' + ic('copy') + '</button>' +
-      '<button class="btn" data-cmd="pull" title="Pull from remote">' + ic('arrowDown') + '</button>' +
-      '<button class="btn" data-cmd="push" title="Push to remote">' + pushLabel + '</button>' +
+      '<button class="btn" data-cmd="pull" title="Pull from remote"' + dis(gitDisabled) + '>' + ic('arrowDown') + '</button>' +
+      '<button class="btn" data-cmd="push" title="Push to remote"' + dis(gitDisabled) + '>' + pushLabel + '</button>' +
       behind +
     '</div>' +
     ticket + changes +

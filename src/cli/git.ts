@@ -142,6 +142,48 @@ export async function diffFromBase(worktreePath: string, baseRef: string): Promi
   return stdout;
 }
 
+export interface DiffFileChange {
+  status: string;
+  path: string;
+  originalPath?: string;
+}
+
+export async function diffFilesFromBase(
+  worktreePath: string,
+  baseRef: string,
+): Promise<{ mergeBase: string; changes: DiffFileChange[] }> {
+  const { stdout: mergeBaseStdout } = await exec('git', ['merge-base', baseRef, 'HEAD'], { cwd: worktreePath, timeout: 10_000 });
+  const mergeBase = mergeBaseStdout.trim();
+  if (!mergeBase) throw new Error(`Could not resolve merge base for ${baseRef}`);
+
+  const changes = await diffFilesBetweenRefs(worktreePath, mergeBase, 'HEAD');
+  return { mergeBase, changes };
+}
+
+export async function diffFilesBetweenRefs(
+  worktreePath: string,
+  leftRef: string,
+  rightRef: string,
+): Promise<DiffFileChange[]> {
+  const { stdout } = await exec('git', ['diff', '--name-status', '-M', leftRef, rightRef], { cwd: worktreePath, timeout: 30_000 });
+  const changes = stdout
+    .split('\n')
+    .filter(Boolean)
+    .map(line => {
+      const parts = line.split('\t');
+      const status = parts[0]?.[0] ?? '';
+      if ((status === 'R' || status === 'C') && parts.length >= 3) {
+        return { status, originalPath: parts[1], path: parts[2] };
+      }
+      if (parts.length >= 2) {
+        return { status, path: parts[1] };
+      }
+      return null;
+    })
+    .filter((change): change is DiffFileChange => !!change && !!change.status && !!change.path);
+  return changes;
+}
+
 export async function lastCommitAge(worktreePath: string): Promise<string | null> {
   try {
     const { stdout } = await exec('git', ['log', '-1', '--format=%cr'], { cwd: worktreePath, timeout: 5_000 });

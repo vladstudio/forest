@@ -14,6 +14,7 @@ export interface TreeState {
   prUrl?: string;
   mergeNotified?: boolean;
   cleaning?: boolean;
+  busyOperation?: string;
   needsSetup?: boolean;
 }
 
@@ -154,6 +155,37 @@ export class StateManager {
       const k = this.key(repoPath, branch);
       if (state.trees[k]) state.trees[k] = { ...state.trees[k], ...updates };
       else log.warn(`updateTree: key ${k} not found in state`);
+    });
+  }
+
+  async tryStartTreeOperation(repoPath: string, branch: string, busyOperation: string): Promise<{ started: boolean; active?: string }> {
+    let started = false;
+    let active: string | undefined;
+    await this.modify(state => {
+      const k = this.key(repoPath, branch);
+      const tree = state.trees[k];
+      if (!tree) return;
+      if (tree.cleaning) {
+        active = 'cleaning up';
+        return;
+      }
+      if (tree.busyOperation) {
+        active = tree.busyOperation;
+        return;
+      }
+      state.trees[k] = { ...tree, busyOperation };
+      started = true;
+    });
+    return { started, active };
+  }
+
+  async clearTreeOperation(repoPath: string, branch: string, busyOperation?: string): Promise<void> {
+    await this.modify(state => {
+      const k = this.key(repoPath, branch);
+      const tree = state.trees[k];
+      if (!tree?.busyOperation) return;
+      if (busyOperation && tree.busyOperation !== busyOperation) return;
+      state.trees[k] = { ...tree, busyOperation: undefined };
     });
   }
 

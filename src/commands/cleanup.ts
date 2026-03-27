@@ -191,6 +191,10 @@ export async function executeDeletePlan(
 export async function deleteTree(ctx: ForestContext, branchArg?: string, isDone?: boolean): Promise<void> {
   const tree = requireTree(ctx, branchArg, 'delete');
   if (!tree) return;
+  if (tree.busyOperation) {
+    vscode.window.showInformationMessage(`${displayName(tree)} is already ${tree.busyOperation}.`);
+    return;
+  }
 
   if (ctx.forestProvider.showDeleteForm && await ctx.forestProvider.showDeleteForm(tree.branch)) return;
 

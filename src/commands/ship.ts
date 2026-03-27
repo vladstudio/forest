@@ -5,7 +5,7 @@ import * as git from '../cli/git';
 import * as gh from '../cli/gh';
 
 import { generatePRBody } from '../cli/ai';
-import { requireTree, updateLinear } from './shared';
+import { requireTree, updateLinear, withTreeOperation } from './shared';
 import { log } from '../logger';
 
 
@@ -40,53 +40,59 @@ export async function ship(ctx: ForestContext, treeArg?: import('../state').Tree
   }
 
   const name = displayName(tree);
-  const prUrl = await vscode.window.withProgress(
-    { location: vscode.ProgressLocation.Notification, title: `Shipping ${name}...` },
-    async (progress) => {
-      // Start push and diff generation in parallel (diff is local, push is network)
-      progress.report({ message: 'Pushing branch...' });
-      const pushPromise = git.pushBranch(tree.path!, tree.branch);
-      const prStatusPromise = ghEnabled && !tree.prUrl ? gh.prStatus(tree.path!) : Promise.resolve(null);
-      const diffPromise = config.ai ? git.diffFromBase(tree.path!, config.baseBranch) : Promise.resolve(null);
+  const prUrl = await withTreeOperation(
+    ctx,
+    tree,
+    'shipping',
+    () => vscode.window.withProgress(
+      { location: vscode.ProgressLocation.Notification, title: `Shipping ${name}...` },
+      async (progress) => {
+        // Start push and diff generation in parallel (diff is local, push is network)
+        progress.report({ message: 'Pushing branch...' });
+        const pushPromise = git.pushBranch(tree.path!, tree.branch);
+        const prStatusPromise = ghEnabled && !tree.prUrl ? gh.prStatus(tree.path!) : Promise.resolve(null);
+        const diffPromise = config.ai ? git.diffFromBase(tree.path!, config.baseBranch) : Promise.resolve(null);
 
-      let url: string | null = null;
-      if (ghEnabled) {
-        if (tree.prUrl) {
-          url = tree.prUrl;
-        } else {
-          const existing = await prStatusPromise;
-          if (existing?.url) {
-            url = existing.url;
+        let url: string | null = null;
+        if (ghEnabled) {
+          if (tree.prUrl) {
+            url = tree.prUrl;
           } else {
-            const prTitle = tree.ticketId && tree.title
-              ? `${tree.ticketId}: ${tree.title}`
-              : name;
+            const existing = await prStatusPromise;
+            if (existing?.url) {
+              url = existing.url;
+            } else {
+              const prTitle = tree.ticketId && tree.title
+                ? `${tree.ticketId}: ${tree.title}`
+                : name;
 
-            let prBody: string | undefined;
-            if (config.ai) {
-              try {
-                progress.report({ message: 'Generating PR description...' });
-                const diff = await diffPromise ?? '';
-                prBody = await generatePRBody(config.ai, diff, prTitle);
-              } catch (e: any) {
-                log.error(`AI PR body generation failed: ${e.message}`);
-                vscode.window.showWarningMessage(`AI description failed, using commits. ${e.message}`);
+              let prBody: string | undefined;
+              if (config.ai) {
+                try {
+                  progress.report({ message: 'Generating PR description...' });
+                  const diff = await diffPromise ?? '';
+                  prBody = await generatePRBody(config.ai, diff, prTitle);
+                } catch (e: any) {
+                  log.error(`AI PR body generation failed: ${e.message}`);
+                  vscode.window.showWarningMessage(`AI description failed, using commits. ${e.message}`);
+                }
               }
-            }
 
-            // Ensure push is done before creating PR
-            await pushPromise;
-            progress.report({ message: 'Creating PR...' });
-            url = await gh.createPR(tree.path!, config.baseBranch, prTitle, prBody);
+              // Ensure push is done before creating PR
+              await pushPromise;
+              progress.report({ message: 'Creating PR...' });
+              url = await gh.createPR(tree.path!, config.baseBranch, prTitle, prBody);
+            }
           }
         }
-      }
 
-      // Always ensure push completes (no-op if already awaited above)
-      await pushPromise;
-      return url;
-    },
+        // Always ensure push completes (no-op if already awaited above)
+        await pushPromise;
+        return url;
+      },
+    ),
   );
+  if (prUrl === undefined) return;
 
   if (prUrl) {
     vscode.window.showInformationMessage(`Shipped! PR: ${prUrl}`);

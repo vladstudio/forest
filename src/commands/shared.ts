@@ -23,6 +23,25 @@ export function requireTree(ctx: ForestContext, arg: TreeState | string | undefi
   return tree as TreeState & { path: string };
 }
 
+export async function withTreeOperation<T>(
+  ctx: ForestContext,
+  tree: TreeState & { path: string },
+  busyOperation: string,
+  fn: () => Promise<T> | Thenable<T>,
+): Promise<T | undefined> {
+  const { started, active } = await ctx.stateManager.tryStartTreeOperation(tree.repoPath, tree.branch, busyOperation);
+  if (!started) {
+    vscode.window.showInformationMessage(`${displayName(tree)} is already ${active ?? 'busy'}.`);
+    return undefined;
+  }
+
+  try {
+    return await fn();
+  } finally {
+    await ctx.stateManager.clearTreeOperation(tree.repoPath, tree.branch, busyOperation).catch(() => {});
+  }
+}
+
 /** Filter out issues that already have trees in the given repo. */
 export function filterUnlinkedIssues<T extends { id: string }>(
   issues: T[],
