@@ -3,18 +3,12 @@ import * as fs from 'fs';
 import type { ForestConfig } from '../config';
 import type { StateManager, TreeState } from '../state';
 import { MainRepoItem, NoTreesItem, StageGroupItem, IssueItem, TreeItemView } from './items';
-import type { TreeContext } from './items';
+import type { TreeContext, TreeHealth } from './items';
 import { getRepoPath } from '../context';
 import * as git from '../cli/git';
 import * as gh from '../cli/gh';
 import * as linear from '../cli/linear';
 import { filterUnlinkedIssues } from '../commands/shared';
-
-export interface TreeHealth {
-  behind: number;
-  age: string | null;
-  pr: { state: string; reviewDecision: string | null; number?: number; url?: string } | null;
-}
 
 type ForestElement = MainRepoItem | NoTreesItem | StageGroupItem | IssueItem | TreeItemView;
 

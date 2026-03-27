@@ -2,6 +2,7 @@ import type { AIConfig } from '../config';
 import { log } from '../logger';
 
 const MAX_DIFF_CHARS = 100_000;
+const MAX_DIFF_CHARS_COMMIT = 10_000;
 const MAX_TOKENS = 4096;
 
 export async function generatePRBody(config: AIConfig, diff: string, title: string): Promise<string> {
@@ -21,16 +22,25 @@ ${trimmedDiff}`;
   return message;
 }
 
-async function callProvider(config: AIConfig, prompt: string): Promise<string> {
+export async function generateCommitMessage(config: AIConfig, diff: string): Promise<string> {
+  const trimmed = diff.length > MAX_DIFF_CHARS_COMMIT
+    ? diff.slice(0, MAX_DIFF_CHARS_COMMIT) + '\n[diff truncated]'
+    : diff;
+  const prompt = `Write a concise one-line git commit message (under 72 characters). Use conventional commit format when appropriate (feat:, fix:, chore:, refactor:, etc.). Output only the commit message, nothing else.\n\nDiff:\n${trimmed}`;
+  log.info(`generateCommitMessage: provider=${config.provider} diffLen=${diff.length}`);
+  return callProvider(config, prompt, 'You write concise one-line git commit messages.');
+}
+
+async function callProvider(config: AIConfig, prompt: string, systemPrompt?: string): Promise<string> {
   switch (config.provider) {
-    case 'anthropic': return callAnthropic(config, prompt);
-    case 'openai': return callOpenAI(config, prompt);
-    case 'gemini': return callGemini(config, prompt);
+    case 'anthropic': return callAnthropic(config, prompt, systemPrompt);
+    case 'openai': return callOpenAI(config, prompt, systemPrompt);
+    case 'gemini': return callGemini(config, prompt, systemPrompt);
     default: throw new Error(`Unknown AI provider: ${config.provider}`);
   }
 }
 
-async function callAnthropic(config: AIConfig, prompt: string): Promise<string> {
+async function callAnthropic(config: AIConfig, prompt: string, systemPrompt?: string): Promise<string> {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -42,6 +52,7 @@ async function callAnthropic(config: AIConfig, prompt: string): Promise<string> 
       model: config.model,
       max_tokens: MAX_TOKENS,
       temperature: 0.3,
+      ...(systemPrompt ? { system: systemPrompt } : {}),
       messages: [{ role: 'user', content: prompt }],
     }),
     signal: AbortSignal.timeout(30_000),
@@ -58,7 +69,7 @@ async function callAnthropic(config: AIConfig, prompt: string): Promise<string> 
   return text.trim();
 }
 
-async function callOpenAI(config: AIConfig, prompt: string): Promise<string> {
+async function callOpenAI(config: AIConfig, prompt: string, systemPrompt?: string): Promise<string> {
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -70,7 +81,7 @@ async function callOpenAI(config: AIConfig, prompt: string): Promise<string> {
       max_tokens: MAX_TOKENS,
       temperature: 0.3,
       messages: [
-        { role: 'system', content: 'You write concise pull request descriptions.' },
+        { role: 'system', content: systemPrompt ?? 'You write concise pull request descriptions.' },
         { role: 'user', content: prompt },
       ],
     }),
@@ -88,13 +99,14 @@ async function callOpenAI(config: AIConfig, prompt: string): Promise<string> {
   return text.trim();
 }
 
-async function callGemini(config: AIConfig, prompt: string): Promise<string> {
+async function callGemini(config: AIConfig, prompt: string, systemPrompt?: string): Promise<string> {
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.apiKey },
       body: JSON.stringify({
+        ...(systemPrompt ? { systemInstruction: { parts: [{ text: systemPrompt }] } } : {}),
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: { temperature: 0.3, maxOutputTokens: MAX_TOKENS },
       }),

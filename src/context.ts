@@ -3,16 +3,21 @@ import * as path from 'path';
 import * as fs from 'fs';
 import type { ForestConfig } from './config';
 import type { StateManager, TreeState } from './state';
-import type { ForestTreeProvider } from './views/ForestTreeProvider';
 import type { ShortcutManager } from './managers/ShortcutManager';
 import type { StatusBarManager } from './managers/StatusBarManager';
+
+export interface IForestProvider {
+  refresh(): void;
+  refreshTrees(): void;
+  dispose(): void;
+}
 
 export interface ForestContext {
   config: ForestConfig;
   stateManager: StateManager;
   shortcutManager: ShortcutManager;
   statusBarManager: StatusBarManager;
-  forestProvider: ForestTreeProvider;
+  forestProvider: IForestProvider;
   outputChannel: vscode.OutputChannel;
   currentTree: TreeState | undefined;
 }

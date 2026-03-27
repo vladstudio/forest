@@ -2,13 +2,13 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { loadConfig, getTreesDir } from './config';
-import { IssueItem, ShortcutItem, StageGroupItem, TreeItemView } from './views/items';
+import { ShortcutItem } from './views/items';
 import type { StashItem } from './views/items';
 import { StateManager } from './state';
 import { ForestContext, getRepoPath } from './context';
 import { ShortcutManager } from './managers/ShortcutManager';
 import { StatusBarManager } from './managers/StatusBarManager';
-import { ForestTreeProvider } from './views/ForestTreeProvider';
+import { ForestWebviewProvider } from './views/ForestWebviewProvider';
 import { ShortcutsTreeProvider } from './views/ShortcutsTreeProvider';
 import { StashesTreeProvider } from './views/StashesTreeProvider';
 import { create, start } from './commands/create';
@@ -194,28 +194,20 @@ export async function activate(context: vscode.ExtensionContext) {
 
   const shortcutManager = new ShortcutManager(config, currentTree);
   const statusBarManager = new StatusBarManager(currentTree);
-  const forestProvider = new ForestTreeProvider(stateManager, config, context.globalState);
+  const forestProvider = new ForestWebviewProvider(stateManager, config);
   const shortcutsProvider = new ShortcutsTreeProvider(config, shortcutManager);
-  const forestView = vscode.window.createTreeView('forest.trees', { treeDataProvider: forestProvider });
-  forestView.onDidCollapseElement(e => {
-    if (e.element instanceof StageGroupItem) forestProvider.setCollapsed(e.element.label as string, true);
-  });
-  forestView.onDidExpandElement(e => {
-    if (e.element instanceof StageGroupItem) forestProvider.setCollapsed(e.element.label as string, false);
-  });
   const stashesProvider = new StashesTreeProvider(repoPath);
   context.subscriptions.push(
-    forestView,
+    vscode.window.registerWebviewViewProvider('forest.trees', forestProvider),
     vscode.window.registerTreeDataProvider('forest.shortcuts', shortcutsProvider),
     vscode.window.registerTreeDataProvider('forest.stashes', stashesProvider),
   );
 
-  // Update noTrees context + sidebar badge
+  // Update noTrees context
   const updateNoTrees = async () => {
     const s = await stateManager.load();
     const trees = stateManager.getTreesForRepo(s, repoPath);
     vscode.commands.executeCommand('setContext', 'forest.noTrees', trees.length === 0);
-    forestView.badge = trees.length ? { value: trees.length, tooltip: `${trees.length} trees` } : undefined;
   };
   updateNoTrees().catch(() => { });
 
@@ -235,45 +227,39 @@ export async function activate(context: vscode.ExtensionContext) {
       }
     }));
 
-  const branchOf = (arg?: string | TreeItemView) => arg instanceof TreeItemView ? arg.tree.branch : arg;
-  const treeOf = (arg?: TreeItemView) => arg instanceof TreeItemView ? arg.tree : undefined;
+  const lookupTree = (branch?: string) =>
+    branch ? stateManager.getTree(stateManager.loadSync(), getRepoPath(), branch) : undefined;
   const andRefresh = <T>(fn: () => Promise<T>) => async () => { await fn(); forestProvider.refreshTrees(); };
 
   reg('forest.create', () => create(ctx));
-  reg('forest.start', (arg: IssueItem | { ticketId: string; title: string }) =>
-    start(ctx, arg instanceof IssueItem ? { ticketId: arg.issue.id, title: arg.issue.title } : arg));
-  reg('forest.switch', (arg?: string | TreeItemView) => switchTree(ctx, branchOf(arg)));
-  reg('forest.ship', (arg?: TreeItemView) => andRefresh(() => ship(ctx, treeOf(arg)))());
-  reg('forest.deleteTree', (arg?: string | TreeItemView) =>
-    deleteTree(ctx, branchOf(arg), arg instanceof TreeItemView && arg.isDoneOrClosed));
-  reg('forest.update', (arg?: TreeItemView) => andRefresh(() => update(ctx, treeOf(arg)))());
-  reg('forest.rebase', (arg?: TreeItemView) => andRefresh(() => rebase(ctx, treeOf(arg)))());
-  reg('forest.pull', (arg?: TreeItemView) => andRefresh(() => pull(ctx, treeOf(arg)))());
-  reg('forest.push', (arg?: TreeItemView) => andRefresh(() => push(ctx, treeOf(arg)))());
+  reg('forest.start', (arg: { ticketId: string; title: string }) => start(ctx, arg));
+  reg('forest.switch', (branch?: string) => switchTree(ctx, branch));
+  reg('forest.ship', (branch?: string) => andRefresh(() => ship(ctx, lookupTree(branch)))());
+  reg('forest.deleteTree', (branch?: string, isDone?: boolean) => deleteTree(ctx, branch, isDone ?? false));
+  reg('forest.update', () => andRefresh(() => update(ctx))());
+  reg('forest.rebase', () => andRefresh(() => rebase(ctx))());
+  reg('forest.pull', () => andRefresh(() => pull(ctx))());
+  reg('forest.push', () => andRefresh(() => push(ctx))());
   reg('forest.list', () => list(ctx));
   reg('forest.openMain', () => vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(repoPath), { forceNewWindow: true }));
   reg('forest.refresh', () => forestProvider.refresh());
-  reg('forest.copyBranch', (arg?: TreeItemView) => {
-    const tree = treeOf(arg) ?? ctx.currentTree;
-    if (tree) vscode.env.clipboard.writeText(tree.branch);
+  reg('forest.copyBranch', () => {
+    if (ctx.currentTree) vscode.env.clipboard.writeText(ctx.currentTree.branch);
   });
-  reg('forest.revealInFinder', (arg?: TreeItemView) => {
-    const tree = treeOf(arg) ?? ctx.currentTree;
-    if (tree?.path) vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(tree.path));
+  reg('forest.revealInFinder', () => {
+    if (ctx.currentTree?.path) vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(ctx.currentTree.path));
   });
-  reg('forest.openPR', (arg?: TreeItemView) => {
-    const tree = treeOf(arg) ?? ctx.currentTree;
-    if (tree?.prUrl) vscode.env.openExternal(vscode.Uri.parse(tree.prUrl));
+  reg('forest.openPR', () => {
+    if (ctx.currentTree?.prUrl) vscode.env.openExternal(vscode.Uri.parse(ctx.currentTree.prUrl));
   });
-  reg('forest.openTicket', async (arg?: TreeItemView) => {
-    const tree = treeOf(arg) ?? ctx.currentTree;
-    if (!tree?.ticketId) return;
-    const issue = await linear.getIssue(tree.ticketId);
+  reg('forest.openTicket', async () => {
+    if (!ctx.currentTree?.ticketId) return;
+    const issue = await linear.getIssue(ctx.currentTree.ticketId);
     if (issue?.url) vscode.env.openExternal(vscode.Uri.parse(issue.url));
   });
-  reg('forest.linkTicket', (arg?: TreeItemView) => {
-    const branch = branchOf(arg);
-    if (branch) return andRefresh(() => linkTicket(ctx, branch))();
+  reg('forest.linkTicket', (branch?: string) => {
+    const b = branch ?? ctx.currentTree?.branch;
+    if (b) return andRefresh(() => linkTicket(ctx, b))();
   });
   const unwrap = (arg: any) => arg instanceof ShortcutItem ? arg.shortcut : arg;
   reg('forest.openShortcut', (arg: any) => shortcutManager.open(unwrap(arg)));

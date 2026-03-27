@@ -120,6 +120,41 @@ export async function hasUncommittedChanges(worktreePath: string): Promise<boole
   return stdout.trim().length > 0;
 }
 
+export async function localChanges(worktreePath: string): Promise<{ added: number; removed: number; modified: number } | null> {
+  try {
+    const { stdout } = await exec('git', ['status', '--porcelain'], { cwd: worktreePath });
+    if (!stdout.trim()) return null;
+    let added = 0, removed = 0, modified = 0;
+    for (const line of stdout.split('\n').filter(Boolean)) {
+      if (line.length < 2) continue;
+      const x = line[0], y = line[1];
+      if (x === '?' && y === '?') { added++; continue; }
+      if (x === '!' && y === '!') continue;
+      if (x === 'D' || y === 'D') { removed++; continue; }
+      if (x === 'A') { added++; continue; }
+      modified++;
+    }
+    return { added, removed, modified };
+  } catch { return null; }
+}
+
+export const commitsAhead = (wt: string, branch: string) =>
+  revListCount(wt, `origin/${branch}..HEAD`);
+
+export async function commitAll(worktreePath: string, message: string): Promise<void> {
+  await exec('git', ['add', '-A'], { cwd: worktreePath });
+  await exec('git', ['commit', '-m', message], { cwd: worktreePath });
+}
+
+export async function discardUnstaged(worktreePath: string): Promise<void> {
+  await exec('git', ['checkout', '--', '.'], { cwd: worktreePath });
+}
+
+export async function workingDiff(worktreePath: string): Promise<string> {
+  const { stdout } = await exec('git', ['diff', 'HEAD'], { cwd: worktreePath, timeout: 30_000 });
+  return stdout;
+}
+
 async function revListCount(worktreePath: string, range: string): Promise<number> {
   try {
     const { stdout } = await exec('git', ['rev-list', '--count', range], { cwd: worktreePath, timeout: 10_000 });

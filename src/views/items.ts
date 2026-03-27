@@ -5,7 +5,11 @@ import type { TreeState } from '../state';
 import type { ShortcutConfig } from '../config';
 import { displayName } from '../state';
 import { shortBaseBranch } from '../utils/slug';
-import type { TreeHealth } from './ForestTreeProvider';
+export interface TreeHealth {
+  behind: number;
+  age: string | null;
+  pr: { state: string; reviewDecision: string | null; number?: number; url?: string } | null;
+}
 
 export class NoTreesItem extends vscode.TreeItem {
   contextValue = 'noTrees';
