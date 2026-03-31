@@ -955,7 +955,6 @@ function treeCard(t, d) {
     changes = '<div class="row"><span class="stats">' + stats + '</span>' +
       '<button class="btn" data-cmd="workingDiff" title="Diff working changes"' + dis(gitDisabled) + '>' + ic('diff') + '</button>' +
       '<button class="btn" data-cmd="branchDiff" title="Diff branch changes"' + dis(gitDisabled) + '>' + ic('diff') + ' branch</button>' +
-      '<button class="btn" data-cmd="mainDiff" title="Diff main against branch"' + dis(gitDisabled) + '>' + ic('diff') + ' main</button>' +
       (d.hasAI ? '<button class="btn" data-cmd="commit"' + dis(gitDisabled) + '>commit</button>' : '') +
       '<button class="btn danger" data-cmd="discard" title="Discard changes"' + dis(gitDisabled) + '>' + ic('x') + '</button></div>';
   }
@@ -972,6 +971,7 @@ function treeCard(t, d) {
       '<button class="btn" data-cmd="pull" title="Pull from remote"' + dis(gitDisabled) + '>' + ic('arrowDown') + '</button>' +
       '<button class="btn" data-cmd="push" title="Push to remote"' + dis(gitDisabled) + '>' + pushLabel + '</button>' +
       behind +
+      '<button class="btn" data-cmd="mainDiff" title="Diff main against branch"' + dis(gitDisabled) + '>' + ic('diff') + ' main</button>' +
     '</div>' +
     ticket + changes +
     '<div class="row">' + lastRow + '</div>' +
