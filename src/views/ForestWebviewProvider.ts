@@ -934,7 +934,11 @@ function mainCard(d) {
 function treeCard(t, d) {
   const branchLabel = ic('gitBranch') + ' ' + h(t.branch);
   if (t.cleaning) return '<div class="card" data-key="' + h(t.key) + '"><div class="row"><span class="branch">' + branchLabel + '</span><span class="dim">cleaning up\\u2026</span></div></div>';
-  if (!t.isCurrent) return '<div class="card" data-key="' + h(t.key) + '"><div class="row"><a class="branch" data-cmd="switch" title="' + h(t.branch) + '">' + branchLabel + '</a></div></div>';
+  if (!t.isCurrent) {
+    const isDoneOrClosed = t.prState === 'MERGED' || t.prState === 'CLOSED';
+    const deleteBtn = isDoneOrClosed ? '<button class="btn danger" data-cmd="delete" data-done="1" title="Delete tree">' + ic('trash') + '</button>' : '';
+    return '<div class="card" data-key="' + h(t.key) + '"><div class="row"><a class="branch" data-cmd="switch" title="' + h(t.branch) + '">' + branchLabel + '</a>' + deleteBtn + '</div></div>';
+  }
   const gitDisabled = !!t.busyOperation;
   const busy = t.busyOperation ? '<span class="dim">' + h(t.busyOperation) + '\\u2026</span>' : '';
   const behind = t.behind > 0 ? '<button class="btn" data-cmd="mergeFromMain" title="Merge ' + t.behind + ' commits from main"' + dis(gitDisabled) + '>main \\u2193' + t.behind + '</button>' : '';
