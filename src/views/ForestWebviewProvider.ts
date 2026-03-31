@@ -694,8 +694,9 @@ button { cursor: pointer; font-family: var(--vscode-font-family); border: none; 
 .btn-toggle.active { background: var(--vscode-selection-background); color: var(--vscode-button-secondaryForeground); opacity: 1; }
 .form-title { display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; margin-bottom: 6px; }
 .form-copy { color: var(--vscode-descriptionForeground); font-size: 11px; line-height: 1.45; }
-.radio-group { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
-.radio-option { display: flex; gap: 8px; padding: 8px; border: 1px solid var(--vscode-activityBar-border, rgba(128,128,128,0.2)); border-radius: 4px; background: transparent; cursor: pointer; }
+.radio-group { display: flex; flex-direction: column; margin-top: 6px; border: 1px solid var(--vscode-activityBar-border, rgba(128,128,128,0.2)); border-radius: 4px; overflow: hidden; }
+.radio-option { display: flex; gap: 8px; padding: 8px; background: transparent; cursor: pointer; border-bottom: 1px solid var(--vscode-activityBar-border, rgba(128,128,128,0.2)); }
+.radio-option:last-child { border-bottom: none; }
 .radio-option:hover { background: var(--vscode-list-hoverBackground, rgba(128,128,128,0.08)); }
 .radio-option input { margin: 2px 0 0; accent-color: var(--vscode-button-background); }
 .radio-option input:focus, .radio-option input:focus-visible { outline: none; box-shadow: none; }
@@ -993,8 +994,7 @@ function renderDeleteForm() {
   }
 
   out += '<div class="form-section">';
-  out += '<div class="form-title">' + ic('trash') + ' Delete ' + h(init.name) + '</div>';
-  out += '<div class="form-copy">Choose what should happen to the worktree, branches, ticket, and pull request.</div>';
+  out += '<div class="form-title" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + ic('trash') + ' Delete ' + h(init.name) + '</div>';
   out += '</div>';
 
   out += '<div class="form-section">';
