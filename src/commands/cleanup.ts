@@ -6,6 +6,7 @@ import * as git from '../cli/git';
 import * as gh from '../cli/gh';
 import { deleteWorkspaceFiles, ensureTreeIdle, requireTree, runStep, updateLinear } from './shared';
 import { log } from '../logger';
+import { notify } from '../notify';
 
 const teardownInProgress = new Set<string>();
 
@@ -58,7 +59,7 @@ async function teardownTree(ctx: ForestContext, tree: TreeState, opts: TeardownO
 export async function cleanupMerged(ctx: ForestContext, tree: TreeState): Promise<void> {
   if (!await ensureTreeIdle(ctx, tree)) return;
   if (tree.path && await git.hasUncommittedChanges(tree.path)) {
-    vscode.window.showWarningMessage('Tree has uncommitted changes. Commit or discard first.');
+    notify.warn('Tree has uncommitted changes. Commit or discard first.');
     return;
   }
   if (!await teardownTree(ctx, tree, { deleteLocal: true, deleteRemote: true })) return;

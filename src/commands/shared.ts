@@ -11,14 +11,15 @@ import * as linear from '../cli/linear';
 import { exec, execShell } from '../utils/exec';
 import { getRepoPath } from '../context';
 import { log } from '../logger';
+import { notify } from '../notify';
 
 /** Resolve tree from arg or current context, showing an error if not found or missing path. */
 export function requireTree(ctx: ForestContext, arg: TreeState | string | undefined, action: string): (TreeState & { path: string }) | undefined {
   const tree = typeof arg === 'string'
     ? ctx.stateManager.getTree(ctx.stateManager.loadSync(), getRepoPath(), arg)
     : arg ?? ctx.currentTree;
-  if (!tree) { vscode.window.showErrorMessage(`No tree to ${action}. Run from a tree window or select from sidebar.`); return undefined; }
-  if (!tree.path) { vscode.window.showErrorMessage(`Cannot ${action}: tree has no worktree path.`); return undefined; }
+  if (!tree) { notify.error(`No tree to ${action}. Run from a tree window or select from sidebar.`); return undefined; }
+  if (!tree.path) { notify.error(`Cannot ${action}: tree has no worktree path.`); return undefined; }
   return tree as TreeState & { path: string };
 }
 
@@ -32,7 +33,7 @@ export async function getBlockingTreeOperation(ctx: ForestContext, tree: Pick<Tr
 export async function ensureTreeIdle(ctx: ForestContext, tree: TreeState): Promise<boolean> {
   const active = await getBlockingTreeOperation(ctx, tree);
   if (!active) return true;
-  vscode.window.showInformationMessage(`${displayName(tree)} is already ${active}.`);
+  notify.info(`${displayName(tree)} is already ${active}.`);
   return false;
 }
 
@@ -44,7 +45,7 @@ export async function withTreeOperation<T>(
 ): Promise<T | undefined> {
   const { started, active } = await ctx.stateManager.tryStartTreeOperation(tree.repoPath, tree.branch, busyOperation);
   if (!started) {
-    vscode.window.showInformationMessage(`${displayName(tree)} is already ${active ?? 'busy'}.`);
+    notify.info(`${displayName(tree)} is already ${active ?? 'busy'}.`);
     return undefined;
   }
 
@@ -88,7 +89,7 @@ export async function runStep(ctx: ForestContext, label: string, fn: () => Promi
     log.error(`Step "${label}": FAILED — ${e.stack ?? e.message}`);
     ctx.outputChannel.appendLine(`[Forest] ${label}: FAILED — ${e.message}`);
     ctx.outputChannel.show(true);
-    vscode.window.showErrorMessage(`${label}: ${e.message}`);
+    notify.error(`${label}: ${e.message}`);
     return false;
   }
 }
@@ -96,7 +97,7 @@ export async function runStep(ctx: ForestContext, label: string, fn: () => Promi
 /** Pick a team key for issue creation. Returns undefined if cancelled. */
 export async function pickTeam(teams?: string[]): Promise<string | undefined> {
   if (!teams?.length) {
-    vscode.window.showErrorMessage('Forest: No Linear teams configured. Set "teams" in .forest/config.json.');
+    notify.error('Forest: No Linear teams configured. Set "teams" in .forest/config.json.');
     return undefined;
   }
   if (teams.length === 1) return teams[0];
@@ -234,7 +235,7 @@ export async function createTree(opts: {
             await git.stashDrop(treePath, carryChanges).catch(() => {});
           }
 
-          void git.pushBranch(treePath, branch).catch(() => vscode.window.showWarningMessage('Failed to push branch. You can push manually later.'));
+          void git.pushBranch(treePath, branch).catch(() => notify.warn('Failed to push branch. You can push manually later.'));
           await postWorktreeSetup(config, repoPath, treePath, tree, progress);
 
           progress.report({ message: 'Opening window...' });

@@ -13,6 +13,7 @@ import * as ai from '../cli/ai';
 import { shortBaseBranch, slugify } from '../utils/slug';
 import { copyConfigFiles, createTree, ensureTreeIdle, ensureWorkspaceFile, focusOrOpenWindow, getBlockingTreeOperation, updateLinear, withTreeOperation } from '../commands/shared';
 import { executeDeletePlan, type DeletePlan } from '../commands/cleanup';
+import { notify } from '../notify';
 import { pickIssue } from '../commands/create';
 import { log } from '../logger';
 
@@ -117,7 +118,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
     if (!tree?.path) return false;
     const active = await getBlockingTreeOperation(this.ctx, tree);
     if (active) {
-      vscode.window.showInformationMessage(`${displayName(tree)} is already ${active}.`);
+      notify.info(`${displayName(tree)} is already ${active}.`);
       return true;
     }
 
@@ -281,7 +282,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
   ): Promise<void> {
     if (!tree.path) return;
     if (!opts.changes.length) {
-      vscode.window.showInformationMessage(opts.emptyMessage);
+      notify.info(opts.emptyMessage);
       return;
     }
 
@@ -337,7 +338,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
         () => git.listBranches(getRepoPath(), this.config.baseBranch),
       );
       if (!branches.length) {
-        vscode.window.showInformationMessage('No available branches.');
+        notify.info('No available branches.');
         this.postMessage({ type: 'branchPickResult', branch: null });
         return;
       }
@@ -382,7 +383,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
         busyOperation,
         () => vscode.window.withProgress(
           { location: vscode.ProgressLocation.Notification, title },
-          async () => { try { await fn(); } catch (e: any) { vscode.window.showErrorMessage(`Forest: ${e.message}`); } },
+          async () => { try { await fn(); } catch (e: any) { notify.error(`Forest: ${e.message}`); } },
         ),
       );
       this.refresh();
@@ -439,7 +440,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
       case 'workingDiff': {
         if (!tree || !tree.path) return;
         const hasChanges = await git.hasUncommittedChanges(tree.path);
-        if (!hasChanges) { vscode.window.showInformationMessage('No working changes.'); return; }
+        if (!hasChanges) { notify.info('No working changes.'); return; }
         await vscode.commands.executeCommand('git.viewChanges', vscode.Uri.file(tree.path));
         break;
       }
@@ -459,7 +460,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
       case 'commit': {
         if (!tree || !tree.path || !this.config.ai) return;
         const commitDiff = await git.workingDiff(tree.path);
-        if (!commitDiff.trim()) { vscode.window.showInformationMessage('No working changes to commit.'); return; }
+        if (!commitDiff.trim()) { notify.info('No working changes to commit.'); return; }
         let message = '';
         try {
           await vscode.window.withProgress(
@@ -469,7 +470,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
             },
           );
         } catch (e: any) {
-          vscode.window.showErrorMessage(`Forest: ${e.message}`);
+          notify.error(`Forest: ${e.message}`);
           return;
         }
         const confirmed = await vscode.window.showInputBox({

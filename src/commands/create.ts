@@ -5,6 +5,7 @@ import * as linear from '../cli/linear';
 import { createTree, filterUnlinkedIssues, updateLinear, pickTeam, promptUncommittedChanges } from './shared';
 import { slugify } from '../utils/slug';
 import { getRepoPath } from '../context';
+import { notify } from '../notify';
 
 function sanitizeBranch(value: string): string {
   return value
@@ -86,7 +87,7 @@ export async function start(ctx: ForestContext, arg: { ticketId: string; title: 
       { location: vscode.ProgressLocation.Notification, title: 'Loading branches...' },
       () => git.listBranches(getRepoPath(), config.baseBranch),
     );
-    if (!branches.length) { vscode.window.showInformationMessage('No available branches.'); return; }
+    if (!branches.length) { notify.info('No available branches.'); return; }
     const picked = await vscode.window.showQuickPick(
       branches.map(b => ({ label: b })),
       { placeHolder: 'Select a branch' },
@@ -107,7 +108,7 @@ export async function start(ctx: ForestContext, arg: { ticketId: string; title: 
     await createTree({ branch, config, stateManager: ctx.stateManager, ticketId, title, existingBranch, carryChanges: stashed });
     await updateLinear(ctx, ticketId, config.linear.statuses.onNew);
   } catch (e: any) {
-    vscode.window.showErrorMessage(e.message);
+    notify.error(e.message);
   }
 }
 
@@ -183,7 +184,7 @@ async function createFromNewBranch(ctx: ForestContext): Promise<void> {
     if (ticketId) await updateLinear(ctx, ticketId, config.linear.statuses.onNew);
   } catch (e: any) {
     if (revertOnCancel && ticketId) await revertLinear(ctx, ticketId);
-    vscode.window.showErrorMessage(e.message);
+    notify.error(e.message);
   }
 }
 
@@ -197,7 +198,7 @@ async function createFromExistingBranch(ctx: ForestContext): Promise<void> {
     () => git.listBranches(repoPath, config.baseBranch),
   );
 
-  if (!branches.length) { vscode.window.showInformationMessage('No available branches.'); return; }
+  if (!branches.length) { notify.info('No available branches.'); return; }
 
   const picked = await vscode.window.showQuickPick(
     branches.map(b => ({ label: b })),
@@ -257,7 +258,7 @@ async function createFromExistingBranch(ctx: ForestContext): Promise<void> {
     if (linkedLinear && ticketId) await updateLinear(ctx, ticketId, config.linear.statuses.onNew);
   } catch (e: any) {
     if (revertOnCancel && ticketId) await revertLinear(ctx, ticketId);
-    vscode.window.showErrorMessage(e.message);
+    notify.error(e.message);
   }
 }
 
@@ -270,7 +271,7 @@ export async function pickIssue(ctx: ForestContext): Promise<{ ticketId: string;
   const issues = await linear.listMyIssues(ctx.config.linear.statuses.issueList, ctx.config.linear.teams);
   const state = await ctx.stateManager.load();
   const available = filterUnlinkedIssues(issues, ctx.stateManager, state, getRepoPath());
-  if (!available.length) { vscode.window.showInformationMessage('No unlinked issues found.'); return null; }
+  if (!available.length) { notify.info('No unlinked issues found.'); return null; }
 
   const pick = await vscode.window.showQuickPick<IssuePickItem>(
     available.map(i => ({ label: `${i.id}  ${i.title}`, description: i.state, issueId: i.id, issueTitle: i.title })),
@@ -301,7 +302,7 @@ export async function createIssue(ctx: ForestContext): Promise<{ ticketId: strin
     );
     return { ticketId, title: issueTitle };
   } catch (e: any) {
-    vscode.window.showErrorMessage(`Failed to create Linear issue: ${e.message}`);
+    notify.error(`Failed to create Linear issue: ${e.message}`);
     return null;
   }
 }

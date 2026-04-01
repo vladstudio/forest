@@ -4,13 +4,7 @@ import type { TreeState } from '../state';
 import { displayName } from '../state';
 import * as git from '../cli/git';
 import { copyConfigFiles, requireTree, withTreeOperation } from './shared';
-
-function showTimedNotification(message: string, ms = 2000): void {
-  vscode.window.withProgress(
-    { location: vscode.ProgressLocation.Notification, title: message },
-    () => new Promise((resolve) => setTimeout(resolve, ms)),
-  );
-}
+import { notify } from '../notify';
 
 async function syncTree(ctx: ForestContext, treeArg: TreeState | undefined, mode: 'merge' | 'rebase'): Promise<void> {
   const label = mode === 'merge' ? 'Update' : 'Rebase';
@@ -29,14 +23,14 @@ async function syncTree(ctx: ForestContext, treeArg: TreeState | undefined, mode
         try {
           await (mode === 'merge' ? git.pullMerge : git.pullRebase)(tree.path!, config.baseBranch);
         } catch (e: any) {
-          vscode.window.showErrorMessage(`${label} failed: ${e.message}. Resolve conflicts manually.`);
+          notify.error(`${label} failed: ${e.message}. Resolve conflicts manually.`);
           return;
         }
 
         progress.report({ message: 'Copying files...' });
         copyConfigFiles(config, tree.repoPath, tree.path!);
 
-        showTimedNotification(`Tree ${mode === 'merge' ? 'updated' : 'rebased'}.`);
+        notify.info(`Tree ${mode === 'merge' ? 'updated' : 'rebased'}.`);
       },
     ),
   );
@@ -62,10 +56,10 @@ async function gitAction(
         try {
           await opts.gitFn(tree);
         } catch (e: any) {
-          vscode.window.showErrorMessage(`${opts.label} failed: ${e.message}`);
+          notify.error(`${opts.label} failed: ${e.message}`);
           return;
         }
-        showTimedNotification(`${opts.label}ed.`);
+        notify.info(`${opts.label}ed.`);
       },
     ),
   );

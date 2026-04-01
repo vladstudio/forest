@@ -7,6 +7,7 @@ import * as gh from '../cli/gh';
 import { generatePRBody } from '../cli/ai';
 import { requireTree, updateLinear, withTreeOperation } from './shared';
 import { log } from '../logger';
+import { notify } from '../notify';
 
 
 export async function ship(ctx: ForestContext, treeArg?: import('../state').TreeState): Promise<void> {
@@ -74,7 +75,7 @@ export async function ship(ctx: ForestContext, treeArg?: import('../state').Tree
                   prBody = await generatePRBody(config.ai, diff, prTitle);
                 } catch (e: any) {
                   log.error(`AI PR body generation failed: ${e.message}`);
-                  vscode.window.showWarningMessage(`AI description failed, using commits. ${e.message}`);
+                  notify.warn(`AI description failed, using commits. ${e.message}`);
                 }
               }
 
@@ -95,10 +96,10 @@ export async function ship(ctx: ForestContext, treeArg?: import('../state').Tree
   if (prUrl === undefined) return;
 
   if (prUrl) {
-    vscode.window.showInformationMessage(`Shipped! PR: ${prUrl}`);
+    notify.info(`Shipped! PR: ${prUrl}`);
     vscode.env.openExternal(vscode.Uri.parse(prUrl));
   } else {
-    vscode.window.showInformationMessage('Shipped!');
+    notify.info('Shipped!');
   }
 
   // Post-ship: automerge, Linear update, state save — all independent, run in parallel
@@ -120,6 +121,6 @@ export async function ship(ctx: ForestContext, treeArg?: import('../state').Tree
   for (const r of results) if (r.status === 'rejected') {
     const msg = r.reason?.message ?? String(r.reason);
     log.error(`Post-ship task failed: ${msg}`);
-    vscode.window.showWarningMessage(`Post-ship task failed: ${msg}`);
+    notify.warn(`Post-ship task failed: ${msg}`);
   }
 }

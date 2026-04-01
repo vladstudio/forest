@@ -4,6 +4,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { repoHash } from './utils/fs';
 import { resolveMainRepo } from './context';
+import { notify } from './notify';
 
 interface ShortcutBase { name: string; onNewTree?: boolean; }
 interface TerminalShortcut extends ShortcutBase { type: 'terminal'; command?: string; env?: Record<string, string>; }
@@ -65,7 +66,7 @@ export async function loadConfig(): Promise<ForestConfig | null> {
   try {
     config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
   } catch (e) {
-    vscode.window.showErrorMessage(`Forest config is invalid: ${e}`);
+    notify.error(`Forest config is invalid: ${e}`);
     return null;
   }
 
@@ -77,7 +78,7 @@ export async function loadConfig(): Promise<ForestConfig | null> {
       const local = JSON.parse(fs.readFileSync(localPath, 'utf8'));
       merged = mergeConfig(merged, local);
     } catch {
-      vscode.window.showWarningMessage('Forest: local.json has syntax errors, ignoring overrides.');
+      notify.warn('Forest: local.json has syntax errors, ignoring overrides.');
     }
   }
 

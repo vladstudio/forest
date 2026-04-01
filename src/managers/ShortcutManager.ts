@@ -4,6 +4,7 @@ import * as path from 'path';
 import type { ForestConfig, ShortcutConfig } from '../config';
 import type { TreeState } from '../state';
 import { shellEscape } from '../utils/slug';
+import { notify } from '../notify';
 
 export class ShortcutManager {
   private terminals = new Map<string, vscode.Terminal[]>();
@@ -128,14 +129,14 @@ export class ShortcutManager {
       cp.spawn('ghostty', ['--working-directory', cwd, ...(cmd ? ['-e', cmd] : [])], { detached: true, stdio: 'ignore' }).on('error', () => {}).unref();
     } else {
       // Unsupported terminal — open app at cwd, command cannot be sent
-      vscode.window.showWarningMessage(`Terminal "${app}" is not supported for command sending. Use iTerm, Terminal, or Ghostty.`);
+      notify.warn(`Terminal "${app}" is not supported for command sending. Use iTerm, Terminal, or Ghostty.`);
       cp.spawn('open', ['-a', app, cwd], { detached: true, stdio: 'ignore' }).on('error', () => {}).unref();
     }
   }
 
   private async openBrowser(sc: ShortcutConfig & { type: 'browser' }, viewColumn?: vscode.ViewColumn, browser?: string): Promise<void> {
     const url = sc.url.trim();
-    if (!url) { vscode.window.showWarningMessage(`Cannot open "${sc.name}": URL is empty.`); return; }
+    if (!url) { notify.warn(`Cannot open "${sc.name}": URL is empty.`); return; }
     this.openUrl(url, browser ?? sc.browser ?? this.config.browser[0], viewColumn);
   }
 

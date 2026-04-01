@@ -1,10 +1,10 @@
-import * as vscode from 'vscode';
 import { writeFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { exec, commandExists } from '../utils/exec';
 import { shortBaseBranch } from '../utils/slug';
 import { log } from '../logger';
+import { notify } from '../notify';
 
 let _available: boolean | null = null;
 let _authWarned = false;
@@ -23,7 +23,7 @@ export async function prStatus(worktreePath: string): Promise<{ state: string; r
     log.error(`prStatus failed: ${e.message}`);
     if (!_authWarned && (e.stderr || e.message || '').includes('auth login')) {
       _authWarned = true;
-      vscode.window.showWarningMessage('Forest: GitHub CLI auth expired. Run "gh auth login" in your terminal.');
+      notify.warn('Forest: GitHub CLI auth expired. Run "gh auth login" in your terminal.');
     }
     return null;
   }

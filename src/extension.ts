@@ -20,6 +20,7 @@ import { deleteWorkspaceFiles, focusOrOpenWindow } from './commands/shared';
 import * as gh from './cli/gh';
 import * as linear from './cli/linear';
 import { initLogger, log } from './logger';
+import { notify } from './notify';
 
 const emptyProvider: vscode.TreeDataProvider<never> = {
   getTreeItem: () => { throw new Error('no items'); },
@@ -222,7 +223,7 @@ export async function activate(context: vscode.ExtensionContext) {
         log.error(`Command ${id} failed: ${e.stack ?? e.message}`);
         outputChannel.appendLine(`[Forest] Command ${id} failed: ${e.stack ?? e.message}`);
         outputChannel.show(true);
-        vscode.window.showErrorMessage(`Forest: ${e.message}`);
+        notify.error(`Forest: ${e.message}`);
       }
     }));
 

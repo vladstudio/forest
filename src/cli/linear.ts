@@ -1,5 +1,5 @@
-import * as vscode from 'vscode';
 import { log } from '../logger';
+import { notify } from '../notify';
 
 const API = 'https://api.linear.app/graphql';
 
@@ -38,7 +38,7 @@ async function gql<T>(query: string, variables?: Record<string, unknown>): Promi
     log.error(`Linear API ${res.status}: ${res.statusText}${body ? ` — ${body}` : ''}`);
     if ((res.status === 401 || res.status === 403) && !_authWarned) {
       _authWarned = true;
-      vscode.window.showWarningMessage('Forest: Linear API key is invalid or expired. Update linear.apiKey in .forest/local.json.');
+      notify.warn('Forest: Linear API key is invalid or expired. Update linear.apiKey in .forest/local.json.');
     }
     throw new Error(`Linear API ${res.status}: ${res.statusText}${body ? ` — ${body}` : ''}`);
   }
