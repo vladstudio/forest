@@ -210,6 +210,11 @@ export async function checkoutWorktree(
   await exec('git', ['-c', 'checkout.workers=0', 'worktree', 'add', worktreePath, branch], { cwd: repoPath });
 }
 
+export async function remoteBranchExists(repoPath: string, branch: string): Promise<boolean> {
+  const { stdout } = await exec('git', ['ls-remote', '--heads', 'origin', branch], { cwd: repoPath });
+  return stdout.trim().length > 0;
+}
+
 export async function branchExists(repoPath: string, branch: string): Promise<boolean> {
   await exec('git', ['fetch', 'origin', branch], { cwd: repoPath }).catch(() => {});
   const { stdout } = await exec('git', ['for-each-ref', '--format=%(refname:short)', `refs/heads/${branch}`, `refs/remotes/origin/${branch}`], { cwd: repoPath });

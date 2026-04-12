@@ -98,21 +98,26 @@ async function fallbackDeletePlan(
   tree: TreeState & { path: string },
   prState?: string | null,
 ): Promise<DeletePlan | undefined> {
-  const defaultBranches: DeleteBranchAction = 'all';
+  const hasRemote = await git.remoteBranchExists(tree.repoPath, tree.branch).catch(() => false);
+  const defaultBranches: DeleteBranchAction = hasRemote ? 'all' : 'local';
   const defaultLinear = defaultLinearAction(prState);
   const defaultPr: DeletePrAction = prState === 'OPEN' ? 'close' : 'none';
 
-  const branchPick = await vscode.window.showQuickPick(
-    [
-      { label: 'Delete local + remote (default)', action: 'all' as const },
-      { label: 'Delete local only', action: 'local' as const },
-      { label: 'Keep branches', action: 'keep' as const },
-    ],
-    {
-      title: `Delete ${displayName(tree)}`,
-      placeHolder: 'What should happen to branches?',
-    },
-  );
+  const branchItems = hasRemote
+    ? [
+        { label: 'Delete local + remote (default)', action: 'all' as const },
+        { label: 'Delete local only', action: 'local' as const },
+        { label: 'Keep branches', action: 'keep' as const },
+      ]
+    : [
+        { label: 'Delete local only (default)', detail: 'Remote branch is already deleted', action: 'local' as const },
+        { label: 'Keep branches', action: 'keep' as const },
+      ];
+
+  const branchPick = await vscode.window.showQuickPick(branchItems, {
+    title: `Delete ${displayName(tree)}`,
+    placeHolder: 'What should happen to branches?',
+  });
   if (!branchPick) return undefined;
 
   let linearAction: DeleteLinearAction = 'none';

@@ -122,7 +122,10 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
       return true;
     }
 
-    const pr = this.config.github.enabled ? await gh.prStatus(tree.path).catch(() => null) : null;
+    const [pr, hasRemote] = await Promise.all([
+      this.config.github.enabled ? gh.prStatus(tree.path).catch(() => null) : null,
+      git.remoteBranchExists(repoPath, tree.branch).catch(() => false),
+    ]);
     const defaultLinearAction = pr?.state === 'MERGED' ? 'cleanup' : 'cancel';
     this.postMessage({
       type: 'showDeleteForm',
@@ -135,7 +138,8 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
         linearEnabled: this.config.linear.enabled && !!tree.ticketId,
         prState: pr?.state ?? null,
         prNumber: pr?.number ?? null,
-        defaultBranches: 'all',
+        defaultBranches: hasRemote ? 'all' : 'local',
+        remoteDeleted: !hasRemote,
         defaultLinearAction,
         defaultPrAction: pr?.state === 'OPEN' ? 'close' : 'none',
         cancelStatusName: this.config.linear.statuses.onCancel,
@@ -1001,7 +1005,12 @@ function renderDeleteForm() {
   out += '<div class="form-section">';
   out += '<div class="form-title">' + ic('gitBranch') + ' Branches</div>';
   out += '<div class="radio-group">';
-  out += radioOption('delete-branches', 'all', ds.branches, 'Delete local + remote', dis);
+  if (init.remoteDeleted) {
+    out += radioOption('delete-branches', 'all', ds.branches, 'Delete local + remote', true);
+    out += '<div class="form-copy" style="margin:-4px 0 4px 28px;opacity:0.7">Remote branch is already deleted.</div>';
+  } else {
+    out += radioOption('delete-branches', 'all', ds.branches, 'Delete local + remote', dis);
+  }
   out += radioOption('delete-branches', 'local', ds.branches, 'Delete local only', dis);
   out += radioOption('delete-branches', 'keep', ds.branches, 'Keep branches', dis);
   out += '</div></div>';
