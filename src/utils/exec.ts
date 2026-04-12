@@ -22,7 +22,8 @@ export async function exec(
     });
     return { stdout: r.stdout.trim(), stderr: r.stderr.trim() };
   } catch (e: any) {
-    log.error(`exec failed: ${command} ${args.join(' ')} — ${e.message}`);
+    if (e.name === 'AbortError') log.info(`exec aborted: ${command} ${args.join(' ')}`);
+    else log.error(`exec failed: ${command} ${args.join(' ')} — ${e.message}`);
     throw e;
   }
 }
@@ -41,7 +42,8 @@ export async function execShell(
     });
     return { stdout: r.stdout.trim(), stderr: r.stderr.trim() };
   } catch (e: any) {
-    log.error(`execShell failed: ${command} — ${e.message}`);
+    if (e.name === 'AbortError') log.info(`execShell aborted: ${command}`);
+    else log.error(`execShell failed: ${command} — ${e.message}`);
     throw e;
   }
 }

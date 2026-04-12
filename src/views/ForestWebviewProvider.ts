@@ -377,8 +377,8 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
 
     if (command === 'pickIssue') {
       if (!this.ctx) return;
-      await this.runPending(async () => {
-        const result = await pickIssue(this.ctx!);
+      await this.runPending(async (signal) => {
+        const result = await pickIssue(this.ctx!, { signal });
         this.postMessage({ type: 'issuePickResult', issue: result ?? null });
       });
       return;
@@ -403,31 +403,32 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
     const ctx = this.ctx;
 
     /** Run a tree-level git operation with inline pending state. */
-    const runTreeAction = (busyOperation: string, fn: (signal: AbortSignal) => Promise<void>) => {
-      if (!ctx || !tree?.path) return;
-      return this.runPending(async (signal) => {
+    const runTreeAction = (busyOperation: string, fn: (signal: AbortSignal) => Promise<void>) =>
+      this.runPending(async (signal) => {
         await withTreeOperation(
-          ctx,
+          ctx!,
           tree as TreeState & { path: string },
           busyOperation,
           () => fn(signal),
         );
       });
-    };
+
+    /** Send pendingDone if the command had a pending label but won't reach runPending. */
+    const bail = () => { this.postMessage({ type: 'pendingDone' }); };
 
     switch (command) {
       case 'pull':
-        if (!tree?.path) return;
+        if (!tree?.path) { bail(); return; }
         await runTreeAction('pulling', (signal) => git.pull(tree.path!, { signal }));
         break;
 
       case 'push':
-        if (!tree?.path) return;
+        if (!tree?.path) { bail(); return; }
         await runTreeAction('pushing', (signal) => git.pushBranch(tree.path!, tree.branch, { signal }));
         break;
 
       case 'mergeFromMain':
-        if (!tree?.path) return;
+        if (!tree?.path) { bail(); return; }
         await runTreeAction('merging', async (signal) => {
           await git.pullMerge(tree.path!, this.config.baseBranch, { signal });
           copyConfigFiles(this.config, tree.repoPath, tree.path!);
@@ -443,7 +444,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
         break;
 
       case 'openTicket': {
-        if (!tree?.ticketId) return;
+        if (!tree?.ticketId) { bail(); return; }
         await this.runPending(async (signal) => {
           const issue = await linear.getIssue(tree.ticketId!, { signal }).catch(() => null);
           if (issue?.url) vscode.env.openExternal(vscode.Uri.parse(issue.url));
@@ -466,7 +467,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
         break;
 
       case 'workingDiff': {
-        if (!tree || !tree.path) return;
+        if (!tree || !tree.path) { bail(); return; }
         await this.runPending(async () => {
           const hasChanges = await git.hasUncommittedChanges(tree.path!);
           if (!hasChanges) { notify.info('No working changes.'); return; }
@@ -476,19 +477,19 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
       }
 
       case 'branchDiff': {
-        if (!tree || !tree.path) return;
+        if (!tree || !tree.path) { bail(); return; }
         await this.runPending(async () => { await this.openBaseDiff(tree); });
         break;
       }
 
       case 'mainDiff': {
-        if (!tree || !tree.path) return;
+        if (!tree || !tree.path) { bail(); return; }
         await this.runPending(async () => { await this.openMainDiff(tree); });
         break;
       }
 
       case 'commit': {
-        if (!tree || !tree.path || !this.config.ai) { this.postMessage({ type: 'pendingDone' }); return; }
+        if (!tree || !tree.path || !this.config.ai) { bail(); return; }
         await this.runPending(async (signal) => {
           const commitDiff = await git.workingDiff(tree.path!);
           if (!commitDiff.trim()) { notify.info('No working changes to commit.'); return; }
@@ -510,12 +511,12 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
       }
 
       case 'discard': {
-        if (!tree || !tree.path) { this.postMessage({ type: 'pendingDone' }); return; }
+        if (!tree || !tree.path) { bail(); return; }
         const pick = await vscode.window.showQuickPick(
           [{ label: 'Discard unstaged', id: 'unstaged' }, { label: 'Discard all (including staged)', id: 'all' }],
           { placeHolder: 'What to discard?' },
         );
-        if (!pick) { this.postMessage({ type: 'pendingDone' }); return; }
+        if (!pick) { bail(); return; }
         await runTreeAction('discarding', (signal) =>
           pick.id === 'unstaged' ? git.discardUnstaged(tree.path!, { signal }) : git.discardChanges(tree.path!, { signal }),
         );
@@ -523,13 +524,13 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
       }
 
       case 'ship': {
-        if (!tree?.path || !ctx) { this.postMessage({ type: 'pendingDone' }); return; }
+        if (!tree?.path || !ctx) { bail(); return; }
         // Pre-checks with QuickPick (user interaction before pending work starts)
         if (await git.hasUncommittedChanges(tree.path)) {
           const choice = await vscode.window.showWarningMessage(
             'You have uncommitted changes.', 'Ship Anyway', 'Cancel',
           );
-          if (choice !== 'Ship Anyway') { this.postMessage({ type: 'pendingDone' }); return; }
+          if (choice !== 'Ship Anyway') { bail(); return; }
         }
         let automerge = false;
         const ghEnabled = ctx.config.github.enabled && await gh.isAvailable();
@@ -540,7 +541,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
               ['Create PR + Automerge', 'Create PR'],
               { placeHolder: 'Ship — Push & Create PR...' },
             );
-            if (!pick) { this.postMessage({ type: 'pendingDone' }); return; }
+            if (!pick) { bail(); return; }
             automerge = pick === 'Create PR + Automerge';
           }
         }
@@ -1016,12 +1017,12 @@ function mainCard(d) {
   return '<div class="' + cls + '" data-key="__main__"><a class="card-label" data-cmd="switchToMain">' + label + '</a></div>';
 }
 
-function pendingBtn(cmd, label) {
+function pendingBtn(label) {
   return '<button class="btn btn-pending" disabled>' + label + '</button><button class="btn" data-cmd="cancelPending" title="Cancel">' + ic('x') + '</button>';
 }
 
 function btn(cmd, label, allDisabled, pendingCmd, opts) {
-  if (pendingCmd === cmd) return pendingBtn(cmd, pendingLabels[cmd] || 'loading\\u2026');
+  if (pendingCmd === cmd) return pendingBtn(pendingLabels[cmd] || 'loading\\u2026');
   var cls = 'btn' + (opts && opts.cls ? ' ' + opts.cls : '');
   var extra = opts && opts.attrs ? ' ' + opts.attrs : '';
   return '<button class="' + cls + '" data-cmd="' + h(cmd) + '"' + extra + dis(allDisabled) + '>' + label + '</button>';
@@ -1066,13 +1067,13 @@ function treeCard(t, d) {
   const isDone = t.prState === 'MERGED' || t.prState === 'CLOSED';
   const doneFlag = isDone ? '1' : '0';
   const lastRow = (isDone || t.prNumber)
-    ? '<button class="btn fill" data-cmd="openPR">PR#' + (t.prNumber || '?') + '</button>' + btn('delete', ic('trash'), allDisabled, null, { cls: 'danger', attrs: 'data-done="' + doneFlag + '" title="Delete tree"' })
+    ? '<button class="btn fill" data-cmd="openPR"' + dis(allDisabled) + '>PR#' + (t.prNumber || '?') + '</button>' + btn('delete', ic('trash'), allDisabled, null, { cls: 'danger', attrs: 'data-done="' + doneFlag + '" title="Delete tree"' })
     : btn('ship', 'Ship - Push and Create PR', allDisabled, pendingCmd, { cls: 'fill' }) + btn('delete', ic('trash'), allDisabled, null, { cls: 'danger', attrs: 'data-done="0" title="Delete tree"' });
   return '<div class="card current" data-key="' + h(t.key) + '">' +
     '<div class="row"><span class="branch" title="' + h(t.branch) + '">' + branchLabel + '</span>' + busy + '</div>' +
     '<div class="row">' +
-      '<button class="btn" data-cmd="revealInFinder" title="Reveal in Finder">' + ic('folderOpen') + '</button>' +
-      '<button class="btn" data-cmd="copyBranch" title="Copy branch name">' + ic('copy') + '</button>' +
+      '<button class="btn" data-cmd="revealInFinder" title="Reveal in Finder"' + dis(allDisabled) + '>' + ic('folderOpen') + '</button>' +
+      '<button class="btn" data-cmd="copyBranch" title="Copy branch name"' + dis(allDisabled) + '>' + ic('copy') + '</button>' +
       btn('pull', ic('arrowDown'), allDisabled, pendingCmd, { attrs: 'title="Pull from remote"' }) +
       btn('push', pushLabel, allDisabled, pendingCmd, { attrs: 'title="Push to remote"' }) +
       behind +

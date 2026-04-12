@@ -267,8 +267,8 @@ interface IssuePickItem extends vscode.QuickPickItem {
   issueTitle: string;
 }
 
-export async function pickIssue(ctx: ForestContext): Promise<{ ticketId: string; title: string } | null | undefined> {
-  const issues = await linear.listMyIssues(ctx.config.linear.statuses.issueList, ctx.config.linear.teams);
+export async function pickIssue(ctx: ForestContext, opts?: { signal?: AbortSignal }): Promise<{ ticketId: string; title: string } | null | undefined> {
+  const issues = await linear.listMyIssues(ctx.config.linear.statuses.issueList, ctx.config.linear.teams, opts);
   const state = await ctx.stateManager.load();
   const available = filterUnlinkedIssues(issues, ctx.stateManager, state, getRepoPath());
   if (!available.length) { notify.info('No unlinked issues found.'); return null; }
