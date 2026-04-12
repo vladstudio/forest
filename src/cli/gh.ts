@@ -52,11 +52,11 @@ export async function repoHasAutomerge(worktreePath: string): Promise<boolean> {
   }
 }
 
-export async function enableAutomerge(worktreePath: string): Promise<void> {
-  await exec('gh', ['pr', 'merge', '--auto', '--squash'], { cwd: worktreePath, timeout: 30_000 });
+export async function enableAutomerge(worktreePath: string, opts?: { signal?: AbortSignal }): Promise<void> {
+  await exec('gh', ['pr', 'merge', '--auto', '--squash'], { cwd: worktreePath, timeout: 30_000, signal: opts?.signal });
 }
 
-export async function createPR(worktreePath: string, baseBranch: string, title: string, body?: string): Promise<string | null> {
+export async function createPR(worktreePath: string, baseBranch: string, title: string, body?: string, opts?: { signal?: AbortSignal }): Promise<string | null> {
   log.info(`createPR: "${title}" → ${baseBranch}`);
   const base = shortBaseBranch(baseBranch);
   const args = ['pr', 'create', '--base', base, '--title', title];
@@ -69,7 +69,7 @@ export async function createPR(worktreePath: string, baseBranch: string, title: 
     args.push('--fill');
   }
   try {
-    const { stdout } = await exec('gh', args, { cwd: worktreePath, timeout: 30_000 });
+    const { stdout } = await exec('gh', args, { cwd: worktreePath, timeout: 30_000, signal: opts?.signal });
     // gh pr create prints the URL on the last line (may have preamble text)
     const url = stdout.trim().split('\n').pop()?.trim();
     log.info(`createPR result: ${url ?? '(no url)'}`);
@@ -79,7 +79,7 @@ export async function createPR(worktreePath: string, baseBranch: string, title: 
   }
 }
 
-export async function closePR(repoPath: string, branch: string): Promise<void> {
+export async function closePR(repoPath: string, branch: string, opts?: { signal?: AbortSignal }): Promise<void> {
   log.info(`closePR: ${branch}`);
-  await exec('gh', ['pr', 'close', branch], { cwd: repoPath, timeout: 30_000 });
+  await exec('gh', ['pr', 'close', branch], { cwd: repoPath, timeout: 30_000, signal: opts?.signal });
 }

@@ -47,24 +47,24 @@ export async function deleteBranch(repoPath: string, branch: string, opts?: { sk
   }
 }
 
-export async function pushBranch(worktreePath: string, branch: string): Promise<void> {
+export async function pushBranch(worktreePath: string, branch: string, opts?: { signal?: AbortSignal }): Promise<void> {
   log.info(`pushBranch: ${branch}`);
-  await exec('git', ['push', '-u', 'origin', branch], { cwd: worktreePath });
+  await exec('git', ['push', '-u', 'origin', branch], { cwd: worktreePath, signal: opts?.signal });
 }
 
-export async function pull(worktreePath: string): Promise<void> {
+export async function pull(worktreePath: string, opts?: { signal?: AbortSignal }): Promise<void> {
   log.info(`pull: ${worktreePath}`);
-  await exec('git', ['pull'], { cwd: worktreePath, timeout: 60_000 });
+  await exec('git', ['pull'], { cwd: worktreePath, timeout: 60_000, signal: opts?.signal });
 }
 
-export async function pullMerge(worktreePath: string, baseRef: string): Promise<void> {
-  await exec('git', ['fetch', 'origin'], { cwd: worktreePath });
-  await exec('git', ['merge', baseRef], { cwd: worktreePath, timeout: 60_000 });
+export async function pullMerge(worktreePath: string, baseRef: string, opts?: { signal?: AbortSignal }): Promise<void> {
+  await exec('git', ['fetch', 'origin'], { cwd: worktreePath, signal: opts?.signal });
+  await exec('git', ['merge', baseRef], { cwd: worktreePath, timeout: 60_000, signal: opts?.signal });
 }
 
-export async function pullRebase(worktreePath: string, baseRef: string): Promise<void> {
-  await exec('git', ['fetch', 'origin'], { cwd: worktreePath });
-  await exec('git', ['rebase', baseRef], { cwd: worktreePath, timeout: 60_000 });
+export async function pullRebase(worktreePath: string, baseRef: string, opts?: { signal?: AbortSignal }): Promise<void> {
+  await exec('git', ['fetch', 'origin'], { cwd: worktreePath, signal: opts?.signal });
+  await exec('git', ['rebase', baseRef], { cwd: worktreePath, timeout: 60_000, signal: opts?.signal });
 }
 
 export async function stash(repoPath: string, message: string): Promise<string> {
@@ -83,9 +83,9 @@ export async function stashDrop(repoPath: string, ref: number | string): Promise
   await exec('git', ['stash', 'drop', stashRef(ref)], { cwd: repoPath });
 }
 
-export async function discardChanges(repoPath: string): Promise<void> {
-  await exec('git', ['reset', '--hard', 'HEAD'], { cwd: repoPath });
-  await exec('git', ['clean', '-fd'], { cwd: repoPath });
+export async function discardChanges(repoPath: string, opts?: { signal?: AbortSignal }): Promise<void> {
+  await exec('git', ['reset', '--hard', 'HEAD'], { cwd: repoPath, signal: opts?.signal });
+  await exec('git', ['clean', '-fd'], { cwd: repoPath, signal: opts?.signal });
 }
 
 export async function hasUncommittedChanges(worktreePath: string): Promise<boolean> {
@@ -114,13 +114,13 @@ export async function localChanges(worktreePath: string): Promise<{ added: numbe
 export const commitsAhead = (wt: string, branch: string) =>
   revListCount(wt, `origin/${branch}..HEAD`);
 
-export async function commitAll(worktreePath: string, message: string): Promise<void> {
-  await exec('git', ['add', '-A'], { cwd: worktreePath });
-  await exec('git', ['commit', '-m', message], { cwd: worktreePath });
+export async function commitAll(worktreePath: string, message: string, opts?: { signal?: AbortSignal }): Promise<void> {
+  await exec('git', ['add', '-A'], { cwd: worktreePath, signal: opts?.signal });
+  await exec('git', ['commit', '-m', message], { cwd: worktreePath, signal: opts?.signal });
 }
 
-export async function discardUnstaged(worktreePath: string): Promise<void> {
-  await exec('git', ['checkout', '--', '.'], { cwd: worktreePath });
+export async function discardUnstaged(worktreePath: string, opts?: { signal?: AbortSignal }): Promise<void> {
+  await exec('git', ['checkout', '--', '.'], { cwd: worktreePath, signal: opts?.signal });
 }
 
 export async function workingDiff(worktreePath: string): Promise<string> {
@@ -137,8 +137,8 @@ async function revListCount(worktreePath: string, range: string): Promise<number
 
 export const commitsBehind = (wt: string, base: string) => revListCount(wt, `HEAD..${base}`);
 
-export async function diffFromBase(worktreePath: string, baseRef: string): Promise<string> {
-  const { stdout } = await exec('git', ['diff', baseRef + '...HEAD'], { cwd: worktreePath, timeout: 30_000 });
+export async function diffFromBase(worktreePath: string, baseRef: string, opts?: { signal?: AbortSignal }): Promise<string> {
+  const { stdout } = await exec('git', ['diff', baseRef + '...HEAD'], { cwd: worktreePath, timeout: 30_000, signal: opts?.signal });
   return stdout;
 }
 
@@ -222,8 +222,8 @@ export async function branchExists(repoPath: string, branch: string): Promise<bo
 }
 
 /** List local branches suitable for worktree checkout, excluding base branch and those already in worktrees. */
-export async function listBranches(repoPath: string, baseBranch: string): Promise<string[]> {
-  await exec('git', ['fetch', 'origin'], { cwd: repoPath });
+export async function listBranches(repoPath: string, baseBranch: string, opts?: { signal?: AbortSignal }): Promise<string[]> {
+  await exec('git', ['fetch', 'origin'], { cwd: repoPath, signal: opts?.signal });
 
   const [{ stdout: wtOut }, { stdout: localOut }, { stdout: remoteOut }] = await Promise.all([
     exec('git', ['worktree', 'list', '--porcelain'], { cwd: repoPath }),

@@ -5,7 +5,7 @@ const MAX_DIFF_CHARS = 100_000;
 const MAX_DIFF_CHARS_COMMIT = 10_000;
 const MAX_TOKENS = 4096;
 
-export async function generatePRBody(config: AIConfig, diff: string, title: string): Promise<string> {
+export async function generatePRBody(config: AIConfig, diff: string, title: string, opts?: { signal?: AbortSignal }): Promise<string> {
   const trimmedDiff = diff.length > MAX_DIFF_CHARS
     ? diff.slice(0, MAX_DIFF_CHARS) + '\n\n[diff truncated]'
     : diff;
@@ -17,30 +17,31 @@ Diff:
 ${trimmedDiff}`;
 
   log.info(`generatePRBody: provider=${config.provider} model=${config.model} diffLen=${diff.length}`);
-  const message = await callProvider(config, prompt);
+  const message = await callProvider(config, prompt, undefined, opts?.signal);
   log.info(`generatePRBody: result ${message.length} chars`);
   return message;
 }
 
-export async function generateCommitMessage(config: AIConfig, diff: string): Promise<string> {
+export async function generateCommitMessage(config: AIConfig, diff: string, opts?: { signal?: AbortSignal }): Promise<string> {
   const trimmed = diff.length > MAX_DIFF_CHARS_COMMIT
     ? diff.slice(0, MAX_DIFF_CHARS_COMMIT) + '\n[diff truncated]'
     : diff;
   const prompt = `Write a concise one-line git commit message (under 72 characters). Use conventional commit format when appropriate (feat:, fix:, chore:, refactor:, etc.). Output only the commit message, nothing else.\n\nDiff:\n${trimmed}`;
   log.info(`generateCommitMessage: provider=${config.provider} diffLen=${diff.length}`);
-  return callProvider(config, prompt, 'You write concise one-line git commit messages.');
+  return callProvider(config, prompt, 'You write concise one-line git commit messages.', opts?.signal);
 }
 
-async function callProvider(config: AIConfig, prompt: string, systemPrompt?: string): Promise<string> {
+async function callProvider(config: AIConfig, prompt: string, systemPrompt?: string, signal?: AbortSignal): Promise<string> {
   switch (config.provider) {
-    case 'anthropic': return callAnthropic(config, prompt, systemPrompt);
-    case 'openai': return callOpenAI(config, prompt, systemPrompt);
-    case 'gemini': return callGemini(config, prompt, systemPrompt);
+    case 'anthropic': return callAnthropic(config, prompt, systemPrompt, signal);
+    case 'openai': return callOpenAI(config, prompt, systemPrompt, signal);
+    case 'gemini': return callGemini(config, prompt, systemPrompt, signal);
     default: throw new Error(`Unknown AI provider: ${config.provider}`);
   }
 }
 
-async function callAnthropic(config: AIConfig, prompt: string, systemPrompt?: string): Promise<string> {
+async function callAnthropic(config: AIConfig, prompt: string, systemPrompt?: string, signal?: AbortSignal): Promise<string> {
+  const timeoutSignal = AbortSignal.timeout(30_000);
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -55,7 +56,7 @@ async function callAnthropic(config: AIConfig, prompt: string, systemPrompt?: st
       ...(systemPrompt ? { system: systemPrompt } : {}),
       messages: [{ role: 'user', content: prompt }],
     }),
-    signal: AbortSignal.timeout(30_000),
+    signal: signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal,
   });
   if (!res.ok) {
     const body = await res.text();
@@ -69,7 +70,8 @@ async function callAnthropic(config: AIConfig, prompt: string, systemPrompt?: st
   return text.trim();
 }
 
-async function callOpenAI(config: AIConfig, prompt: string, systemPrompt?: string): Promise<string> {
+async function callOpenAI(config: AIConfig, prompt: string, systemPrompt?: string, signal?: AbortSignal): Promise<string> {
+  const timeoutSignal = AbortSignal.timeout(30_000);
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -85,7 +87,7 @@ async function callOpenAI(config: AIConfig, prompt: string, systemPrompt?: strin
         { role: 'user', content: prompt },
       ],
     }),
-    signal: AbortSignal.timeout(30_000),
+    signal: signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal,
   });
   if (!res.ok) {
     const body = await res.text();
@@ -99,7 +101,8 @@ async function callOpenAI(config: AIConfig, prompt: string, systemPrompt?: strin
   return text.trim();
 }
 
-async function callGemini(config: AIConfig, prompt: string, systemPrompt?: string): Promise<string> {
+async function callGemini(config: AIConfig, prompt: string, systemPrompt?: string, signal?: AbortSignal): Promise<string> {
+  const timeoutSignal = AbortSignal.timeout(30_000);
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent`,
     {
@@ -110,7 +113,7 @@ async function callGemini(config: AIConfig, prompt: string, systemPrompt?: strin
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: { temperature: 0.3, maxOutputTokens: MAX_TOKENS },
       }),
-      signal: AbortSignal.timeout(30_000),
+      signal: signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal,
     },
   );
   if (!res.ok) {

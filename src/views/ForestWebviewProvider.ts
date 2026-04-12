@@ -13,6 +13,7 @@ import * as ai from '../cli/ai';
 import { shortBaseBranch, slugify } from '../utils/slug';
 import { copyConfigFiles, createTree, ensureTreeIdle, ensureWorkspaceFile, focusOrOpenWindow, getBlockingTreeOperation, updateLinear, withTreeOperation } from '../commands/shared';
 import { executeDeletePlan, type DeletePlan } from '../commands/cleanup';
+import { shipCore } from '../commands/ship';
 import { notify } from '../notify';
 import { pickIssue } from '../commands/create';
 import { log } from '../logger';
@@ -67,6 +68,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
   private ctx?: ForestContext;
   private dataCache = new Map<string, { data: Promise<TreeCardData>; time: number }>();
   private readonly CACHE_TTL = 30_000;
+  private pendingAbort: AbortController | null = null;
 
   constructor(
     private readonly stateManager: StateManager,
@@ -151,6 +153,21 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
 
   private postMessage(msg: Record<string, unknown>): void {
     this.view?.webview.postMessage(msg);
+  }
+
+  /** Run an async operation with inline pending state in the webview. */
+  private async runPending(fn: (signal: AbortSignal) => Promise<void>): Promise<void> {
+    const ac = new AbortController();
+    this.pendingAbort = ac;
+    try {
+      await fn(ac.signal);
+    } catch (e: any) {
+      if (!ac.signal.aborted) notify.error(`Forest: ${e.message}`);
+    } finally {
+      this.pendingAbort = null;
+      this.postMessage({ type: 'pendingDone' });
+      this.refresh();
+    }
   }
 
   private async update(): Promise<void> {
@@ -335,29 +352,35 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
+    if (command === 'cancelPending') {
+      this.pendingAbort?.abort();
+      return;
+    }
+
     // Create form commands (no key needed)
     if (command === 'pickBranch') {
-      const branches = await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: 'Loading branches...' },
-        () => git.listBranches(getRepoPath(), this.config.baseBranch),
-      );
-      if (!branches.length) {
-        notify.info('No available branches.');
-        this.postMessage({ type: 'branchPickResult', branch: null });
-        return;
-      }
-      const picked = await vscode.window.showQuickPick(
-        branches.map(b => ({ label: b })),
-        { placeHolder: 'Select a branch' },
-      );
-      this.postMessage({ type: 'branchPickResult', branch: picked?.label ?? null });
+      await this.runPending(async (signal) => {
+        const branches = await git.listBranches(getRepoPath(), this.config.baseBranch, { signal });
+        if (!branches.length) {
+          notify.info('No available branches.');
+          this.postMessage({ type: 'branchPickResult', branch: null });
+          return;
+        }
+        const picked = await vscode.window.showQuickPick(
+          branches.map(b => ({ label: b })),
+          { placeHolder: 'Select a branch' },
+        );
+        this.postMessage({ type: 'branchPickResult', branch: picked?.label ?? null });
+      });
       return;
     }
 
     if (command === 'pickIssue') {
       if (!this.ctx) return;
-      const result = await pickIssue(this.ctx);
-      this.postMessage({ type: 'issuePickResult', issue: result ?? null });
+      await this.runPending(async () => {
+        const result = await pickIssue(this.ctx!);
+        this.postMessage({ type: 'issuePickResult', issue: result ?? null });
+      });
       return;
     }
 
@@ -379,35 +402,34 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
     const tree = this.stateManager.getTree(state, repoPath, branch);
     const ctx = this.ctx;
 
-    const withProgress = async (busyOperation: string, title: string, fn: () => Promise<void>) => {
+    /** Run a tree-level git operation with inline pending state. */
+    const runTreeAction = (busyOperation: string, fn: (signal: AbortSignal) => Promise<void>) => {
       if (!ctx || !tree?.path) return;
-      await withTreeOperation(
-        ctx,
-        tree as TreeState & { path: string },
-        busyOperation,
-        () => vscode.window.withProgress(
-          { location: vscode.ProgressLocation.Notification, title },
-          async () => { try { await fn(); } catch (e: any) { notify.error(`Forest: ${e.message}`); } },
-        ),
-      );
-      this.refresh();
+      return this.runPending(async (signal) => {
+        await withTreeOperation(
+          ctx,
+          tree as TreeState & { path: string },
+          busyOperation,
+          () => fn(signal),
+        );
+      });
     };
 
     switch (command) {
       case 'pull':
         if (!tree?.path) return;
-        await withProgress('pulling', 'Pulling...', () => git.pull(tree.path!));
+        await runTreeAction('pulling', (signal) => git.pull(tree.path!, { signal }));
         break;
 
       case 'push':
         if (!tree?.path) return;
-        await withProgress('pushing', 'Pushing...', () => git.pushBranch(tree.path!, tree.branch));
+        await runTreeAction('pushing', (signal) => git.pushBranch(tree.path!, tree.branch, { signal }));
         break;
 
       case 'mergeFromMain':
         if (!tree?.path) return;
-        await withProgress('merging', 'Merging from main...', async () => {
-          await git.pullMerge(tree.path!, this.config.baseBranch);
+        await runTreeAction('merging', async (signal) => {
+          await git.pullMerge(tree.path!, this.config.baseBranch, { signal });
           copyConfigFiles(this.config, tree.repoPath, tree.path!);
         });
         break;
@@ -422,8 +444,10 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
 
       case 'openTicket': {
         if (!tree?.ticketId) return;
-        const issue = await linear.getIssue(tree.ticketId).catch(() => null);
-        if (issue?.url) vscode.env.openExternal(vscode.Uri.parse(issue.url));
+        await this.runPending(async (signal) => {
+          const issue = await linear.getIssue(tree.ticketId!, { signal }).catch(() => null);
+          if (issue?.url) vscode.env.openExternal(vscode.Uri.parse(issue.url));
+        });
         break;
       }
 
@@ -443,66 +467,99 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
 
       case 'workingDiff': {
         if (!tree || !tree.path) return;
-        const hasChanges = await git.hasUncommittedChanges(tree.path);
-        if (!hasChanges) { notify.info('No working changes.'); return; }
-        await vscode.commands.executeCommand('git.viewChanges', vscode.Uri.file(tree.path));
+        await this.runPending(async () => {
+          const hasChanges = await git.hasUncommittedChanges(tree.path!);
+          if (!hasChanges) { notify.info('No working changes.'); return; }
+          await vscode.commands.executeCommand('git.viewChanges', vscode.Uri.file(tree.path!));
+        });
         break;
       }
 
       case 'branchDiff': {
         if (!tree || !tree.path) return;
-        await this.openBaseDiff(tree);
+        await this.runPending(async () => { await this.openBaseDiff(tree); });
         break;
       }
 
       case 'mainDiff': {
         if (!tree || !tree.path) return;
-        await this.openMainDiff(tree);
+        await this.runPending(async () => { await this.openMainDiff(tree); });
         break;
       }
 
       case 'commit': {
-        if (!tree || !tree.path || !this.config.ai) return;
-        const commitDiff = await git.workingDiff(tree.path);
-        if (!commitDiff.trim()) { notify.info('No working changes to commit.'); return; }
-        let message = '';
-        try {
-          await vscode.window.withProgress(
-            { location: vscode.ProgressLocation.Notification, title: 'Generating commit message...' },
-            async () => {
-              message = await ai.generateCommitMessage(this.config.ai!, commitDiff);
-            },
+        if (!tree || !tree.path || !this.config.ai) { this.postMessage({ type: 'pendingDone' }); return; }
+        await this.runPending(async (signal) => {
+          const commitDiff = await git.workingDiff(tree.path!);
+          if (!commitDiff.trim()) { notify.info('No working changes to commit.'); return; }
+          const message = await ai.generateCommitMessage(this.config.ai!, commitDiff, { signal });
+          const confirmed = await vscode.window.showInputBox({
+            value: message,
+            prompt: 'Commit message — all changes will be staged',
+            ignoreFocusOut: true,
+          });
+          if (!confirmed) return;
+          await withTreeOperation(
+            ctx!,
+            tree as TreeState & { path: string },
+            'committing',
+            () => git.commitAll(tree.path!, confirmed, { signal }),
           );
-        } catch (e: any) {
-          notify.error(`Forest: ${e.message}`);
-          return;
-        }
-        const confirmed = await vscode.window.showInputBox({
-          value: message,
-          prompt: 'Commit message — all changes will be staged',
-          ignoreFocusOut: true,
         });
-        if (!confirmed) return;
-        await withProgress('committing', 'Committing...', () => git.commitAll(tree.path!, confirmed));
         break;
       }
 
       case 'discard': {
-        if (!tree || !tree.path) return;
+        if (!tree || !tree.path) { this.postMessage({ type: 'pendingDone' }); return; }
         const pick = await vscode.window.showQuickPick(
           [{ label: 'Discard unstaged', id: 'unstaged' }, { label: 'Discard all (including staged)', id: 'all' }],
           { placeHolder: 'What to discard?' },
         );
-        if (!pick) return;
-        await withProgress('discarding', 'Discarding...', () =>
-          pick.id === 'unstaged' ? git.discardUnstaged(tree.path!) : git.discardChanges(tree.path!),
+        if (!pick) { this.postMessage({ type: 'pendingDone' }); return; }
+        await runTreeAction('discarding', (signal) =>
+          pick.id === 'unstaged' ? git.discardUnstaged(tree.path!, { signal }) : git.discardChanges(tree.path!, { signal }),
         );
         break;
       }
 
-      case 'ship':
-        vscode.commands.executeCommand('forest.ship', branch);
+      case 'ship': {
+        if (!tree?.path || !ctx) { this.postMessage({ type: 'pendingDone' }); return; }
+        // Pre-checks with QuickPick (user interaction before pending work starts)
+        if (await git.hasUncommittedChanges(tree.path)) {
+          const choice = await vscode.window.showWarningMessage(
+            'You have uncommitted changes.', 'Ship Anyway', 'Cancel',
+          );
+          if (choice !== 'Ship Anyway') { this.postMessage({ type: 'pendingDone' }); return; }
+        }
+        let automerge = false;
+        const ghEnabled = ctx.config.github.enabled && await gh.isAvailable();
+        if (ghEnabled) {
+          const hasAutomerge = await gh.repoHasAutomerge(tree.path);
+          if (hasAutomerge) {
+            const pick = await vscode.window.showQuickPick(
+              ['Create PR + Automerge', 'Create PR'],
+              { placeHolder: 'Ship — Push & Create PR...' },
+            );
+            if (!pick) { this.postMessage({ type: 'pendingDone' }); return; }
+            automerge = pick === 'Create PR + Automerge';
+          }
+        }
+        await this.runPending(async (signal) => {
+          const prUrl = await withTreeOperation(
+            ctx,
+            tree as TreeState & { path: string },
+            'shipping',
+            () => shipCore(ctx, tree as TreeState & { path: string }, automerge, signal),
+          );
+          if (prUrl) {
+            notify.info(`Shipped! PR: ${prUrl}`);
+            vscode.env.openExternal(vscode.Uri.parse(prUrl));
+          } else if (prUrl !== undefined) {
+            notify.info('Shipped!');
+          }
+        });
         break;
+      }
 
       case 'delete':
         await this.showDeleteForm(branch);
@@ -709,6 +766,8 @@ button { cursor: pointer; font-family: var(--vscode-font-family); border: none; 
 .radio-option.disabled { opacity: 0.6; cursor: default; }
 .radio-body { min-width: 0; flex: 1; }
 .radio-title { font-size: 12px; }
+@keyframes pulse { 0%,100% { opacity: 0.7; } 50% { opacity: 0.4; } }
+.btn-pending { animation: pulse 1.5s ease-in-out infinite; border-style: dashed; }
 </style>
 </head>
 <body>
@@ -721,6 +780,14 @@ let formInit = null;
 let formState = null;
 let deleteInit = null;
 let deleteState = null;
+let pendingAction = null; // { cmd: string, key: string|null }
+
+const pendingLabels = {
+  pull: 'pulling\\u2026', push: 'pushing\\u2026', mergeFromMain: 'merging\\u2026',
+  commit: 'committing\\u2026', discard: 'discarding\\u2026', ship: 'shipping\\u2026',
+  pickBranch: 'loading\\u2026', pickIssue: 'loading\\u2026', openTicket: 'opening\\u2026',
+  workingDiff: 'loading\\u2026', branchDiff: 'loading\\u2026', mainDiff: 'loading\\u2026',
+};
 
 function defaultFormState(init) {
   return {
@@ -757,6 +824,10 @@ window.addEventListener('message', e => {
     case 'update':
       latestData = msg.data;
       if (mode === 'list') renderCurrentMode();
+      break;
+    case 'pendingDone':
+      pendingAction = null;
+      renderCurrentMode();
       break;
     case 'showCreateForm':
       mode = 'create';
@@ -855,8 +926,16 @@ document.getElementById('root').addEventListener('click', e => {
     });
     return;
   }
+  if (btn.dataset.cmd === 'cancelPending') {
+    vscode.postMessage({ command: 'cancelPending' });
+    return;
+  }
   const msg = { command: btn.dataset.cmd, key: btn.closest('[data-key]')?.dataset.key };
   if (btn.dataset.done !== undefined) msg.isDoneOrClosed = btn.dataset.done === '1';
+  if (pendingLabels[btn.dataset.cmd] && !pendingAction) {
+    pendingAction = { cmd: btn.dataset.cmd, key: msg.key || null };
+    renderCurrentMode();
+  }
   vscode.postMessage(msg);
 });
 
@@ -937,6 +1016,17 @@ function mainCard(d) {
   return '<div class="' + cls + '" data-key="__main__"><a class="card-label" data-cmd="switchToMain">' + label + '</a></div>';
 }
 
+function pendingBtn(cmd, label) {
+  return '<button class="btn btn-pending" disabled>' + label + '</button><button class="btn" data-cmd="cancelPending" title="Cancel">' + ic('x') + '</button>';
+}
+
+function btn(cmd, label, allDisabled, pendingCmd, opts) {
+  if (pendingCmd === cmd) return pendingBtn(cmd, pendingLabels[cmd] || 'loading\\u2026');
+  var cls = 'btn' + (opts && opts.cls ? ' ' + opts.cls : '');
+  var extra = opts && opts.attrs ? ' ' + opts.attrs : '';
+  return '<button class="' + cls + '" data-cmd="' + h(cmd) + '"' + extra + dis(allDisabled) + '>' + label + '</button>';
+}
+
 function treeCard(t, d) {
   const branchLabel = ic('gitBranch') + ' ' + h(t.branch);
   if (t.cleaning) return '<div class="card" data-key="' + h(t.key) + '"><div class="row"><span class="branch">' + branchLabel + '</span><span class="dim">cleaning up\\u2026</span></div></div>';
@@ -945,17 +1035,22 @@ function treeCard(t, d) {
     const deleteBtn = isDoneOrClosed ? '<button class="btn danger" data-cmd="delete" data-done="1" title="Delete tree">' + ic('trash') + '</button>' : '';
     return '<div class="card" data-key="' + h(t.key) + '"><div class="row"><a class="branch" data-cmd="switch" title="' + h(t.branch) + '">' + branchLabel + '</a>' + deleteBtn + '</div></div>';
   }
-  const gitDisabled = !!t.busyOperation;
-  const busy = t.busyOperation ? '<span class="dim">' + h(t.busyOperation) + '\\u2026</span>' : '';
-  const behind = t.behind > 0 ? '<button class="btn" data-cmd="mergeFromMain" title="Merge ' + t.behind + ' commits from main"' + dis(gitDisabled) + '>main \\u2193' + t.behind + '</button>' : '';
+  const isPending = pendingAction && pendingAction.key === t.key;
+  const pendingCmd = isPending ? pendingAction.cmd : null;
+  const allDisabled = !!t.busyOperation || isPending;
+  const busy = !isPending && t.busyOperation ? '<span class="dim">' + h(t.busyOperation) + '\\u2026</span>' : '';
+  const behind = t.behind > 0 ? btn('mergeFromMain', 'main \\u2193' + t.behind, allDisabled, pendingCmd, { attrs: 'title="Merge ' + t.behind + ' commits from main"' }) : '';
   const pushLabel = t.ahead > 0 ? ic('arrowUp') + t.ahead : ic('arrowUp');
   let ticket = '';
   if (d.linearEnabled) {
     if (t.ticketId) {
       const lbl = t.ticketId + (t.ticketTitle ? ': ' + t.ticketTitle : '');
-      ticket = '<div class="row">' + ic('checkbox') + '<a class="ticket" data-cmd="openTicket" title="' + h(lbl) + '">' + h(lbl) + '</a><button class="btn faint" data-cmd="detachTicket">detach</button></div>';
+      const ticketLink = pendingCmd === 'openTicket'
+        ? '<span class="ticket dim">' + (pendingLabels.openTicket || 'loading\\u2026') + '</span>'
+        : '<a class="ticket" data-cmd="openTicket" title="' + h(lbl) + '"' + (allDisabled ? ' style="pointer-events:none;opacity:0.5"' : '') + '>' + h(lbl) + '</a>';
+      ticket = '<div class="row">' + ic('checkbox') + ticketLink + (pendingCmd === 'openTicket' ? '<button class="btn" data-cmd="cancelPending" title="Cancel">' + ic('x') + '</button>' : '<button class="btn faint" data-cmd="detachTicket"' + dis(allDisabled) + '>detach</button>') + '</div>';
     } else {
-      ticket = '<div class="row"><button class="btn faint" data-cmd="linkTicket" style="flex:1">' + ic('link') + ' No ticket</button></div>';
+      ticket = '<div class="row"><button class="btn faint" data-cmd="linkTicket" style="flex:1"' + dis(allDisabled) + '>' + ic('link') + ' No ticket</button></div>';
     }
   }
   let changes = '';
@@ -963,25 +1058,25 @@ function treeCard(t, d) {
     const lc = t.localChanges;
     const stats = [lc.added ? '<span class="add">+' + lc.added + '</span>' : '', lc.removed ? '<span class="del">-' + lc.removed + '</span>' : '', lc.modified ? '<span class="mod">~' + lc.modified + '</span>' : ''].filter(Boolean).join(' ');
     changes = '<div class="row"><span class="stats">' + stats + '</span>' +
-      '<button class="btn" data-cmd="workingDiff" title="Diff working changes"' + dis(gitDisabled) + '>' + ic('diff') + '</button>' +
-      '<button class="btn" data-cmd="branchDiff" title="Diff branch changes"' + dis(gitDisabled) + '>' + ic('diff') + ' branch</button>' +
-      (d.hasAI ? '<button class="btn" data-cmd="commit"' + dis(gitDisabled) + '>commit</button>' : '') +
-      '<button class="btn danger" data-cmd="discard" title="Discard changes"' + dis(gitDisabled) + '>' + ic('x') + '</button></div>';
+      btn('workingDiff', ic('diff'), allDisabled, pendingCmd, { attrs: 'title="Diff working changes"' }) +
+      btn('branchDiff', ic('diff') + ' branch', allDisabled, pendingCmd, { attrs: 'title="Diff branch changes"' }) +
+      (d.hasAI ? btn('commit', 'commit', allDisabled, pendingCmd) : '') +
+      btn('discard', ic('x'), allDisabled, pendingCmd, { cls: 'danger', attrs: 'title="Discard changes"' }) + '</div>';
   }
   const isDone = t.prState === 'MERGED' || t.prState === 'CLOSED';
   const doneFlag = isDone ? '1' : '0';
   const lastRow = (isDone || t.prNumber)
-    ? '<button class="btn fill" data-cmd="openPR">PR#' + (t.prNumber || '?') + '</button><button class="btn danger" data-cmd="delete" data-done="' + doneFlag + '" title="Delete tree"' + dis(gitDisabled) + '>' + ic('trash') + '</button>'
-    : '<button class="btn fill" data-cmd="ship"' + dis(gitDisabled) + '>Ship - Push and Create PR</button><button class="btn danger" data-cmd="delete" data-done="0" title="Delete tree"' + dis(gitDisabled) + '>' + ic('trash') + '</button>';
+    ? '<button class="btn fill" data-cmd="openPR">PR#' + (t.prNumber || '?') + '</button>' + btn('delete', ic('trash'), allDisabled, null, { cls: 'danger', attrs: 'data-done="' + doneFlag + '" title="Delete tree"' })
+    : btn('ship', 'Ship - Push and Create PR', allDisabled, pendingCmd, { cls: 'fill' }) + btn('delete', ic('trash'), allDisabled, null, { cls: 'danger', attrs: 'data-done="0" title="Delete tree"' });
   return '<div class="card current" data-key="' + h(t.key) + '">' +
     '<div class="row"><span class="branch" title="' + h(t.branch) + '">' + branchLabel + '</span>' + busy + '</div>' +
     '<div class="row">' +
       '<button class="btn" data-cmd="revealInFinder" title="Reveal in Finder">' + ic('folderOpen') + '</button>' +
       '<button class="btn" data-cmd="copyBranch" title="Copy branch name">' + ic('copy') + '</button>' +
-      '<button class="btn" data-cmd="pull" title="Pull from remote"' + dis(gitDisabled) + '>' + ic('arrowDown') + '</button>' +
-      '<button class="btn" data-cmd="push" title="Push to remote"' + dis(gitDisabled) + '>' + pushLabel + '</button>' +
+      btn('pull', ic('arrowDown'), allDisabled, pendingCmd, { attrs: 'title="Pull from remote"' }) +
+      btn('push', pushLabel, allDisabled, pendingCmd, { attrs: 'title="Push to remote"' }) +
       behind +
-      '<button class="btn" data-cmd="mainDiff" title="Diff main against branch"' + dis(gitDisabled) + '>' + ic('diff') + ' main</button>' +
+      btn('mainDiff', ic('diff') + ' main', allDisabled, pendingCmd, { attrs: 'title="Diff main against branch"' }) +
     '</div>' +
     ticket + changes +
     '<div class="row">' + lastRow + '</div>' +
@@ -1069,7 +1164,11 @@ function renderCreateForm() {
   }
   out += '</div>';
   out += '<div class="form-row">';
-  out += '<button class="btn" data-cmd="pickBranch"' + (dis ? ' disabled' : '') + '>Select branch</button>';
+  if (pendingAction && pendingAction.cmd === 'pickBranch') {
+    out += '<button class="btn btn-pending" disabled>loading\\u2026</button><button class="btn" data-cmd="cancelPending" title="Cancel">' + ic('x') + '</button>';
+  } else {
+    out += '<button class="btn" data-cmd="pickBranch"' + (dis || pendingAction ? ' disabled' : '') + '>Select branch</button>';
+  }
   if (fs.branchMode === 'existing') {
     out += '<button class="btn" data-form="branchNew"' + (dis ? ' disabled' : '') + '>Create new</button>';
   }
@@ -1096,9 +1195,13 @@ function renderCreateForm() {
     }
     out += '</div>';
     out += '<div class="form-row">';
-    out += '<button class="btn" data-cmd="pickIssue"' + (dis ? ' disabled' : '') + '>Select ticket</button>';
-    out += '<button class="btn' + (fs.ticketMode === 'new' ? ' btn-toggle active' : '') + '" data-form="ticketNew"' + (dis ? ' disabled' : '') + '>Create new</button>';
-    out += '<button class="btn' + (fs.ticketMode === 'none' ? ' btn-toggle active' : '') + '" data-form="ticketNone"' + (dis ? ' disabled' : '') + '>No ticket</button>';
+    if (pendingAction && pendingAction.cmd === 'pickIssue') {
+      out += '<button class="btn btn-pending" disabled>loading\\u2026</button><button class="btn" data-cmd="cancelPending" title="Cancel">' + ic('x') + '</button>';
+    } else {
+      out += '<button class="btn" data-cmd="pickIssue"' + (dis || pendingAction ? ' disabled' : '') + '>Select ticket</button>';
+    }
+    out += '<button class="btn' + (fs.ticketMode === 'new' ? ' btn-toggle active' : '') + '" data-form="ticketNew"' + (dis || pendingAction ? ' disabled' : '') + '>Create new</button>';
+    out += '<button class="btn' + (fs.ticketMode === 'none' ? ' btn-toggle active' : '') + '" data-form="ticketNone"' + (dis || pendingAction ? ' disabled' : '') + '>No ticket</button>';
     out += '</div>';
 
     if (fs.ticketMode === 'new') {

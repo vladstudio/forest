@@ -22,16 +22,17 @@ export interface LinearIssue {
   url?: string;
 }
 
-async function gql<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
+async function gql<T>(query: string, variables?: Record<string, unknown>, signal?: AbortSignal): Promise<T> {
   if (!_apiKey) throw new Error('Linear API key not configured');
   const opMatch = query.match(/^\s*(query|mutation)\s*(\w*)/);
   const opName = opMatch ? `${opMatch[1]} ${opMatch[2]}`.trim() : 'unknown';
   log.info(`Linear gql: ${opName}${variables ? ` vars=${JSON.stringify(variables)}` : ''}`);
+  const timeoutSignal = AbortSignal.timeout(15_000);
   const res = await fetch(API, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: _apiKey },
     body: JSON.stringify({ query, variables }),
-    signal: AbortSignal.timeout(15_000),
+    signal: signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal,
   });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
@@ -89,7 +90,7 @@ async function resolveStateId(teamKey: string, nameOrType: string): Promise<stri
   throw new Error(`Unknown Linear state "${nameOrType}" for team ${teamKey}`);
 }
 
-export async function listMyIssues(states: string[], teams?: string[]): Promise<LinearIssue[]> {
+export async function listMyIssues(states: string[], teams?: string[], opts?: { signal?: AbortSignal }): Promise<LinearIssue[]> {
   try {
     // states are type-level names like "triage", "backlog", etc.
     const filter: Record<string, unknown> = {
@@ -104,6 +105,7 @@ export async function listMyIssues(states: string[], teams?: string[]): Promise<
         }
       }`,
       { filter },
+      opts?.signal,
     );
     return data.issues.nodes.map(n => ({
       id: n.identifier,
@@ -115,13 +117,14 @@ export async function listMyIssues(states: string[], teams?: string[]): Promise<
   } catch (e: any) { log.error(`listMyIssues failed: ${e.message}`); return []; }
 }
 
-export async function getIssue(issueId: string): Promise<LinearIssue | null> {
+export async function getIssue(issueId: string, opts?: { signal?: AbortSignal }): Promise<LinearIssue | null> {
   try {
     const data = await gql<{ issue: { identifier: string; title: string; state: { name: string; type: string }; priority: number; url: string } }>(
       `query($id: String!) {
         issue(id: $id) { identifier title state { name type } priority url }
       }`,
       { id: issueId },
+      opts?.signal,
     );
     const i = data.issue;
     return { id: i.identifier, title: i.title, state: i.state.type, priority: i.priority, url: i.url };
