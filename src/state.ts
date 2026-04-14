@@ -115,11 +115,11 @@ export class StateManager {
     for (let i = 0;; i++) {
       try { fs.mkdirSync(lock); } catch (e: any) {
         if (e.code !== 'EEXIST') throw e;
-        try { if (Date.now() - fs.statSync(lock).mtimeMs > 10_000) { fs.rmSync(lock); continue; } } catch {}
+        try { if (Date.now() - fs.statSync(lock).mtimeMs > 10_000) { fs.rmdirSync(lock); continue; } } catch {}
         if (i >= 99) throw new Error('State file is locked');
         await new Promise(r => setTimeout(r, 50)); continue;
       }
-      try { return await fn(); } finally { try { fs.rmSync(lock); } catch {} }
+      try { return await fn(); } finally { try { fs.rmdirSync(lock); } catch {} }
     }
   }
 
