@@ -1094,6 +1094,7 @@ function treeCard(t, d) {
     ? '<button class="btn fill" data-cmd="openPR"' + dis(allDisabled) + '>PR#' + (t.prNumber || '?') + '</button>' + btn('delete', ic('trash'), allDisabled, null, { cls: 'danger', attrs: 'data-done="' + doneFlag + '" title="Delete tree"' })
     : btn('ship', 'Ship - Push and Create PR', allDisabled, pendingCmd, { cls: 'fill' }) + btn('delete', ic('trash'), allDisabled, null, { cls: 'danger', attrs: 'data-done="0" title="Delete tree"' });
   return '<div class="card current" data-key="' + h(t.key) + '">' +
+    ticket +
     '<div class="row"><span class="branch" title="' + h(t.branch) + '">' + branchLabel + '</span>' + busy + '</div>' +
     '<div class="row">' +
       '<button class="btn" data-cmd="revealInFinder" title="Reveal in Finder"' + dis(allDisabled) + '>' + ic('folderOpen') + '</button>' +
@@ -1103,7 +1104,7 @@ function treeCard(t, d) {
       behind +
       btn('mainDiff', ic('diff') + ' main', allDisabled, pendingCmd, { attrs: 'title="Diff main against branch"' }) +
     '</div>' +
-    ticket + changes +
+    changes +
     '<div class="row">' + lastRow + '</div>' +
   '</div>';
 }
