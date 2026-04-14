@@ -352,6 +352,22 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
+    if (key === '__main__') {
+      const repoPath = getRepoPath();
+      switch (command) {
+        case 'revealInFinder':
+          vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(repoPath));
+          break;
+        case 'pull':
+          await this.runPending((signal) => git.pull(repoPath, { signal }));
+          break;
+        case 'push':
+          await this.runPending((signal) => git.pushBranch(repoPath, shortBaseBranch(this.config.baseBranch), { signal }));
+          break;
+      }
+      return;
+    }
+
     if (command === 'cancelPending') {
       this.pendingAbort?.abort();
       return;
@@ -1013,7 +1029,17 @@ function renderList(d) {
 function mainCard(d) {
   const cls = 'card card-main' + (d.mainIsCurrent ? ' current' : '');
   const label = ic('house') + ' ' + h(d.baseBranch) + ' \\u00b7 ' + h(d.repoName);
-  if (d.mainIsCurrent) return '<div class="' + cls + '"><span class="card-label">' + label + '</span></div>';
+  if (d.mainIsCurrent) {
+    var isPending = pendingAction && pendingAction.key === '__main__';
+    var pCmd = isPending ? pendingAction.cmd : null;
+    var allDis = isPending;
+    return '<div class="' + cls + '" data-key="__main__"><span class="card-label">' + label + '</span>' +
+      '<div class="row">' +
+        '<button class="btn" data-cmd="revealInFinder" title="Reveal in Finder"' + dis(allDis) + '>' + ic('folderOpen') + '</button>' +
+        btn('pull', ic('arrowDown'), allDis, pCmd, { attrs: 'title="Pull"' }) +
+        btn('push', ic('arrowUp'), allDis, pCmd, { attrs: 'title="Push"' }) +
+      '</div></div>';
+  }
   return '<div class="' + cls + '" data-key="__main__"><a class="card-label" data-cmd="switchToMain">' + label + '</a></div>';
 }
 
@@ -1155,34 +1181,6 @@ function renderCreateForm() {
     out += '<div class="form-error">' + h(fs.error) + '</div>';
   }
 
-  // Branch section
-  out += '<div class="form-section">';
-  out += '<div class="form-row">';
-  if (fs.branchMode === 'existing' && fs.existingBranch) {
-    out += '<span class="form-value">' + ic('gitBranch') + ' ' + h(fs.existingBranch) + '</span>';
-  } else {
-    out += '<span class="form-value dim">' + ic('gitBranch') + ' New branch</span>';
-  }
-  out += '</div>';
-  out += '<div class="form-row">';
-  if (pendingAction && pendingAction.cmd === 'pickBranch') {
-    out += '<button class="btn btn-pending" disabled>loading\\u2026</button><button class="btn" data-cmd="cancelPending" title="Cancel">' + ic('x') + '</button>';
-  } else {
-    out += '<button class="btn" data-cmd="pickBranch"' + (dis || pendingAction ? ' disabled' : '') + '>Select branch</button>';
-  }
-  if (fs.branchMode === 'existing') {
-    out += '<button class="btn" data-form="branchNew"' + (dis ? ' disabled' : '') + '>Create new</button>';
-  }
-  out += '</div>';
-  if (fs.branchMode === 'new') {
-    out += '<input class="form-input" id="branchNameInput" placeholder="my-feature-branch" value="' + h(fs.branchName) + '"' + (dis ? ' disabled' : '') + '>';
-    out += '<div class="form-hint" id="branchHint" style="display:none"></div>';
-    if (fs.ticketMode === 'new' && fs.newTicketTitle && !fs.branchManuallyEdited) {
-      out += '<div class="form-hint">Ticket ID will be prepended after creation</div>';
-    }
-  }
-  out += '</div>';
-
   // Linear section
   if (init.linearEnabled) {
     out += '<div class="form-section">';
@@ -1226,6 +1224,34 @@ function renderCreateForm() {
     }
     out += '</div>';
   }
+
+  // Branch section
+  out += '<div class="form-section">';
+  out += '<div class="form-row">';
+  if (fs.branchMode === 'existing' && fs.existingBranch) {
+    out += '<span class="form-value">' + ic('gitBranch') + ' ' + h(fs.existingBranch) + '</span>';
+  } else {
+    out += '<span class="form-value dim">' + ic('gitBranch') + ' New branch</span>';
+  }
+  out += '</div>';
+  out += '<div class="form-row">';
+  if (pendingAction && pendingAction.cmd === 'pickBranch') {
+    out += '<button class="btn btn-pending" disabled>loading\\u2026</button><button class="btn" data-cmd="cancelPending" title="Cancel">' + ic('x') + '</button>';
+  } else {
+    out += '<button class="btn" data-cmd="pickBranch"' + (dis || pendingAction ? ' disabled' : '') + '>Select branch</button>';
+  }
+  if (fs.branchMode === 'existing') {
+    out += '<button class="btn" data-form="branchNew"' + (dis ? ' disabled' : '') + '>Create new</button>';
+  }
+  out += '</div>';
+  if (fs.branchMode === 'new') {
+    out += '<input class="form-input" id="branchNameInput" placeholder="my-feature-branch" value="' + h(fs.branchName) + '"' + (dis ? ' disabled' : '') + '>';
+    out += '<div class="form-hint" id="branchHint" style="display:none"></div>';
+    if (fs.ticketMode === 'new' && fs.newTicketTitle && !fs.branchManuallyEdited) {
+      out += '<div class="form-hint">Ticket ID will be prepended after creation</div>';
+    }
+  }
+  out += '</div>';
 
   // Uncommitted changes
   if (init.uncommittedCount > 0) {
