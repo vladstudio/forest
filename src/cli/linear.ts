@@ -205,6 +205,5 @@ export async function updateIssueState(issueId: string, state: string, team?: st
     }`,
     { id: issueId, input: { stateId } },
   );
-  if (!result.issueUpdate.success) {
-  }
+  if (!result.issueUpdate.success) throw new Error(`Linear update failed: ${issueId} → ${state}`);
 }
