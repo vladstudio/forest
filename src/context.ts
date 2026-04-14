@@ -16,6 +16,7 @@ export interface IForestProvider {
 
 export interface ForestContext {
   config: ForestConfig;
+  repoPath: string;
   stateManager: StateManager;
   shortcutManager: ShortcutManager;
   statusBarManager: StatusBarManager;
@@ -39,7 +40,7 @@ export function resolveMainRepo(wsPath: string): string {
         return path.resolve(gitdir, '..', '..', '..');
       }
     }
-  } catch {}
+  } catch { /* not a worktree — wsPath is the main repo */ }
   return wsPath;
 }
 

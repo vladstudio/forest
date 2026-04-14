@@ -9,14 +9,13 @@ import { TREE_OPERATION_HEARTBEAT_MS, displayName, type TreeState, type StateMan
 import * as git from '../cli/git';
 import * as linear from '../cli/linear';
 import { exec, execShell } from '../utils/exec';
-import { getRepoPath } from '../context';
 import { log } from '../logger';
 import { notify } from '../notify';
 
 /** Resolve tree from arg or current context, showing an error if not found or missing path. */
 export function requireTree(ctx: ForestContext, arg: TreeState | string | undefined, action: string): (TreeState & { path: string }) | undefined {
   const tree = typeof arg === 'string'
-    ? ctx.stateManager.getTree(ctx.stateManager.loadSync(), getRepoPath(), arg)
+    ? ctx.stateManager.getTree(ctx.stateManager.loadSync(), ctx.repoPath, arg)
     : arg ?? ctx.currentTree;
   if (!tree) { notify.error(`No tree to ${action}. Run from a tree window or select from sidebar.`); return undefined; }
   if (!tree.path) { notify.error(`Cannot ${action}: tree has no worktree path.`); return undefined; }
@@ -139,7 +138,7 @@ async function postWorktreeSetup(config: ForestConfig, repoPath: string, treePat
   const hasDirenv = fs.existsSync(path.join(treePath, '.envrc'));
   if (hasDirenv) {
     progress?.report({ message: 'Running direnv allow...' });
-    await execShell('direnv allow', { cwd: treePath, timeout: 10_000 }).catch(() => {});
+    await execShell('direnv allow', { cwd: treePath, timeout: 10_000 }).catch(() => { /* non-fatal */ });
   }
 }
 
@@ -182,13 +181,13 @@ export async function createTree(opts: {
   branch: string;
   config: ForestConfig;
   stateManager: StateManager;
+  repoPath: string;
   ticketId?: string;
   title?: string;
   existingBranch?: boolean;
   carryChanges?: string | false;
 }): Promise<TreeState> {
-  const { branch, config, stateManager, ticketId, title, existingBranch, carryChanges } = opts;
-  const repoPath = getRepoPath();
+  const { branch, config, stateManager, repoPath, ticketId, title, existingBranch, carryChanges } = opts;
   const createKey = `${repoPath}:${branch}`;
   if (createInProgress.has(createKey)) throw new Error('Tree creation already in progress.');
   createInProgress.add(createKey);
@@ -248,8 +247,8 @@ export async function createTree(opts: {
     } catch (e: any) {
       log.error(`createTree failed: ${branch} — ${e.message}`);
       await stateManager.removeTree(repoPath, branch);
-      await git.removeWorktree(repoPath, treePath).catch(() => {});
-      if (!existingBranch) await git.deleteBranch(repoPath, branch).catch(() => {});
+      await git.removeWorktree(repoPath, treePath).catch((e: any) => log.warn(`Rollback removeWorktree failed: ${e.message}`));
+      if (!existingBranch) await git.deleteBranch(repoPath, branch).catch((e: any) => log.warn(`Rollback deleteBranch failed: ${e.message}`));
       throw e;
     }
   } finally { createInProgress.delete(createKey); }

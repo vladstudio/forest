@@ -1,12 +1,11 @@
 import * as vscode from 'vscode';
 import type { ForestContext } from '../context';
 import { displayName } from '../state';
-import { getRepoPath } from '../context';
 import { notify } from '../notify';
 
 export async function list(ctx: ForestContext): Promise<void> {
   const state = await ctx.stateManager.load();
-  const trees = ctx.stateManager.getTreesForRepo(state, getRepoPath()).filter(t => t.path);
+  const trees = ctx.stateManager.getTreesForRepo(state, ctx.repoPath).filter(t => t.path);
   if (!trees.length) { notify.info('No trees yet.'); return; }
 
   const curPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;

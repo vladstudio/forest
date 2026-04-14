@@ -2,7 +2,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { exec } from '../utils/exec';
-import { shortBaseBranch } from '../utils/slug';
 import { log } from '../logger';
 
 const stashRef = (ref: number | string) => typeof ref === 'number' ? `stash@{${ref}}` : ref;
@@ -12,10 +11,10 @@ export async function createWorktree(
 ): Promise<void> {
   log.info(`createWorktree: ${branch} at ${worktreePath} (base: ${baseRef})`);
   await Promise.all([
-    exec('git', ['fetch', 'origin', shortBaseBranch(baseRef)], { cwd: repoPath }),
+    exec('git', ['fetch', 'origin', baseRef], { cwd: repoPath }),
     exec('git', ['worktree', 'prune'], { cwd: repoPath }),
   ]);
-  await exec('git', ['-c', 'checkout.workers=0', 'worktree', 'add', worktreePath, '-b', branch, baseRef], { cwd: repoPath });
+  await exec('git', ['-c', 'checkout.workers=0', 'worktree', 'add', worktreePath, '-b', branch, `origin/${baseRef}`], { cwd: repoPath });
 }
 
 export async function removeWorktree(repoPath: string, worktreePath: string): Promise<void> {
@@ -59,12 +58,12 @@ export async function pull(worktreePath: string, opts?: { signal?: AbortSignal }
 
 export async function pullMerge(worktreePath: string, baseRef: string, opts?: { signal?: AbortSignal }): Promise<void> {
   await exec('git', ['fetch', 'origin'], { cwd: worktreePath, signal: opts?.signal });
-  await exec('git', ['merge', baseRef], { cwd: worktreePath, timeout: 60_000, signal: opts?.signal });
+  await exec('git', ['merge', `origin/${baseRef}`], { cwd: worktreePath, timeout: 60_000, signal: opts?.signal });
 }
 
 export async function pullRebase(worktreePath: string, baseRef: string, opts?: { signal?: AbortSignal }): Promise<void> {
   await exec('git', ['fetch', 'origin'], { cwd: worktreePath, signal: opts?.signal });
-  await exec('git', ['rebase', baseRef], { cwd: worktreePath, timeout: 60_000, signal: opts?.signal });
+  await exec('git', ['rebase', `origin/${baseRef}`], { cwd: worktreePath, timeout: 60_000, signal: opts?.signal });
 }
 
 export async function stash(repoPath: string, message: string): Promise<string> {
@@ -135,10 +134,10 @@ async function revListCount(worktreePath: string, range: string): Promise<number
   } catch { return 0; }
 }
 
-export const commitsBehind = (wt: string, base: string) => revListCount(wt, `HEAD..${base}`);
+export const commitsBehind = (wt: string, base: string) => revListCount(wt, `HEAD..origin/${base}`);
 
 export async function diffFromBase(worktreePath: string, baseRef: string, opts?: { signal?: AbortSignal }): Promise<string> {
-  const { stdout } = await exec('git', ['diff', baseRef + '...HEAD'], { cwd: worktreePath, timeout: 30_000, signal: opts?.signal });
+  const { stdout } = await exec('git', ['diff', `origin/${baseRef}...HEAD`], { cwd: worktreePath, timeout: 30_000, signal: opts?.signal });
   return stdout;
 }
 
@@ -152,7 +151,7 @@ export async function diffFilesFromBase(
   worktreePath: string,
   baseRef: string,
 ): Promise<{ mergeBase: string; changes: DiffFileChange[] }> {
-  const { stdout: mergeBaseStdout } = await exec('git', ['merge-base', baseRef, 'HEAD'], { cwd: worktreePath, timeout: 10_000 });
+  const { stdout: mergeBaseStdout } = await exec('git', ['merge-base', `origin/${baseRef}`, 'HEAD'], { cwd: worktreePath, timeout: 10_000 });
   const mergeBase = mergeBaseStdout.trim();
   if (!mergeBase) throw new Error(`Could not resolve merge base for ${baseRef}`);
 
@@ -247,8 +246,7 @@ export async function listBranches(repoPath: string, baseBranch: string, opts?: 
     if (!allBranches.has(name)) allBranches.add(name);
   }
 
-  const base = shortBaseBranch(baseBranch);
   return [...allBranches]
-    .filter(b => b !== base && !wtBranches.has(b))
+    .filter(b => b !== baseBranch && !wtBranches.has(b))
     .sort();
 }

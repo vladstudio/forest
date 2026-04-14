@@ -183,21 +183,23 @@ export async function validateStatuses(
     for (const t of statuses.issueList) {
       if (!VALID_TYPES.includes(t)) problems.push(`issueList: "${t}" is not a valid state type`);
     }
-    for (const team of teams) {
+    const transitionFields = { onNew: statuses.onNew, onShip: statuses.onShip, onCleanup: statuses.onCleanup, onCancel: statuses.onCancel };
+    const teamResults = await Promise.all(teams.map(async (team) => {
       const states = await getWorkflowStates(team);
-      if (!states.length) { problems.push(`Team "${team}" has no workflow states (wrong team key?)`); continue; }
-      // Validate transition statuses (onNew, onShip, etc.) — can match name or type
-      for (const [field, value] of Object.entries({ onNew: statuses.onNew, onShip: statuses.onShip, onCleanup: statuses.onCleanup, onCancel: statuses.onCancel })) {
+      if (!states.length) return [`Team "${team}" has no workflow states (wrong team key?)`];
+      const teamProblems: string[] = [];
+      for (const [field, value] of Object.entries(transitionFields)) {
         const lower = value.toLowerCase();
         const byName = states.find(s => s.name.toLowerCase() === lower);
         const byType = states.find(s => s.type === lower);
         if (!byName && !byType) {
           const available = [...new Set(states.map(s => s.name))].join(', ');
-          problems.push(`${field}: "${value}" not found for team ${team} (available: ${available})`);
+          teamProblems.push(`${field}: "${value}" not found for team ${team} (available: ${available})`);
         }
       }
-    }
-    return problems;
+      return teamProblems;
+    }));
+    return [...problems, ...teamResults.flat()];
   } catch { return []; }
 }
 

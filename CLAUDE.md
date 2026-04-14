@@ -20,10 +20,10 @@ Output: `dist/extension.js` (single bundle, `vscode` marked as external).
 
 **Entry point**: `src/extension.ts` — loads config, creates managers/providers, registers commands, sets up state watching across windows.
 
-**Key flow**: Config → StateManager → Managers → TreeDataProviders → VS Code UI.
+**Key flow**: Config → StateManager → Managers → Providers → VS Code UI.
 
 ### Config (`src/config.ts`)
-Three-tier merge: defaults → `.forest/config.json` (repo) → `.forest/local.json` (gitignored per-dev). Shortcuts merge by `name` field; type is inferred from fields (`url` → browser, `path` → file, else terminal). Shortcuts support `onNewTree: true` to auto-open when a tree is first created. Shortcut values are literal; Forest does not expand `${...}` placeholders in shortcut commands, URLs, env vars, or file paths. `baseBranch` stored without `origin/` prefix (auto-prepended). `linear` auto-enabled when `teams` or `apiKey` present. `github` accepts boolean shorthand. Top-level `browser` setting is a `string[]` (first item is default, right-click picks from list); values: `integrated` | `external` | app name. Per-shortcut `browser` field overrides it. Top-level `terminal` is also `string[]`; values: `integrated` | app name (`iTerm`, `Terminal`, `Ghostty`). Both accept a single string for backward compatibility.
+Three-tier merge: defaults → `.forest/config.json` (repo) → `.forest/local.json` (gitignored per-dev). Shortcuts merge by `name` field; type is inferred from fields (`url` → browser, `path` → file, else terminal). Shortcuts support `onNewTree: true` to auto-open when a tree is first created. Shortcut values are literal; Forest does not expand `${...}` placeholders in shortcut commands, URLs, env vars, or file paths. `baseBranch` stored without `origin/` prefix; callers prepend when needed. `linear` auto-enabled when `teams` or `apiKey` present. `github` accepts boolean shorthand. Top-level `browser` setting is a `string[]` (first item is default, right-click picks from list); values: `integrated` | `external` | app name. Per-shortcut `browser` field overrides it. Top-level `terminal` is also `string[]`; values: `integrated` | app name (`iTerm`, `Terminal`, `Ghostty`). Both accept a single string for backward compatibility.
 
 ### State (`src/state.ts`)
 Global state at `~/.forest/state.json`. Trees keyed as `repoPath:branch`. File-watch-based cross-window coordination with debounced events. Atomic writes via temp+rename. Write-locked to prevent races.
@@ -39,7 +39,7 @@ Thin wrappers (40-60 lines) around shared logic in `commands/shared.ts`. `create
 - **StatusBarManager**: Shows current tree info in status bar.
 
 ### Views (`src/views/`)
-Standard `TreeDataProvider` pattern. `items.ts` defines all TreeItem subclasses with `contextValue` for context menus. Health metrics (commits behind, PR status, age) cached 30 seconds in `ForestTreeProvider`.
+`ForestWebviewProvider` renders the main tree sidebar as a webview. `ShortcutsTreeProvider` is a standard `TreeDataProvider` for the shortcuts panel. Health metrics (commits behind, PR status, age) cached 30 seconds.
 
 ### CLI Wrappers (`src/cli/`)
 `git.ts`, `linear.ts`, `gh.ts` — thin exec wrappers. Tool availability cached once per session. All calls wrapped in try/catch for graceful degradation when tools are missing. `gh.ts` also has `repoHasAutomerge()` (cached) and `enableAutomerge()` for the ship automerge flow. `ai.ts` — raw `fetch` calls to AI providers (anthropic, openai, gemini) for PR body generation; used by `ship` when `config.ai` is set, falls back to `--fill` on failure.

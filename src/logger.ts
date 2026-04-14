@@ -15,6 +15,7 @@ export const log = {
 
 export class Logger {
   private fd: number;
+  private writeQueue = Promise.resolve();
   private writeCount = 0;
 
   constructor() {
@@ -22,15 +23,20 @@ export class Logger {
     this.fd = fs.openSync(LOG_PATH, 'a');
   }
 
-  private write(level: string, msg: string): void {
+  private enqueue(level: string, msg: string): void {
     const line = `[${new Date().toISOString()}] [${level}] ${msg}\n`;
-    try {
-      fs.writeSync(this.fd, line);
-      if (++this.writeCount % 100 === 0) this.rotate();
-    } catch {}
+    this.writeQueue = this.writeQueue.then(async () => {
+      try {
+        const buf = Buffer.from(line);
+        await new Promise<void>((resolve, reject) =>
+          fs.write(this.fd, buf, 0, buf.length, null, (err) => err ? reject(err) : resolve()),
+        );
+        if (++this.writeCount % 100 === 0) await this.rotate();
+      } catch { /* best-effort */ }
+    });
   }
 
-  private rotate(): void {
+  private async rotate(): Promise<void> {
     try {
       const stat = fs.fstatSync(this.fd);
       if (stat.size > MAX_SIZE) {
@@ -44,12 +50,14 @@ export class Logger {
     } catch {}
   }
 
-  info(msg: string): void { this.write('INFO', msg); }
-  warn(msg: string): void { this.write('WARN', msg); }
-  error(msg: string): void { this.write('ERROR', msg); }
+  info(msg: string): void { this.enqueue('INFO', msg); }
+  warn(msg: string): void { this.enqueue('WARN', msg); }
+  error(msg: string): void { this.enqueue('ERROR', msg); }
 
   dispose(): void {
-    try { fs.closeSync(this.fd); } catch {}
+    this.writeQueue.then(() => {
+      try { fs.closeSync(this.fd); } catch {}
+    });
   }
 }
 

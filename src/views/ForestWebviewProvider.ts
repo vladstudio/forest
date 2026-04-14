@@ -5,12 +5,11 @@ import * as crypto from 'crypto';
 import type { ForestConfig } from '../config';
 import type { ForestContext } from '../context';
 import { displayName, type StateManager, type TreeState } from '../state';
-import { getRepoPath } from '../context';
 import * as git from '../cli/git';
 import * as gh from '../cli/gh';
 import * as linear from '../cli/linear';
 import * as ai from '../cli/ai';
-import { shortBaseBranch, slugify } from '../utils/slug';
+import { formatBranch } from '../utils/slug';
 import { copyConfigFiles, createTree, ensureTreeIdle, ensureWorkspaceFile, focusOrOpenWindow, getBlockingTreeOperation, updateLinear, withTreeOperation } from '../commands/shared';
 import { executeDeletePlan, type DeletePlan } from '../commands/cleanup';
 import { shipCore } from '../commands/ship';
@@ -77,6 +76,8 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
 
   setContext(ctx: ForestContext): void { this.ctx = ctx; }
 
+  private get repoPath(): string { return this.ctx!.repoPath; }
+
   resolveWebviewView(view: vscode.WebviewView): void {
     this.view = view;
     view.webview.options = { enableScripts: true };
@@ -95,7 +96,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
 
   async showCreateForm(): Promise<void> {
     if (!this.view || !this.ctx) return;
-    const repoPath = getRepoPath();
+    const repoPath = this.repoPath;
     const localChanges = await git.localChanges(repoPath).catch(() => null);
     const uncommittedCount = localChanges ? localChanges.added + localChanges.removed + localChanges.modified : 0;
     this.postMessage({
@@ -111,7 +112,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
 
   async showDeleteForm(branchArg?: string): Promise<boolean> {
     if (!this.view?.visible || !this.ctx) return false;
-    const repoPath = getRepoPath();
+    const repoPath = this.repoPath;
     const branch = branchArg ?? this.ctx.currentTree?.branch;
     if (!branch) return false;
 
@@ -171,7 +172,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
   }
 
   private async update(): Promise<void> {
-    if (!this.view?.visible) return;
+    if (!this.view?.visible || !this.ctx) return;
     try {
       const data = await this.buildData();
       this.view.webview.postMessage({ type: 'update', data });
@@ -209,7 +210,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
   }
 
   private async buildData(): Promise<WebviewData> {
-    const repoPath = getRepoPath();
+    const repoPath = this.repoPath;
     const state = await this.stateManager.load();
     const trees = this.stateManager.getTreesForRepo(state, repoPath);
     const curPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -256,7 +257,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
 
     return {
       repoName: path.basename(repoPath),
-      baseBranch: shortBaseBranch(this.config.baseBranch),
+      baseBranch: this.config.baseBranch,
       mainIsCurrent: curPath === repoPath,
       hasAI: !!this.config.ai,
       linearEnabled: this.config.linear.enabled,
@@ -272,21 +273,22 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
       leftRef: mergeBase,
       rightRef: 'HEAD',
       changes,
-      emptyMessage: `No branch changes from ${shortBaseBranch(this.config.baseBranch)}.`,
+      emptyMessage: `No branch changes from ${this.config.baseBranch}.`,
       sourcePath: `${tree.path}/${mergeBase}...HEAD`,
     });
   }
 
   private async openMainDiff(tree: TreeState): Promise<void> {
     if (!tree.path) return;
-    const changes = await git.diffFilesBetweenRefs(tree.path, this.config.baseBranch, 'HEAD');
+    const remoteBase = `origin/${this.config.baseBranch}`;
+    const changes = await git.diffFilesBetweenRefs(tree.path, remoteBase, 'HEAD');
     await this.openRefDiff(tree, {
       title: 'main diff',
-      leftRef: this.config.baseBranch,
+      leftRef: remoteBase,
       rightRef: 'HEAD',
       changes,
-      emptyMessage: `No differences between ${shortBaseBranch(this.config.baseBranch)} and this branch.`,
-      sourcePath: `${tree.path}/${this.config.baseBranch}..HEAD`,
+      emptyMessage: `No differences between ${this.config.baseBranch} and this branch.`,
+      sourcePath: `${tree.path}/${remoteBase}..HEAD`,
     });
   }
 
@@ -348,12 +350,12 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
     const { command, key } = msg;
 
     if (command === 'switchToMain') {
-      focusOrOpenWindow(vscode.Uri.file(getRepoPath()));
+      focusOrOpenWindow(vscode.Uri.file(this.repoPath));
       return;
     }
 
     if (key === '__main__') {
-      const repoPath = getRepoPath();
+      const repoPath = this.repoPath;
       switch (command) {
         case 'revealInFinder':
           vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(repoPath));
@@ -362,7 +364,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
           await this.runPending((signal) => git.pull(repoPath, { signal }));
           break;
         case 'push':
-          await this.runPending((signal) => git.pushBranch(repoPath, shortBaseBranch(this.config.baseBranch), { signal }));
+          await this.runPending((signal) => git.pushBranch(repoPath, this.config.baseBranch, { signal }));
           break;
       }
       return;
@@ -376,7 +378,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
     // Create form commands (no key needed)
     if (command === 'pickBranch') {
       await this.runPending(async (signal) => {
-        const branches = await git.listBranches(getRepoPath(), this.config.baseBranch, { signal });
+        const branches = await git.listBranches(this.repoPath, this.config.baseBranch, { signal });
         if (!branches.length) {
           notify.info('No available branches.');
           this.postMessage({ type: 'branchPickResult', branch: null });
@@ -591,7 +593,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
   private async handleCreateSubmit(msg: Record<string, any>): Promise<void> {
     if (!this.ctx) return;
     const ctx = this.ctx;
-    const repoPath = getRepoPath();
+    const repoPath = this.repoPath;
 
     try {
       let ticketId: string | undefined = msg.ticketId;
@@ -626,9 +628,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
         branch = msg.existingBranch;
       } else if (ticketId && title && !msg.branchManuallyEdited) {
         // New ticket created — use branchFormat with real ticketId
-        branch = ctx.config.branchFormat
-          .replace('${ticketId}', ticketId)
-          .replace('${slug}', slugify(title));
+        branch = formatBranch(ctx.config.branchFormat, ticketId, title);
       } else {
         branch = msg.branchName;
       }
@@ -651,6 +651,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
           branch,
           config: ctx.config,
           stateManager: ctx.stateManager,
+          repoPath: ctx.repoPath,
           ticketId,
           title,
           existingBranch: msg.branchMode === 'existing',

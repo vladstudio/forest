@@ -96,11 +96,8 @@ export async function loadConfig(): Promise<ForestConfig | null> {
     merged.shortcuts = merged.shortcuts.map(normalizeShortcut);
   }
 
-  // Normalize baseBranch: auto-prepend origin/ if missing
-  merged.baseBranch = merged.baseBranch?.trim() || 'main';
-  if (!merged.baseBranch.includes('/')) {
-    merged.baseBranch = `origin/${merged.baseBranch}`;
-  }
+  // Normalize baseBranch: strip any origin/ prefix — callers prepend when needed
+  merged.baseBranch = (merged.baseBranch?.trim() || 'main').replace(/^origin\//, '');
 
   // Normalize github: accept boolean shorthand
   if (typeof merged.github === 'boolean') {

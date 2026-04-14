@@ -2,7 +2,6 @@ import { writeFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { exec, commandExists } from '../utils/exec';
-import { shortBaseBranch } from '../utils/slug';
 import { log } from '../logger';
 import { notify } from '../notify';
 
@@ -58,8 +57,7 @@ export async function enableAutomerge(worktreePath: string, opts?: { signal?: Ab
 
 export async function createPR(worktreePath: string, baseBranch: string, title: string, body?: string, opts?: { signal?: AbortSignal }): Promise<string | null> {
   log.info(`createPR: "${title}" → ${baseBranch}`);
-  const base = shortBaseBranch(baseBranch);
-  const args = ['pr', 'create', '--base', base, '--title', title];
+  const args = ['pr', 'create', '--base', baseBranch, '--title', title];
   let bodyFile: string | undefined;
   if (body) {
     bodyFile = join(tmpdir(), `forest-pr-body-${Date.now()}.md`);

@@ -3,18 +3,8 @@ import type { ForestContext } from '../context';
 import * as git from '../cli/git';
 import * as linear from '../cli/linear';
 import { createTree, filterUnlinkedIssues, updateLinear, pickTeam, promptUncommittedChanges } from './shared';
-import { slugify } from '../utils/slug';
-import { getRepoPath } from '../context';
+import { sanitizeBranch, formatBranch } from '../utils/slug';
 import { notify } from '../notify';
-
-function sanitizeBranch(value: string): string {
-  return value
-    .replace(/[<>:"|?*\x00-\x1f\s~^\\]+/g, '-')
-    .replace(/\.{2,}/g, '-')
-    .replace(/\/\//g, '/')
-    .replace(/-+/g, '-')
-    .replace(/^[-./]+|[-./]+$/g, '');
-}
 
 function showBranchInput(options?: { value?: string }): Promise<string | undefined> {
   return new Promise(resolve => {
@@ -69,9 +59,7 @@ export async function start(ctx: ForestContext, arg: { ticketId: string; title: 
   const { ticketId, title } = arg;
 
   // Generate branch name from format
-  const defaultBranch = config.branchFormat
-    .replace('${ticketId}', ticketId)
-    .replace('${slug}', slugify(title));
+  const defaultBranch = formatBranch(config.branchFormat, ticketId, title);
 
   const choice = await vscode.window.showQuickPick([
     { label: `$(folder) New branch: ${defaultBranch}`, id: 'new' },
@@ -85,7 +73,7 @@ export async function start(ctx: ForestContext, arg: { ticketId: string; title: 
   if (choice.id === 'existing') {
     const branches = await vscode.window.withProgress(
       { location: vscode.ProgressLocation.Notification, title: 'Loading branches...' },
-      () => git.listBranches(getRepoPath(), config.baseBranch),
+      () => git.listBranches(ctx.repoPath, config.baseBranch),
     );
     if (!branches.length) { notify.info('No available branches.'); return; }
     const picked = await vscode.window.showQuickPick(
@@ -101,11 +89,11 @@ export async function start(ctx: ForestContext, arg: { ticketId: string; title: 
     branch = edited;
   }
 
-  const stashed = await promptUncommittedChanges(getRepoPath());
+  const stashed = await promptUncommittedChanges(ctx.repoPath);
   if (stashed === undefined) return;
 
   try {
-    await createTree({ branch, config, stateManager: ctx.stateManager, ticketId, title, existingBranch, carryChanges: stashed });
+    await createTree({ branch, config, stateManager: ctx.stateManager, repoPath: ctx.repoPath, ticketId, title, existingBranch, carryChanges: stashed });
     await updateLinear(ctx, ticketId, config.linear.statuses.onNew);
   } catch (e: any) {
     notify.error(e.message);
@@ -152,8 +140,8 @@ async function createFromNewBranch(ctx: ForestContext): Promise<void> {
       revertOnCancel = true;
     } else if (link.id === 'select') {
       const result = await pickIssue(ctx);
-      if (result === undefined) return;
-      if (result) { ticketId = result.ticketId; title = result.title; }
+      if (!result) return;
+      ticketId = result.ticketId; title = result.title;
     }
   }
 
@@ -161,9 +149,7 @@ async function createFromNewBranch(ctx: ForestContext): Promise<void> {
   let branchOpts: { value?: string } | undefined;
   if (ticketId && title) {
     branchOpts = {
-      value: config.branchFormat
-        .replace('${ticketId}', ticketId)
-        .replace('${slug}', slugify(title))
+      value: formatBranch(config.branchFormat, ticketId, title),
     };
   }
 
@@ -173,14 +159,14 @@ async function createFromNewBranch(ctx: ForestContext): Promise<void> {
     return;
   }
 
-  const stashed = await promptUncommittedChanges(getRepoPath());
+  const stashed = await promptUncommittedChanges(ctx.repoPath);
   if (stashed === undefined) {
     if (revertOnCancel && ticketId) await revertLinear(ctx, ticketId);
     return;
   }
 
   try {
-    await createTree({ branch: branchName, config, stateManager: ctx.stateManager, ticketId, title, carryChanges: stashed });
+    await createTree({ branch: branchName, config, stateManager: ctx.stateManager, repoPath: ctx.repoPath, ticketId, title, carryChanges: stashed });
     if (ticketId) await updateLinear(ctx, ticketId, config.linear.statuses.onNew);
   } catch (e: any) {
     if (revertOnCancel && ticketId) await revertLinear(ctx, ticketId);
@@ -190,7 +176,7 @@ async function createFromNewBranch(ctx: ForestContext): Promise<void> {
 
 async function createFromExistingBranch(ctx: ForestContext): Promise<void> {
   const config = ctx.config;
-  const repoPath = getRepoPath();
+  const repoPath = ctx.repoPath;
   const linearEnabled = config.linear.enabled && linear.isAvailable();
 
   const branches = await vscode.window.withProgress(
@@ -235,8 +221,8 @@ async function createFromExistingBranch(ctx: ForestContext): Promise<void> {
 
     if (link.id === 'select') {
       const result = await pickIssue(ctx);
-      if (result === undefined) return;
-      if (result) { ticketId = result.ticketId; title = result.title; linkedLinear = true; }
+      if (!result) return;
+      ticketId = result.ticketId; title = result.title; linkedLinear = true;
     } else if (link.id === 'create') {
       const result = await createIssue(ctx);
       if (!result) return;
@@ -254,7 +240,7 @@ async function createFromExistingBranch(ctx: ForestContext): Promise<void> {
   }
 
   try {
-    await createTree({ branch, config, stateManager: ctx.stateManager, ticketId, title, existingBranch: true, carryChanges: stashed });
+    await createTree({ branch, config, stateManager: ctx.stateManager, repoPath: ctx.repoPath, ticketId, title, existingBranch: true, carryChanges: stashed });
     if (linkedLinear && ticketId) await updateLinear(ctx, ticketId, config.linear.statuses.onNew);
   } catch (e: any) {
     if (revertOnCancel && ticketId) await revertLinear(ctx, ticketId);
@@ -267,11 +253,11 @@ interface IssuePickItem extends vscode.QuickPickItem {
   issueTitle: string;
 }
 
-export async function pickIssue(ctx: ForestContext, opts?: { signal?: AbortSignal }): Promise<{ ticketId: string; title: string } | null | undefined> {
+export async function pickIssue(ctx: ForestContext, opts?: { signal?: AbortSignal }): Promise<{ ticketId: string; title: string } | undefined> {
   const issues = await linear.listMyIssues(ctx.config.linear.statuses.issueList, ctx.config.linear.teams, opts);
   const state = await ctx.stateManager.load();
-  const available = filterUnlinkedIssues(issues, ctx.stateManager, state, getRepoPath());
-  if (!available.length) { notify.info('No unlinked issues found.'); return null; }
+  const available = filterUnlinkedIssues(issues, ctx.stateManager, state, ctx.repoPath);
+  if (!available.length) { notify.info('No unlinked issues found.'); return undefined; }
 
   const pick = await vscode.window.showQuickPick<IssuePickItem>(
     available.map(i => ({ label: `${i.id}  ${i.title}`, description: i.state, issueId: i.id, issueTitle: i.title })),
@@ -281,19 +267,19 @@ export async function pickIssue(ctx: ForestContext, opts?: { signal?: AbortSigna
   return { ticketId: pick.issueId, title: pick.issueTitle };
 }
 
-export async function createIssue(ctx: ForestContext): Promise<{ ticketId: string; title: string } | null> {
+export async function createIssue(ctx: ForestContext): Promise<{ ticketId: string; title: string } | undefined> {
   const config = ctx.config;
   const issueTitle = await vscode.window.showInputBox({ prompt: 'Issue title', placeHolder: '' });
-  if (!issueTitle) return null;
+  if (!issueTitle) return undefined;
 
   const priorityPick = await vscode.window.showQuickPick<vscode.QuickPickItem & { value: number }>(
     [{ label: '$(dash) No priority', value: 0 }, { label: 'Urgent', value: 1 }, { label: 'High', value: 2 }, { label: 'Normal', value: 3 }, { label: 'Low', value: 4 }],
     { placeHolder: 'Priority' },
   );
-  if (!priorityPick) return null;
+  if (!priorityPick) return undefined;
 
   const team = await pickTeam(config.linear.teams);
-  if (!team) return null;
+  if (!team) return undefined;
 
   try {
     const ticketId = await vscode.window.withProgress(
@@ -303,6 +289,6 @@ export async function createIssue(ctx: ForestContext): Promise<{ ticketId: strin
     return { ticketId, title: issueTitle };
   } catch (e: any) {
     notify.error(`Failed to create Linear issue: ${e.message}`);
-    return null;
+    return undefined;
   }
 }

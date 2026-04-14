@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import type { ForestContext } from '../context';
-import { getRepoPath } from '../context';
 import { pickIssue, createIssue } from './create';
 import { updateLinear } from './shared';
 
@@ -16,8 +15,7 @@ export async function linkTicket(ctx: ForestContext, branch: string): Promise<vo
 
   if (choice.id === 'select') {
     const result = await pickIssue(ctx);
-    if (result === undefined) return;
-    if (result === null) return;
+    if (!result) return;
     ticketId = result.ticketId;
     title = result.title;
   } else {
@@ -27,6 +25,6 @@ export async function linkTicket(ctx: ForestContext, branch: string): Promise<vo
     title = result.title;
   }
 
-  await ctx.stateManager.updateTree(getRepoPath(), branch, { ticketId, title });
+  await ctx.stateManager.updateTree(ctx.repoPath, branch, { ticketId, title });
   await updateLinear(ctx, ticketId, ctx.config.linear.statuses.onNew);
 }

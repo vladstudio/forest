@@ -57,7 +57,7 @@ export class StateManager {
 
   private startWatching(): void {
     let lastContent = '';
-    try { lastContent = fs.readFileSync(this.statePath, 'utf8'); } catch {}
+    try { lastContent = fs.readFileSync(this.statePath, 'utf8'); } catch (e: any) { log.warn(`Initial state read failed: ${e.message}`); }
     const dir = path.dirname(this.statePath);
     const basename = path.basename(this.statePath);
     this.watcher = fs.watch(dir, (_event, filename) => {
@@ -85,7 +85,7 @@ export class StateManager {
         return empty;
       }
       const backup = `${this.statePath}.corrupt-${Date.now()}`;
-      try { fs.copyFileSync(this.statePath, backup); } catch {}
+      try { fs.copyFileSync(this.statePath, backup); } catch (e: any) { log.warn(`State backup failed: ${e.message}`); }
       log.error(`State load failed: ${e.message}`);
       notify.error('Forest state is unreadable. Starting empty; original kept as a .corrupt backup.');
       return { version: 1, trees: {} };
@@ -106,8 +106,8 @@ export class StateManager {
     const data = JSON.stringify(state, null, 2);
     this.lastWrittenContent = data;
     const tmp = this.statePath + '.tmp';
-    fs.writeFileSync(tmp, data, 'utf8');
-    fs.renameSync(tmp, this.statePath);
+    await fs.promises.writeFile(tmp, data, 'utf8');
+    await fs.promises.rename(tmp, this.statePath);
   }
 
   private key(repoPath: string, branch: string): string {
@@ -120,11 +120,11 @@ export class StateManager {
     for (let i = 0;; i++) {
       try { fs.mkdirSync(lock); } catch (e: any) {
         if (e.code !== 'EEXIST') throw e;
-        try { if (Date.now() - fs.statSync(lock).mtimeMs > 10_000) { fs.rmdirSync(lock); continue; } } catch {}
+        try { if (Date.now() - fs.statSync(lock).mtimeMs > 10_000) { fs.rmSync(lock); continue; } } catch {}
         if (i >= 99) throw new Error('State file is locked');
         await new Promise(r => setTimeout(r, 50)); continue;
       }
-      try { return await fn(); } finally { try { fs.rmdirSync(lock); } catch {} }
+      try { return await fn(); } finally { try { fs.rmSync(lock); } catch {} }
     }
   }
 

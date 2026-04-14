@@ -2,13 +2,12 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { loadConfig, getTreesDir } from './config';
-import { ShortcutItem } from './views/items';
+import { ShortcutItem, ShortcutsTreeProvider } from './views/ShortcutsTreeProvider';
 import { StateManager } from './state';
 import { ForestContext, getRepoPath } from './context';
 import { ShortcutManager } from './managers/ShortcutManager';
 import { StatusBarManager } from './managers/StatusBarManager';
 import { ForestWebviewProvider } from './views/ForestWebviewProvider';
-import { ShortcutsTreeProvider } from './views/ShortcutsTreeProvider';
 import { start } from './commands/create';
 import { linkTicket } from './commands/linkTicket';
 import { switchTree } from './commands/switch';
@@ -211,7 +210,7 @@ export async function activate(context: vscode.ExtensionContext) {
   updateNoTrees().catch(() => { });
 
   const ctx: ForestContext = {
-    config, stateManager, shortcutManager,
+    config, repoPath, stateManager, shortcutManager,
     statusBarManager, forestProvider, outputChannel, currentTree,
   };
   forestProvider.setContext(ctx);
@@ -228,7 +227,7 @@ export async function activate(context: vscode.ExtensionContext) {
     }));
 
   const lookupTree = (branch?: string) =>
-    branch ? stateManager.getTree(stateManager.loadSync(), getRepoPath(), branch) : undefined;
+    branch ? stateManager.getTree(stateManager.loadSync(), repoPath, branch) : undefined;
   const andRefresh = <T>(fn: () => Promise<T>) => async () => { await fn(); forestProvider.refreshTrees(); };
 
   reg('forest.create', () => ctx.forestProvider.showCreateForm());
