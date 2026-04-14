@@ -15,7 +15,6 @@ import { executeDeletePlan, type DeletePlan } from '../commands/cleanup';
 import { shipCore } from '../commands/ship';
 import { notify } from '../notify';
 import { pickIssue } from '../commands/create';
-import { log } from '../logger';
 
 interface TreeCardData {
   key: string;
@@ -176,9 +175,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
     try {
       const data = await this.buildData();
       this.view.webview.postMessage({ type: 'update', data });
-    } catch (e: any) {
-      log.error(`ForestWebviewProvider.update: ${e.message}`);
-    }
+    } catch { }
   }
 
   private getTreeData(tree: TreeState): Promise<TreeCardData> {

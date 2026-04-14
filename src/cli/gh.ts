@@ -2,7 +2,6 @@ import { writeFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { exec, commandExists } from '../utils/exec';
-import { log } from '../logger';
 import { notify } from '../notify';
 
 let _available: boolean | null = null;
@@ -19,7 +18,6 @@ export async function prStatus(worktreePath: string): Promise<{ state: string; r
     const data = JSON.parse(stdout);
     return { state: data.state || 'OPEN', reviewDecision: data.reviewDecision || null, number: data.number, url: data.url };
   } catch (e: any) {
-    log.error(`prStatus failed: ${e.message}`);
     if (!_authWarned && (e.stderr || e.message || '').includes('auth login')) {
       _authWarned = true;
       notify.warn('Forest: GitHub CLI auth expired. Run "gh auth login" in your terminal.');
@@ -32,7 +30,7 @@ export async function prIsMerged(repoPath: string, branch: string): Promise<bool
   try {
     const { stdout } = await exec('gh', ['pr', 'view', branch, '--json', 'state'], { cwd: repoPath, timeout: 10_000 });
     return JSON.parse(stdout).state === 'MERGED';
-  } catch (e: any) { log.error(`prIsMerged(${branch}) failed: ${e.message}`); return false; }
+  } catch { return false; }
 }
 
 const automergeCache = new Map<string, { value: boolean; time: number }>();
@@ -45,8 +43,7 @@ export async function repoHasAutomerge(worktreePath: string): Promise<boolean> {
     const value = stdout.trim() === 'true';
     automergeCache.set(worktreePath, { value, time: Date.now() });
     return value;
-  } catch (e: any) {
-    log.error(`repoHasAutomerge check failed: ${e.message}`);
+  } catch {
     return false;
   }
 }
@@ -56,7 +53,6 @@ export async function enableAutomerge(worktreePath: string, opts?: { signal?: Ab
 }
 
 export async function createPR(worktreePath: string, baseBranch: string, title: string, body?: string, opts?: { signal?: AbortSignal }): Promise<string | null> {
-  log.info(`createPR: "${title}" → ${baseBranch}`);
   const args = ['pr', 'create', '--base', baseBranch, '--title', title];
   let bodyFile: string | undefined;
   if (body) {
@@ -70,7 +66,6 @@ export async function createPR(worktreePath: string, baseBranch: string, title: 
     const { stdout } = await exec('gh', args, { cwd: worktreePath, timeout: 30_000, signal: opts?.signal });
     // gh pr create prints the URL on the last line (may have preamble text)
     const url = stdout.trim().split('\n').pop()?.trim();
-    log.info(`createPR result: ${url ?? '(no url)'}`);
     return url || null;
   } finally {
     if (bodyFile) try { unlinkSync(bodyFile); } catch {}
@@ -78,6 +73,5 @@ export async function createPR(worktreePath: string, baseBranch: string, title: 
 }
 
 export async function closePR(repoPath: string, branch: string, opts?: { signal?: AbortSignal }): Promise<void> {
-  log.info(`closePR: ${branch}`);
   await exec('gh', ['pr', 'close', branch], { cwd: repoPath, timeout: 30_000, signal: opts?.signal });
 }

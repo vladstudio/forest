@@ -1,5 +1,4 @@
 import type { AIConfig } from '../config';
-import { log } from '../logger';
 
 const MAX_DIFF_CHARS = 100_000;
 const MAX_DIFF_CHARS_COMMIT = 10_000;
@@ -16,10 +15,7 @@ PR title: ${title}
 Diff:
 ${trimmedDiff}`;
 
-  log.info(`generatePRBody: provider=${config.provider} model=${config.model} diffLen=${diff.length}`);
-  const message = await callProvider(config, prompt, undefined, opts?.signal);
-  log.info(`generatePRBody: result ${message.length} chars`);
-  return message;
+  return callProvider(config, prompt, undefined, opts?.signal);
 }
 
 export async function generateCommitMessage(config: AIConfig, diff: string, opts?: { signal?: AbortSignal }): Promise<string> {
@@ -27,7 +23,6 @@ export async function generateCommitMessage(config: AIConfig, diff: string, opts
     ? diff.slice(0, MAX_DIFF_CHARS_COMMIT) + '\n[diff truncated]'
     : diff;
   const prompt = `Write a concise one-line git commit message (under 72 characters). Use conventional commit format when appropriate (feat:, fix:, chore:, refactor:, etc.). Output only the commit message, nothing else.\n\nDiff:\n${trimmed}`;
-  log.info(`generateCommitMessage: provider=${config.provider} diffLen=${diff.length}`);
   return callProvider(config, prompt, 'You write concise one-line git commit messages.', opts?.signal);
 }
 
@@ -58,15 +53,10 @@ async function callAnthropic(config: AIConfig, prompt: string, systemPrompt?: st
     }),
     signal: signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal,
   });
-  if (!res.ok) {
-    const body = await res.text();
-    log.error(`Anthropic API error ${res.status}: ${body}`);
-    throw new Error(`Anthropic API error: ${res.status}`);
-  }
+  if (!res.ok) throw new Error(`Anthropic API error: ${res.status}`);
   const data = await res.json() as { content: { text: string }[]; stop_reason?: string };
   const text = data.content?.[0]?.text;
   if (!text) throw new Error('Anthropic API returned empty response');
-  if (data.stop_reason === 'max_tokens') log.warn('Anthropic response truncated (max_tokens)');
   return text.trim();
 }
 
@@ -89,15 +79,10 @@ async function callOpenAI(config: AIConfig, prompt: string, systemPrompt?: strin
     }),
     signal: signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal,
   });
-  if (!res.ok) {
-    const body = await res.text();
-    log.error(`OpenAI API error ${res.status}: ${body}`);
-    throw new Error(`OpenAI API error: ${res.status}`);
-  }
+  if (!res.ok) throw new Error(`OpenAI API error: ${res.status}`);
   const data = await res.json() as { choices: { message: { content: string }; finish_reason?: string }[] };
   const text = data.choices?.[0]?.message?.content;
   if (!text) throw new Error('OpenAI API returned empty response');
-  if (data.choices?.[0]?.finish_reason === 'length') log.warn('OpenAI response truncated (length)');
   return text.trim();
 }
 
@@ -117,8 +102,6 @@ async function callGemini(config: AIConfig, prompt: string, systemPrompt?: strin
     },
   );
   if (!res.ok) {
-    const body = await res.text();
-    log.error(`Gemini API error ${res.status}: ${body}`);
     throw new Error(`Gemini API error: ${res.status}`);
   }
   const data = await res.json() as { candidates: { content: { parts: { text: string }[] } }[] };

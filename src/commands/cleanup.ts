@@ -5,7 +5,6 @@ import { displayName } from '../state';
 import * as git from '../cli/git';
 import * as gh from '../cli/gh';
 import { deleteWorkspaceFiles, ensureTreeIdle, requireTree, runStep, updateLinear } from './shared';
-import { log } from '../logger';
 import { notify } from '../notify';
 
 const teardownInProgress = new Set<string>();
@@ -17,8 +16,7 @@ interface TeardownOpts {
 
 async function teardownTree(ctx: ForestContext, tree: TreeState, opts: TeardownOpts = {}): Promise<boolean> {
   const key = `${tree.repoPath}:${tree.branch}`;
-  if (teardownInProgress.has(key)) { log.warn(`teardownTree already in progress: ${tree.branch}`); return false; }
-  log.info(`teardownTree: ${tree.branch}`);
+  if (teardownInProgress.has(key)) return false;
   teardownInProgress.add(key);
   let removedFromState = false;
   const clearCleaning = () => ctx.stateManager.updateTree(tree.repoPath, tree.branch, { cleaning: undefined });

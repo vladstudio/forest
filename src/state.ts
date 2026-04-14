@@ -2,7 +2,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import * as vscode from 'vscode';
-import { log } from './logger';
 import { notify } from './notify';
 
 export interface TreeState {
@@ -57,7 +56,7 @@ export class StateManager {
 
   private startWatching(): void {
     let lastContent = '';
-    try { lastContent = fs.readFileSync(this.statePath, 'utf8'); } catch (e: any) { log.warn(`Initial state read failed: ${e.message}`); }
+    try { lastContent = fs.readFileSync(this.statePath, 'utf8'); } catch { }
     const dir = path.dirname(this.statePath);
     const basename = path.basename(this.statePath);
     this.watcher = fs.watch(dir, (_event, filename) => {
@@ -69,10 +68,9 @@ export class StateManager {
           if (content !== lastContent) {
             lastContent = content;
             if (content === this.lastWrittenContent) return; // self-write
-            log.info('State file changed externally');
             this._onDidChange.fire({ state: JSON.parse(content), isLocal: false });
           }
-        } catch (e: any) { log.error(`State watch read failed: ${e.message}`); }
+        } catch { }
       }, 50);
     });
   }
@@ -85,8 +83,7 @@ export class StateManager {
         return empty;
       }
       const backup = `${this.statePath}.corrupt-${Date.now()}`;
-      try { fs.copyFileSync(this.statePath, backup); } catch (e: any) { log.warn(`State backup failed: ${e.message}`); }
-      log.error(`State load failed: ${e.message}`);
+      try { fs.copyFileSync(this.statePath, backup); } catch { }
       notify.error('Forest state is unreadable. Starting empty; original kept as a .corrupt backup.');
       return { version: 1, trees: {} };
     }
@@ -101,8 +98,6 @@ export class StateManager {
   }
 
   private async save(state: ForestState): Promise<void> {
-    const keys = Object.keys(state.trees);
-    log.info(`State save: ${keys.length} trees [${keys.join(', ')}]`);
     const data = JSON.stringify(state, null, 2);
     this.lastWrittenContent = data;
     const tmp = this.statePath + '.tmp';
@@ -145,21 +140,17 @@ export class StateManager {
   }
 
   async addTree(repoPath: string, tree: TreeState): Promise<void> {
-    log.info(`addTree: ${tree.branch} (${tree.ticketId ?? 'no ticket'})`);
     await this.modify(state => { state.trees[this.key(repoPath, tree.branch)] = tree; });
   }
 
   async removeTree(repoPath: string, branch: string): Promise<void> {
-    log.info(`removeTree: ${branch}`);
     await this.modify(state => { delete state.trees[this.key(repoPath, branch)]; });
   }
 
   async updateTree(repoPath: string, branch: string, updates: Partial<TreeState>): Promise<void> {
-    log.info(`updateTree: ${branch} ${JSON.stringify(updates)}`);
     await this.modify(state => {
       const k = this.key(repoPath, branch);
       if (state.trees[k]) state.trees[k] = { ...state.trees[k], ...updates };
-      else log.warn(`updateTree: key ${k} not found in state`);
     });
   }
 

@@ -1,6 +1,5 @@
 import { execFile as cpExecFile, exec as cpExec } from 'child_process';
 import { promisify } from 'util';
-import { log } from '../logger';
 
 const execFileAsync = promisify(cpExecFile);
 const execAsync = promisify(cpExec);
@@ -22,8 +21,6 @@ export async function exec(
     });
     return { stdout: r.stdout.trim(), stderr: r.stderr.trim() };
   } catch (e: any) {
-    if (e.name === 'AbortError') log.info(`exec aborted: ${command} ${args.join(' ')}`);
-    else log.error(`exec failed: ${command} ${args.join(' ')} — ${e.message}`);
     throw e;
   }
 }
@@ -42,8 +39,6 @@ export async function execShell(
     });
     return { stdout: r.stdout.trim(), stderr: r.stderr.trim() };
   } catch (e: any) {
-    if (e.name === 'AbortError') log.info(`execShell aborted: ${command}`);
-    else log.error(`execShell failed: ${command} — ${e.message}`);
     throw e;
   }
 }

@@ -2,14 +2,12 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { exec } from '../utils/exec';
-import { log } from '../logger';
 
 const stashRef = (ref: number | string) => typeof ref === 'number' ? `stash@{${ref}}` : ref;
 
 export async function createWorktree(
   repoPath: string, worktreePath: string, branch: string, baseRef: string,
 ): Promise<void> {
-  log.info(`createWorktree: ${branch} at ${worktreePath} (base: ${baseRef})`);
   await Promise.all([
     exec('git', ['fetch', 'origin', baseRef], { cwd: repoPath }),
     exec('git', ['worktree', 'prune'], { cwd: repoPath }),
@@ -18,12 +16,10 @@ export async function createWorktree(
 }
 
 export async function removeWorktree(repoPath: string, worktreePath: string): Promise<void> {
-  log.info(`removeWorktree: ${worktreePath}`);
   // Safety: refuse to delete the parent trees directory
   const treesRoot = path.join(os.homedir(), '.forest', 'trees');
   const rel = path.relative(treesRoot, worktreePath);
   if (!rel || rel.startsWith('..') || rel.split(path.sep).length < 2) {
-    log.error(`removeWorktree: refusing dangerous path: ${worktreePath}`);
     throw new Error(`removeWorktree: refusing dangerous path: ${worktreePath}`);
   }
   try {
@@ -37,22 +33,17 @@ export async function removeWorktree(repoPath: string, worktreePath: string): Pr
 }
 
 export async function deleteBranch(repoPath: string, branch: string, opts?: { skipRemote?: boolean }): Promise<void> {
-  log.info(`deleteBranch: ${branch}`);
   await exec('git', ['branch', '-D', branch], { cwd: repoPath });
   if (!opts?.skipRemote) {
-    await exec('git', ['push', 'origin', '--delete', branch], { cwd: repoPath }).catch((e: any) => {
-      log.warn(`deleteBranch remote delete failed for ${branch}: ${e.message}`);
-    });
+    await exec('git', ['push', 'origin', '--delete', branch], { cwd: repoPath }).catch(() => {});
   }
 }
 
 export async function pushBranch(worktreePath: string, branch: string, opts?: { signal?: AbortSignal }): Promise<void> {
-  log.info(`pushBranch: ${branch}`);
   await exec('git', ['push', '-u', 'origin', branch], { cwd: worktreePath, signal: opts?.signal });
 }
 
 export async function pull(worktreePath: string, opts?: { signal?: AbortSignal }): Promise<void> {
-  log.info(`pull: ${worktreePath}`);
   await exec('git', ['pull'], { cwd: worktreePath, timeout: 60_000, signal: opts?.signal });
 }
 

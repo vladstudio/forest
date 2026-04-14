@@ -7,7 +7,6 @@ import * as gh from '../cli/gh';
 
 import { generatePRBody } from '../cli/ai';
 import { requireTree, updateLinear, withTreeOperation } from './shared';
-import { log } from '../logger';
 import { notify } from '../notify';
 
 /** Core shipping logic: push + create PR + post-ship tasks. No UI wrappers. */
@@ -45,7 +44,6 @@ export async function shipCore(
             prBody = await generatePRBody(config.ai, diff, prTitle, { signal });
           } catch (e: any) {
             if (signal?.aborted) throw e;
-            log.error(`AI PR body generation failed: ${e.message}`);
             notify.warn(`AI description failed, using commits. ${e.message}`);
           }
         }
@@ -67,7 +65,6 @@ export async function shipCore(
   const results = await Promise.allSettled(postShip);
   for (const r of results) if (r.status === 'rejected') {
     const msg = r.reason?.message ?? String(r.reason);
-    log.error(`Post-ship task failed: ${msg}`);
     notify.warn(`Post-ship task failed: ${msg}`);
   }
 
@@ -76,7 +73,6 @@ export async function shipCore(
 
 export async function ship(ctx: ForestContext, treeArg?: TreeState): Promise<void> {
   const tree = requireTree(ctx, treeArg, 'ship');
-  log.info(`ship: ${tree?.branch ?? '(no tree)'} ticket=${tree?.ticketId ?? '(none)'}`);
   if (!tree) return;
 
   if (await git.hasUncommittedChanges(tree.path)) {

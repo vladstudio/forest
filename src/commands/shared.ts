@@ -9,7 +9,6 @@ import { TREE_OPERATION_HEARTBEAT_MS, displayName, type TreeState, type StateMan
 import * as git from '../cli/git';
 import * as linear from '../cli/linear';
 import { exec, execShell } from '../utils/exec';
-import { log } from '../logger';
 import { notify } from '../notify';
 
 /** Resolve tree from arg or current context, showing an error if not found or missing path. */
@@ -49,9 +48,7 @@ export async function withTreeOperation<T>(
   }
 
   const heartbeat = setInterval(() => {
-    ctx.stateManager.touchTreeOperation(tree.repoPath, tree.branch, busyOperation).catch((e: any) => {
-      log.warn(`touchTreeOperation failed for ${tree.branch}: ${e.message}`);
-    });
+    ctx.stateManager.touchTreeOperation(tree.repoPath, tree.branch, busyOperation).catch(() => {});
   }, TREE_OPERATION_HEARTBEAT_MS);
 
   try {
@@ -81,11 +78,9 @@ export function filterUnlinkedIssues<T extends { id: string }>(
 export async function runStep(ctx: ForestContext, label: string, fn: () => Promise<void>): Promise<boolean> {
   try {
     await fn();
-    log.info(`Step "${label}": done`);
     ctx.outputChannel.appendLine(`[Forest] ${label}: done`);
     return true;
   } catch (e: any) {
-    log.error(`Step "${label}": FAILED — ${e.stack ?? e.message}`);
     ctx.outputChannel.appendLine(`[Forest] ${label}: FAILED — ${e.message}`);
     ctx.outputChannel.show(true);
     notify.error(`${label}: ${e.message}`);
@@ -108,9 +103,9 @@ export async function pickTeam(teams?: string[]): Promise<string | undefined> {
 }
 
 export async function updateLinear(ctx: ForestContext, ticketId: string, status: string | undefined): Promise<void> {
-  if (!status) { log.info(`updateLinear skipped: no status configured (${ticketId})`); return; }
-  if (!ctx.config.linear.enabled) { log.info(`updateLinear skipped: linear not enabled (${ticketId} → ${status})`); return; }
-  if (!linear.isAvailable()) { log.warn(`updateLinear skipped: linear not available/no API key (${ticketId} → ${status})`); return; }
+  if (!status) return;
+  if (!ctx.config.linear.enabled) return;
+  if (!linear.isAvailable()) return;
   await runStep(ctx, `Linear ${ticketId} → ${status}`, () => linear.updateIssueState(ticketId, status));
 }
 
@@ -213,7 +208,6 @@ export async function createTree(opts: {
       ...(hasNewTreeShortcuts ? { needsSetup: true } : {}),
     };
 
-    log.info(`createTree: ${branch} ticket=${ticketId ?? '(none)'} existing=${!!existingBranch} carry=${!!carryChanges}`);
     // Save state early to prevent duplicates across windows.
     await stateManager.addTree(repoPath, tree);
 
@@ -245,10 +239,9 @@ export async function createTree(opts: {
         },
       );
     } catch (e: any) {
-      log.error(`createTree failed: ${branch} — ${e.message}`);
       await stateManager.removeTree(repoPath, branch);
-      await git.removeWorktree(repoPath, treePath).catch((e: any) => log.warn(`Rollback removeWorktree failed: ${e.message}`));
-      if (!existingBranch) await git.deleteBranch(repoPath, branch).catch((e: any) => log.warn(`Rollback deleteBranch failed: ${e.message}`));
+      await git.removeWorktree(repoPath, treePath).catch(() => {});
+      if (!existingBranch) await git.deleteBranch(repoPath, branch).catch(() => {});
       throw e;
     }
   } finally { createInProgress.delete(createKey); }

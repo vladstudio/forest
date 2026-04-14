@@ -38,7 +38,6 @@ export interface ForestConfig {
   maxTrees: number;
   browser: string[];
   terminal: string[];
-  logging: boolean;
 }
 
 const DEFAULTS: Partial<ForestConfig> = {
@@ -51,7 +50,6 @@ const DEFAULTS: Partial<ForestConfig> = {
   maxTrees: 10,
   browser: ['integrated'],
   terminal: ['integrated'],
-  logging: true,
 };
 
 export async function loadConfig(): Promise<ForestConfig | null> {

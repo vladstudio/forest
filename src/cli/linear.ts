@@ -1,4 +1,3 @@
-import { log } from '../logger';
 import { notify } from '../notify';
 
 const API = 'https://api.linear.app/graphql';
@@ -24,9 +23,6 @@ export interface LinearIssue {
 
 async function gql<T>(query: string, variables?: Record<string, unknown>, signal?: AbortSignal): Promise<T> {
   if (!_apiKey) throw new Error('Linear API key not configured');
-  const opMatch = query.match(/^\s*(query|mutation)\s*(\w*)/);
-  const opName = opMatch ? `${opMatch[1]} ${opMatch[2]}`.trim() : 'unknown';
-  log.info(`Linear gql: ${opName}${variables ? ` vars=${JSON.stringify(variables)}` : ''}`);
   const timeoutSignal = AbortSignal.timeout(15_000);
   const res = await fetch(API, {
     method: 'POST',
@@ -36,7 +32,6 @@ async function gql<T>(query: string, variables?: Record<string, unknown>, signal
   });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    log.error(`Linear API ${res.status}: ${res.statusText}${body ? ` — ${body}` : ''}`);
     if ((res.status === 401 || res.status === 403) && !_authWarned) {
       _authWarned = true;
       notify.warn('Forest: Linear API key is invalid or expired. Update linear.apiKey in .forest/local.json.');
@@ -47,12 +42,9 @@ async function gql<T>(query: string, variables?: Record<string, unknown>, signal
   if (json.errors?.length) {
     const errMsg = json.errors.map(e => e.message).join('; ');
     if (!json.data) {
-      log.error(`Linear GraphQL error: ${errMsg}${variables ? ` (vars: ${JSON.stringify(variables)})` : ''}`);
       throw new Error(`Linear GraphQL error: ${errMsg}${variables ? ` (vars: ${JSON.stringify(variables)})` : ''}`);
     }
-    log.warn(`Linear GraphQL partial error: ${errMsg}`);
   }
-  log.info(`Linear gql ${opName}: ok`);
   return json.data as T;
 }
 
@@ -114,7 +106,7 @@ export async function listMyIssues(states: string[], teams?: string[], opts?: { 
       priority: n.priority,
       url: n.url,
     }));
-  } catch (e: any) { log.error(`listMyIssues failed: ${e.message}`); return []; }
+  } catch { return []; }
 }
 
 export async function getIssue(issueId: string, opts?: { signal?: AbortSignal }): Promise<LinearIssue | null> {
@@ -128,7 +120,7 @@ export async function getIssue(issueId: string, opts?: { signal?: AbortSignal })
     );
     const i = data.issue;
     return { id: i.identifier, title: i.title, state: i.state.type, priority: i.priority, url: i.url };
-  } catch (e: any) { log.error(`getIssue(${issueId}) failed: ${e.message}`); return null; }
+  } catch { return null; }
 }
 
 export async function createIssue(opts: {
@@ -204,7 +196,6 @@ export async function validateStatuses(
 }
 
 export async function updateIssueState(issueId: string, state: string, team?: string): Promise<void> {
-  log.info(`updateIssueState: ${issueId} → ${state}${team ? ` (team: ${team})` : ''}`);
   // Extract team key from issue ID (e.g. "KAD-4828" → "KAD")
   const teamKey = team || issueId.replace(/-\d+$/, '');
   const stateId = await resolveStateId(teamKey, state);
@@ -215,6 +206,5 @@ export async function updateIssueState(issueId: string, state: string, team?: st
     { id: issueId, input: { stateId } },
   );
   if (!result.issueUpdate.success) {
-    log.error(`updateIssueState: mutation returned success=false for ${issueId} → ${state}`);
   }
 }
