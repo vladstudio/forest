@@ -802,6 +802,7 @@ let formState = null;
 let deleteInit = null;
 let deleteState = null;
 let pendingAction = null; // { cmd: string, key: string|null }
+let loadingMessage = null; // string | null
 
 const pendingLabels = {
   pull: 'pulling\\u2026', push: 'pushing\\u2026', mergeFromMain: 'merging\\u2026',
@@ -852,12 +853,14 @@ window.addEventListener('message', e => {
       break;
     case 'showCreateForm':
       mode = 'create';
+      loadingMessage = null;
       formInit = msg.init;
       formState = defaultFormState(msg.init);
       renderCurrentMode();
       break;
     case 'showDeleteForm':
       mode = 'delete';
+      loadingMessage = null;
       deleteInit = msg.init;
       deleteState = defaultDeleteState(msg.init);
       renderCurrentMode();
@@ -953,6 +956,10 @@ document.getElementById('root').addEventListener('click', e => {
   }
   const msg = { command: btn.dataset.cmd, key: btn.closest('[data-key]')?.dataset.key };
   if (btn.dataset.done !== undefined) msg.isDoneOrClosed = btn.dataset.done === '1';
+  if (btn.dataset.cmd === 'delete') {
+    loadingMessage = 'Loading\\u2026';
+    renderCurrentMode();
+  }
   if (pendingLabels[btn.dataset.cmd] && !pendingAction) {
     pendingAction = { cmd: btn.dataset.cmd, key: msg.key || null };
     renderCurrentMode();
@@ -1000,8 +1007,16 @@ const icons = {
 };
 const ic = name => '<span class="icon">' + icons[name] + '</span>';
 
+function renderLoading(message) {
+  document.getElementById('root').innerHTML =
+    '<div class="form"><div class="form-section"><div class="form-title"><span class="btn-pending" style="border:none;padding:0">' + h(message) + '</span></div></div>' +
+    '<div class="form-actions"><button class="btn-cancel" data-form="cancel">Cancel</button></div></div>';
+}
+
 function renderCurrentMode() {
-  if (mode === 'create' && formState) {
+  if (loadingMessage) {
+    renderLoading(loadingMessage);
+  } else if (mode === 'create' && formState) {
     renderCreateForm();
   } else if (mode === 'delete' && deleteState) {
     renderDeleteForm();
@@ -1079,7 +1094,7 @@ function treeCard(t, d) {
       const ticketLink = pendingCmd === 'openTicket'
         ? '<span class="ticket dim">' + (pendingLabels.openTicket || 'loading\\u2026') + '</span>'
         : '<a class="ticket" data-cmd="openTicket" title="' + h(lbl) + '"' + (allDisabled ? ' style="pointer-events:none;opacity:0.5"' : '') + '>' + h(lbl) + '</a>';
-      ticket = '<div class="row">' + ic('checkbox') + ticketLink + (pendingCmd === 'openTicket' ? '<button class="btn" data-cmd="cancelPending" title="Cancel">' + ic('x') + '</button>' : '<button class="btn faint" data-cmd="detachTicket"' + dis(allDisabled) + '>detach</button>') + '</div>';
+      ticket = '<div class="row">' + ic('checkbox') + ticketLink + (pendingCmd === 'openTicket' ? '<button class="btn" data-cmd="cancelPending" title="Cancel">' + ic('x') + '</button>' : '<button class="btn" data-cmd="detachTicket"' + dis(allDisabled) + '>detach</button>') + '</div>';
     } else {
       ticket = '<div class="row"><button class="btn faint" data-cmd="linkTicket" style="flex:1"' + dis(allDisabled) + '>' + ic('link') + ' No ticket</button></div>';
     }
@@ -1106,8 +1121,8 @@ function treeCard(t, d) {
       '<button class="btn" data-cmd="revealInFinder" title="Reveal in Finder"' + dis(allDisabled) + '>' + ic('folderOpen') + '</button>' +
       '<button class="btn" data-cmd="copyBranch" title="Copy branch name"' + dis(allDisabled) + '>' + ic('copy') + '</button>' +
       btn('pull', t.remoteBehind > 0 ? ic('arrowDown') + t.remoteBehind : ic('arrowDown'), allDisabled, pendingCmd, { attrs: 'title="Pull from remote"' }) +
-      btn('push', pushLabel, allDisabled, pendingCmd, { attrs: 'title="Push to remote"' }) +
       behind +
+      btn('push', pushLabel, allDisabled, pendingCmd, { attrs: 'title="Push to remote"' }) +
       btn('mainDiff', ic('diff') + ' main', allDisabled, pendingCmd, { attrs: 'title="Diff main against branch"' }) +
     '</div>' +
     changes +
@@ -1390,6 +1405,7 @@ function handleFormAction(action) {
       break;
     case 'cancel':
       mode = 'list';
+      loadingMessage = null;
       break;
   }
   renderCurrentMode();
