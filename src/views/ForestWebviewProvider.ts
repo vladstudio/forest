@@ -1025,13 +1025,15 @@ function renderCurrentMode() {
   }
 }
 
-function radioOption(name, value, currentValue, title, disabled) {
+function radioOption(name, value, currentValue, title, disabled, subtitle) {
   return '<label class="radio-option' + (disabled ? ' disabled' : '') + '">' +
     '<input type="radio" name="' + h(name) + '" value="' + h(value) + '"' +
     (currentValue === value ? ' checked' : '') +
     (disabled ? ' disabled' : '') +
     '>' +
-    '<span class="radio-body"><div class="radio-title">' + h(title) + '</div></span>' +
+    '<span class="radio-body"><div class="radio-title">' + h(title) + '</div>' +
+    (subtitle ? '<div class="form-copy" style="opacity:0.7">' + h(subtitle) + '</div>' : '') +
+    '</span>' +
   '</label>';
 }
 
@@ -1148,8 +1150,7 @@ function renderDeleteForm() {
   out += '<div class="form-title">' + ic('gitBranch') + ' Branches</div>';
   out += '<div class="radio-group">';
   if (init.remoteDeleted) {
-    out += radioOption('delete-branches', 'all', ds.branches, 'Delete local + remote', true);
-    out += '<div class="form-copy" style="margin:-4px 0 4px 28px;opacity:0.7">Remote branch is already deleted.</div>';
+    out += radioOption('delete-branches', 'all', ds.branches, 'Delete local + remote', true, 'Remote branch is already deleted.');
   } else {
     out += radioOption('delete-branches', 'all', ds.branches, 'Delete local + remote', dis);
   }
