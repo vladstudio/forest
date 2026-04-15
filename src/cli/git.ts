@@ -104,6 +104,9 @@ export async function localChanges(worktreePath: string): Promise<{ added: numbe
 export const commitsAhead = (wt: string, branch: string) =>
   revListCount(wt, `origin/${branch}..HEAD`);
 
+export const commitsBehindRemote = (wt: string, branch: string) =>
+  revListCount(wt, `HEAD..origin/${branch}`);
+
 export async function commitAll(worktreePath: string, message: string, opts?: { signal?: AbortSignal }): Promise<void> {
   await exec('git', ['add', '-A'], { cwd: worktreePath, signal: opts?.signal });
   await exec('git', ['commit', '-m', message], { cwd: worktreePath, signal: opts?.signal });

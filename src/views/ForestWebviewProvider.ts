@@ -27,6 +27,7 @@ interface TreeCardData {
   prState?: string;
   behind: number;
   ahead: number;
+  remoteBehind: number;
   localChanges: { added: number; removed: number; modified: number } | null;
   isCurrent: boolean;
   cleaning: boolean;
@@ -37,6 +38,7 @@ interface WebviewData {
   repoName: string;
   baseBranch: string;
   mainIsCurrent: boolean;
+  mainBehind: number;
   hasAI: boolean;
   linearEnabled: boolean;
   groups: Array<{ label: string; trees: TreeCardData[] }>;
@@ -56,7 +58,7 @@ function baseCard(t: TreeState, isCurrent: boolean): TreeCardData {
     key: `${t.repoPath}:${t.branch}`,
     branch: t.branch, path: t.path,
     ticketId: t.ticketId, ticketTitle: t.title,
-    behind: 0, ahead: 0, localChanges: null,
+    behind: 0, ahead: 0, remoteBehind: 0, localChanges: null,
     isCurrent, cleaning: false, busyOperation: t.busyOperation,
   };
 }
@@ -192,9 +194,10 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
     const base = baseCard(tree, false);
     if (!tree.path || !fs.existsSync(tree.path)) return base;
 
-    const [behind, ahead, pr, localChanges] = await Promise.all([
+    const [behind, ahead, remoteBehind, pr, localChanges] = await Promise.all([
       git.commitsBehind(tree.path, this.config.baseBranch),
       git.commitsAhead(tree.path, tree.branch),
+      git.commitsBehindRemote(tree.path, tree.branch),
       this.config.github.enabled ? gh.prStatus(tree.path) : Promise.resolve(null),
       git.localChanges(tree.path),
     ]);
@@ -203,7 +206,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
       this.stateManager.updateTree(tree.repoPath, tree.branch, { prUrl: pr.url }).catch(() => { });
     }
 
-    return { ...base, prNumber: pr?.number, prUrl: pr?.url ?? tree.prUrl, prState: pr?.state, behind, ahead, localChanges };
+    return { ...base, prNumber: pr?.number, prUrl: pr?.url ?? tree.prUrl, prState: pr?.state, behind, ahead, remoteBehind, localChanges };
   }
 
   private async buildData(): Promise<WebviewData> {
@@ -218,9 +221,11 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
 
-    const cardResults = await Promise.all(
-      trees.map(t => t.cleaning ? Promise.resolve(null) : this.getTreeData(t).catch(() => null)),
-    );
+    const mainIsCurrent = curPath === repoPath;
+    const [cardResults, mainBehind] = await Promise.all([
+      Promise.all(trees.map(t => t.cleaning ? Promise.resolve(null) : this.getTreeData(t).catch(() => null))),
+      mainIsCurrent ? git.commitsBehind(repoPath, this.config.baseBranch) : Promise.resolve(0),
+    ]);
 
     const cleaning: TreeCardData[] = [];
     const inProgress: TreeCardData[] = [];
@@ -255,7 +260,8 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
     return {
       repoName: path.basename(repoPath),
       baseBranch: this.config.baseBranch,
-      mainIsCurrent: curPath === repoPath,
+      mainIsCurrent,
+      mainBehind,
       hasAI: !!this.config.ai,
       linearEnabled: this.config.linear.enabled,
       groups,
@@ -1031,11 +1037,11 @@ function mainCard(d) {
     var isPending = pendingAction && pendingAction.key === '__main__';
     var pCmd = isPending ? pendingAction.cmd : null;
     var allDis = isPending;
+    var pullLabel = d.mainBehind > 0 ? ic('arrowDown') + d.mainBehind : ic('arrowDown');
     return '<div class="' + cls + '" data-key="__main__"><span class="card-label">' + label + '</span>' +
       '<div class="row">' +
         '<button class="btn" data-cmd="revealInFinder" title="Reveal in Finder"' + dis(allDis) + '>' + ic('folderOpen') + '</button>' +
-        btn('pull', ic('arrowDown'), allDis, pCmd, { attrs: 'title="Pull"' }) +
-        btn('push', ic('arrowUp'), allDis, pCmd, { attrs: 'title="Push"' }) +
+        btn('pull', pullLabel, allDis, pCmd, { attrs: 'title="Pull"' }) +
       '</div></div>';
   }
   return '<div class="' + cls + '" data-key="__main__"><a class="card-label" data-cmd="switchToMain">' + label + '</a></div>';
@@ -1099,7 +1105,7 @@ function treeCard(t, d) {
     '<div class="row">' +
       '<button class="btn" data-cmd="revealInFinder" title="Reveal in Finder"' + dis(allDisabled) + '>' + ic('folderOpen') + '</button>' +
       '<button class="btn" data-cmd="copyBranch" title="Copy branch name"' + dis(allDisabled) + '>' + ic('copy') + '</button>' +
-      btn('pull', ic('arrowDown'), allDisabled, pendingCmd, { attrs: 'title="Pull from remote"' }) +
+      btn('pull', t.remoteBehind > 0 ? ic('arrowDown') + t.remoteBehind : ic('arrowDown'), allDisabled, pendingCmd, { attrs: 'title="Pull from remote"' }) +
       btn('push', pushLabel, allDisabled, pendingCmd, { attrs: 'title="Push to remote"' }) +
       behind +
       btn('mainDiff', ic('diff') + ' main', allDisabled, pendingCmd, { attrs: 'title="Diff main against branch"' }) +
