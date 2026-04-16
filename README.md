@@ -16,10 +16,8 @@ VSCode extension for parallel feature development using git worktrees. One Linea
 | --------------------------- | ------------------------------------------------------------------- |
 | **New Tree**                | Unified wizard: pick new or existing branch, optionally link a Linear ticket |
 | **Ship**                    | Push branch + create PR (with optional automerge) + move ticket to configured status |
-| **Cleanup**                 | Merge PR + delete worktree + move ticket to configured status       |
-| **Delete Tree**             | Remove worktree, keep branches                                     |
-| **Delete Tree + Local**     | Remove worktree + local branch, keep remote                        |
-| **Delete Tree + Branches**  | Remove worktree + all branches + move ticket to canceled            |
+| **Cleanup**                 | Auto-triggered when PR is merged: remove worktree + branches + move ticket to configured status |
+| **Delete Tree**             | Interactive form: choose branch cleanup (keep / local only / all), Linear status, and PR handling |
 | **Update**                  | Merge from main + re-copy env files                                 |
 | **List**                    | Quick-pick list of all active trees                                 |
 
@@ -92,7 +90,7 @@ To set up Forest, ask Claude (or any AI) to read this README and generate `.fore
 | `branchFormat` | no       | `${ticketId}-${slug}` | Branch naming. Supports `${ticketId}`, `${slug}`                                                                                                                                                                                                                                                                          |
 | `baseBranch`   | no       | `main`                | Base branch name (`origin/` prefix is added automatically)                                                                                                                                                                                                                                                                |
 | `maxTrees`     | no       | `10`                  | Max concurrent worktrees                                                                                                                                                                                                                                                                                                  |
-| `ai`           | no       | disabled              | AI-generated PR descriptions. Set `provider` (`anthropic`, `openai`, `gemini`), `model`, and `apiKey`. Best placed in `local.json`                                                                                                                                                                                       |
+| `ai`           | no       | disabled              | AI-generated PR descriptions and commit messages. Set `provider` (`anthropic`, `openai`, `gemini`), `model`, and `apiKey`. Best placed in `local.json`                                                                                                                                                                    |
 | `logging`      | no       | `true`                | File-based logging to `~/.forest/forest.log`. Rotates at 5 MB                                                                                                                                                                                                                                                            |
 | `browser`      | no       | `["integrated"]`      | Browser app list. First item is the default; right-click a shortcut to pick another. Values: `integrated` (VS Code integrated browser), `external` (system default), or an app name (e.g. `"Firefox"`)                                                                                                                            |
 | `terminal`     | no       | `["integrated"]`      | Terminal app list. First item is the default; right-click to pick another. Values: `integrated` (VS Code terminal), or an external app (`iTerm`, `Terminal`, `Ghostty`). External terminals receive the shortcut command automatically                                                                                     |
@@ -105,11 +103,11 @@ To set up Forest, ask Claude (or any AI) to read this README and generate `.fore
 
 ### Tree Grouping
 
-- **Todo** — Linear issues without a branch yet
 - **Cleaning up** — cleanup in progress (loading spinner)
 - **In Progress** — no PR created yet
 - **In Review** — PR is open
 - **Done** — PR has been merged
+- **Closed** — PR has been closed
 
 ### Tree Health Indicators
 
@@ -187,17 +185,16 @@ Switch between trees from the sidebar. All processes keep running in background 
 | --------------------------------- | --------------------------------------- |
 | `Forest: New Tree`                | Create tree (unified wizard)            |
 | `Forest: Switch Tree`             | Open another tree's window              |
-| `Forest: Ship`                    | Push + create PR                        |
-| `Forest: Ship + Automerge`        | Push + create PR + enable automerge     |
-| `Forest: Cleanup`                 | Merge PR + remove tree                  |
-| `Forest: Delete Tree`             | Remove tree, keep branches              |
-| `Forest: Delete Tree + Local`     | Remove tree + local branch              |
-| `Forest: Delete Tree + Branches`  | Remove tree + all branches              |
+| `Forest: Ship`                    | Push + create PR (offers automerge if repo supports it) |
+| `Forest: Delete Tree`             | Interactive deletion with branch/ticket/PR options |
 | `Forest: Update`                  | Merge from main + re-copy config files  |
 | `Forest: Rebase`                  | Rebase onto main                        |
+| `Forest: Pull`                    | Pull latest changes                     |
+| `Forest: Push`                    | Push to remote                          |
 | `Forest: List`                    | List all trees                          |
 | `Forest: Open Main`               | Open main repo window                   |
-| `Forest: Open PR`                 | Open PR in browser                      |
+| `Forest: View Pull Request`       | Open PR in browser                      |
+| `Forest: View Linear Ticket`      | Open Linear ticket in browser           |
 | `Forest: Reveal in Finder`        | Open worktree directory in Finder       |
 | `Forest: Copy Branch Name`        | Copy current tree's branch to clipboard |
 | `Forest: Copy Setup Prompt`       | Copy AI setup prompt to clipboard       |
