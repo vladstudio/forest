@@ -1049,7 +1049,7 @@ function renderList(d) {
 
 function mainCard(d) {
   const cls = 'card card-main' + (d.mainIsCurrent ? ' current' : '');
-  const label = ic('house') + ' ' + h(d.baseBranch) + ' \\u00b7 ' + h(d.repoName);
+  const label = h(d.baseBranch) + ' \\u00b7 ' + h(d.repoName);
   if (d.mainIsCurrent) {
     var isPending = pendingAction && pendingAction.key === '__main__';
     var pCmd = isPending ? pendingAction.cmd : null;
@@ -1076,7 +1076,7 @@ function btn(cmd, label, allDisabled, pendingCmd, opts) {
 }
 
 function treeCard(t, d) {
-  const branchLabel = ic('gitBranch') + ' ' + h(t.branch);
+  const branchLabel = h(t.branch);
   if (t.cleaning) return '<div class="card" data-key="' + h(t.key) + '"><div class="row"><span class="branch">' + branchLabel + '</span><span class="dim">cleaning up\\u2026</span></div></div>';
   if (!t.isCurrent) {
     const isDoneOrClosed = t.prState === 'MERGED' || t.prState === 'CLOSED';
@@ -1096,9 +1096,9 @@ function treeCard(t, d) {
       const ticketLink = pendingCmd === 'openTicket'
         ? '<span class="ticket dim">' + (pendingLabels.openTicket || 'loading\\u2026') + '</span>'
         : '<a class="ticket" data-cmd="openTicket" title="' + h(lbl) + '"' + (allDisabled ? ' style="pointer-events:none;opacity:0.5"' : '') + '>' + h(lbl) + '</a>';
-      ticket = '<div class="row">' + ic('checkbox') + ticketLink + (pendingCmd === 'openTicket' ? '<button class="btn" data-cmd="cancelPending" title="Cancel">' + ic('x') + '</button>' : '<button class="btn" data-cmd="detachTicket"' + dis(allDisabled) + '>detach</button>') + '</div>';
+      ticket = '<div class="row">' + ticketLink + (pendingCmd === 'openTicket' ? '<button class="btn" data-cmd="cancelPending" title="Cancel">' + ic('x') + '</button>' : '<button class="btn" data-cmd="detachTicket"' + dis(allDisabled) + '>detach</button>') + '</div>';
     } else {
-      ticket = '<div class="row"><button class="btn faint" data-cmd="linkTicket" style="flex:1"' + dis(allDisabled) + '>' + ic('link') + ' No ticket</button></div>';
+      ticket = '<div class="row"><button class="btn faint" data-cmd="linkTicket" style="flex:1"' + dis(allDisabled) + '>No ticket</button></div>';
     }
   }
   let changes = '';
@@ -1107,7 +1107,7 @@ function treeCard(t, d) {
     const stats = [lc.added ? '<span class="add">+' + lc.added + '</span>' : '', lc.removed ? '<span class="del">-' + lc.removed + '</span>' : '', lc.modified ? '<span class="mod">~' + lc.modified + '</span>' : ''].filter(Boolean).join(' ');
     changes = '<div class="row"><span class="stats">' + stats + '</span>' +
       btn('workingDiff', ic('diff'), allDisabled, pendingCmd, { attrs: 'title="Diff working changes"' }) +
-      btn('branchDiff', ic('diff') + ' branch', allDisabled, pendingCmd, { attrs: 'title="Diff branch changes"' }) +
+      btn('branchDiff', 'Diff branch', allDisabled, pendingCmd, { attrs: 'title="Diff branch changes"' }) +
       (d.hasAI ? btn('commit', 'commit', allDisabled, pendingCmd) : '') +
       btn('discard', ic('x'), allDisabled, pendingCmd, { cls: 'danger', attrs: 'title="Discard changes"' }) + '</div>';
   }
@@ -1125,7 +1125,7 @@ function treeCard(t, d) {
       btn('pull', t.remoteBehind > 0 ? ic('arrowDown') + t.remoteBehind : ic('arrowDown'), allDisabled, pendingCmd, { attrs: 'title="Pull from remote"' }) +
       behind +
       btn('push', pushLabel, allDisabled, pendingCmd, { attrs: 'title="Push to remote"' }) +
-      btn('mainDiff', ic('diff') + ' main', allDisabled, pendingCmd, { attrs: 'title="Diff main against branch"' }) +
+      btn('mainDiff', 'Diff main', allDisabled, pendingCmd, { attrs: 'title="Diff main against branch"' }) +
     '</div>' +
     changes +
     '<div class="row">' + lastRow + '</div>' +
@@ -1143,11 +1143,11 @@ function renderDeleteForm() {
   }
 
   out += '<div class="form-section">';
-  out += '<div class="form-title" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + ic('trash') + ' Delete ' + h(init.name) + '</div>';
+  out += '<div class="form-title" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Delete ' + h(init.name) + '</div>';
   out += '</div>';
 
   out += '<div class="form-section">';
-  out += '<div class="form-title">' + ic('gitBranch') + ' Branches</div>';
+  out += '<div class="form-title">Branches</div>';
   out += '<div class="radio-group">';
   if (init.remoteDeleted) {
     out += radioOption('delete-branches', 'all', ds.branches, 'Delete local + remote', true, 'Remote branch is already deleted.');
@@ -1160,7 +1160,7 @@ function renderDeleteForm() {
 
   if (init.linearEnabled) {
     out += '<div class="form-section">';
-    out += '<div class="form-title">' + ic('linear') + ' Linear</div>';
+    out += '<div class="form-title">Linear</div>';
     out += '<div class="radio-group">';
     out += radioOption('delete-linear', 'cancel', ds.linear, 'Move to canceled', dis);
     out += radioOption('delete-linear', 'cleanup', ds.linear, 'Move to done', dis);
@@ -1207,11 +1207,11 @@ function renderCreateForm() {
     out += '<div class="form-section">';
     out += '<div class="form-row">';
     if (fs.ticketMode === 'existing' && fs.ticketId) {
-      out += '<span class="form-value">' + ic('linear') + ' ' + h(fs.ticketId + ': ' + (fs.ticketTitle || '')) + '</span>';
+      out += '<span class="form-value">' + h(fs.ticketId + ': ' + (fs.ticketTitle || '')) + '</span>';
     } else if (fs.ticketMode === 'new') {
-      out += '<span class="form-value dim">' + ic('linear') + ' New Linear ticket</span>';
+      out += '<span class="form-value dim">New Linear ticket</span>';
     } else {
-      out += '<span class="form-value dim">' + ic('linear') + ' No Linear ticket</span>';
+      out += '<span class="form-value dim">No Linear ticket</span>';
     }
     out += '</div>';
     out += '<div class="form-row">';
@@ -1250,9 +1250,9 @@ function renderCreateForm() {
   out += '<div class="form-section">';
   out += '<div class="form-row">';
   if (fs.branchMode === 'existing' && fs.existingBranch) {
-    out += '<span class="form-value">' + ic('gitBranch') + ' ' + h(fs.existingBranch) + '</span>';
+    out += '<span class="form-value">' + h(fs.existingBranch) + '</span>';
   } else {
-    out += '<span class="form-value dim">' + ic('gitBranch') + ' New branch</span>';
+    out += '<span class="form-value dim">New branch</span>';
   }
   out += '</div>';
   out += '<div class="form-row">';

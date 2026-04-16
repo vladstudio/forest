@@ -62,8 +62,8 @@ export async function start(ctx: ForestContext, arg: { ticketId: string; title: 
   const defaultBranch = formatBranch(config.branchFormat, ticketId, title);
 
   const choice = await vscode.window.showQuickPick([
-    { label: `$(folder) New branch: ${defaultBranch}`, id: 'new' },
-    { label: '$(list-tree) Use existing branch', id: 'existing' },
+    { label: `New branch: ${defaultBranch}`, id: 'new' },
+    { label: 'Use existing branch', id: 'existing' },
   ], { placeHolder: `Start ${ticketId}: ${title}` });
   if (!choice) return;
 
@@ -103,8 +103,8 @@ export async function start(ctx: ForestContext, arg: { ticketId: string; title: 
 /** Unified creation wizard (the [+] button). */
 export async function create(ctx: ForestContext): Promise<void> {
   const choice = await vscode.window.showQuickPick([
-    { label: '$(add) New branch', id: 'new' },
-    { label: '$(folder) Existing branch', id: 'existing' },
+    { label: 'New branch', id: 'new' },
+    { label: 'Existing branch', id: 'existing' },
   ], { placeHolder: 'Create a new tree' });
   if (!choice) return;
 
@@ -126,9 +126,9 @@ async function createFromNewBranch(ctx: ForestContext): Promise<void> {
 
   if (linearEnabled) {
     const link = await vscode.window.showQuickPick([
-      { label: '$(add) Create new Linear issue', id: 'create' },
-      { label: '$(search) Link to existing Linear issue', id: 'select' },
-      { label: '$(dash) No Linear issue', id: 'skip' },
+      { label: 'Create new Linear issue', id: 'create' },
+      { label: 'Link to existing Linear issue', id: 'select' },
+      { label: 'No Linear issue', id: 'skip' },
     ], { placeHolder: 'Link a Linear issue?' });
     if (!link) return;
 
@@ -213,9 +213,9 @@ async function createFromExistingBranch(ctx: ForestContext): Promise<void> {
 
   if (!ticketId && linearEnabled) {
     const link = await vscode.window.showQuickPick([
-      { label: '$(search) Link to existing Linear issue', id: 'select' },
-      { label: '$(add) Create new Linear issue', id: 'create' },
-      { label: '$(dash) No Linear issue', id: 'skip' },
+      { label: 'Link to existing Linear issue', id: 'select' },
+      { label: 'Create new Linear issue', id: 'create' },
+      { label: 'No Linear issue', id: 'skip' },
     ], { placeHolder: 'Link a Linear issue?' });
     if (!link) return;
 
@@ -273,7 +273,7 @@ export async function createIssue(ctx: ForestContext): Promise<{ ticketId: strin
   if (!issueTitle) return undefined;
 
   const priorityPick = await vscode.window.showQuickPick<vscode.QuickPickItem & { value: number }>(
-    [{ label: '$(dash) No priority', value: 0 }, { label: 'Urgent', value: 1 }, { label: 'High', value: 2 }, { label: 'Normal', value: 3 }, { label: 'Low', value: 4 }],
+    [{ label: 'No priority', value: 0 }, { label: 'Urgent', value: 1 }, { label: 'High', value: 2 }, { label: 'Normal', value: 3 }, { label: 'Low', value: 4 }],
     { placeHolder: 'Priority' },
   );
   if (!priorityPick) return undefined;

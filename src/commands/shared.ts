@@ -160,8 +160,8 @@ function checkMaxTrees(stateManager: StateManager, state: import('../state').For
 export async function promptUncommittedChanges(repoPath: string): Promise<string | false | undefined> {
   if (!await git.hasUncommittedChanges(repoPath)) return false;
   const pick = await vscode.window.showQuickPick([
-    { label: '$(arrow-right) Carry to new tree', id: 'carry' },
-    { label: '$(trash) Discard changes', id: 'discard' },
+    { label: 'Carry to new tree', id: 'carry' },
+    { label: 'Discard changes', id: 'discard' },
   ], { placeHolder: 'You have uncommitted changes' });
   if (!pick) return undefined;
   if (pick.id === 'carry') return git.stash(repoPath, `forest-carry-${Date.now()}`);

@@ -11,7 +11,7 @@ export class StatusBarManager {
   show(): void {
     if (!this.currentTree) return;
     const name = displayName(this.currentTree);
-    this.item.text = `$(folder) ${this.currentTree.ticketId ?? this.currentTree.branch}`;
+    this.item.text = this.currentTree.ticketId ?? this.currentTree.branch;
     this.item.tooltip = `${name}\nClick to list all trees`;
     this.item.command = 'forest.list';
     this.item.show();

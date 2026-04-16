@@ -5,8 +5,8 @@ import { updateLinear } from './shared';
 
 export async function linkTicket(ctx: ForestContext, branch: string): Promise<void> {
   const choice = await vscode.window.showQuickPick([
-    { label: '$(search) Link to existing Linear issue', id: 'select' },
-    { label: '$(add) Create new Linear issue', id: 'create' },
+    { label: 'Link to existing Linear issue', id: 'select' },
+    { label: 'Create new Linear issue', id: 'create' },
   ], { placeHolder: 'Attach a Linear ticket' });
   if (!choice) return;
 
