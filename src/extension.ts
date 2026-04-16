@@ -181,7 +181,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   const shortcutManager = new ShortcutManager(config, currentTree);
   const statusBarManager = new StatusBarManager(currentTree);
-  const forestProvider = new ForestWebviewProvider(stateManager, config);
+  const forestProvider = new ForestWebviewProvider(stateManager, config, context.extensionUri);
   const shortcutsProvider = new ShortcutsTreeProvider(config, shortcutManager);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider('forest.trees', forestProvider),
