@@ -743,7 +743,7 @@ body { margin: 0; padding: 0; font-family: var(--vscode-font-family); font-size:
 .card-label { flex: 1; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 4px; }
 .branch { font-size: 12px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 3px; }
 [data-cmd] { cursor: pointer; text-decoration: none; color: inherit; }
-a[data-cmd] { color: var(--vscode-breadcrumb-foreground, inherit); }
+a[data-cmd] { color: inherit; }
 a[data-cmd]:hover { opacity: 0.7; }
 .row { display: flex; align-items: center; gap: 3px; margin-bottom: 5px; min-height: 20px; flex-wrap: wrap; }
 .row:last-child { margin-bottom: 0; }
