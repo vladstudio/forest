@@ -691,11 +691,14 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
     const tree = this.stateManager.getTree(state, repoPath, branch);
 
     if (!tree?.path) {
-      this.postMessage({ type: 'deleteResult', success: false, error: 'Tree path is missing.' });
+      notify.error('Delete failed: tree path is missing.');
+      this.postMessage({ type: 'deleteResult', key, success: false, error: 'Tree path is missing.' });
       return;
     }
     if (!await ensureTreeIdle(ctx, tree)) {
-      this.postMessage({ type: 'deleteResult', success: false, error: `${displayName(tree)} is busy with another Git operation.` });
+      const error = `${displayName(tree)} is busy with another Git operation.`;
+      notify.error(error);
+      this.postMessage({ type: 'deleteResult', key, success: false, error });
       return;
     }
 
@@ -706,13 +709,18 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
         pr: msg.pr,
       };
       const success = await executeDeletePlan(ctx, tree as TreeState & { path: string }, plan);
+      if (!success) {
+        notify.error('Delete was interrupted. Check notifications for details.');
+      }
       this.postMessage({
         type: 'deleteResult',
+        key,
         success,
         error: success ? null : 'Delete was interrupted. Check notifications for details.',
       });
     } catch (e: any) {
-      this.postMessage({ type: 'deleteResult', success: false, error: e.message });
+      notify.error(`Delete failed: ${e.message}`);
+      this.postMessage({ type: 'deleteResult', key, success: false, error: e.message });
     }
   }
 
@@ -801,6 +809,7 @@ let formInit = null;
 let formState = null;
 let deleteInit = null;
 let deleteState = null;
+let optimisticCleaningKeys = new Set();
 let pendingAction = null; // { cmd: string, key: string|null }
 let loadingMessage = null; // string | null
 
@@ -893,15 +902,15 @@ window.addEventListener('message', e => {
       }
       break;
     case 'deleteResult':
+      if (msg.key) optimisticCleaningKeys.delete(msg.key);
       if (deleteState) {
         deleteState.submitting = false;
-        if (msg.success) {
-          mode = 'list';
-        } else {
+        if (!msg.success) {
           deleteState.error = msg.error;
         }
-        renderCurrentMode();
       }
+      mode = 'list';
+      renderCurrentMode();
       break;
   }
 });
@@ -938,9 +947,11 @@ document.getElementById('root').addEventListener('click', e => {
     return;
   }
   if (btn.dataset.cmd === 'deleteForm:submit' && deleteState) {
+    optimisticCleaningKeys.add(deleteState.key);
     deleteState.submitting = true;
     deleteState.error = null;
-    renderDeleteForm();
+    mode = 'list';
+    renderCurrentMode();
     vscode.postMessage({
       command: 'deleteForm:submit',
       key: deleteState.key,
@@ -1038,13 +1049,48 @@ function radioOption(name, value, currentValue, title, disabled, subtitle) {
 }
 
 function renderList(d) {
-  const parts = [mainCard(d)];
-  if (!d.groups.length) parts.push('<p class="empty">No trees yet. Click + to create one.</p>');
-  for (const g of d.groups) {
+  const data = withOptimisticCleaning(d);
+  const parts = [mainCard(data)];
+  if (!data.groups.length) parts.push('<p class="empty">No trees yet. Click + to create one.</p>');
+  for (const g of data.groups) {
     parts.push('<div class="group">' + h(g.label) + ' <span>' + g.trees.length + '</span></div>');
-    for (const t of g.trees) parts.push(treeCard(t, d));
+    for (const t of g.trees) parts.push(treeCard(t, data));
   }
   document.getElementById('root').innerHTML = parts.join('');
+}
+
+function withOptimisticCleaning(data) {
+  if (!data || !optimisticCleaningKeys.size) return data;
+
+  var moved = [];
+  var groups = [];
+  for (var i = 0; i < data.groups.length; i++) {
+    var group = data.groups[i];
+    var trees = [];
+    for (var j = 0; j < group.trees.length; j++) {
+      var tree = group.trees[j];
+      if (!tree.cleaning && optimisticCleaningKeys.has(tree.key)) {
+        moved.push({ ...tree, cleaning: true });
+      } else {
+        trees.push(tree);
+      }
+    }
+    if (trees.length) groups.push({ label: group.label, trees: trees });
+  }
+
+  if (!moved.length) return data;
+
+  var cleaningIdx = groups.findIndex(function(group) { return group.label === 'Cleaning up'; });
+  if (cleaningIdx >= 0) {
+    groups[cleaningIdx] = {
+      label: groups[cleaningIdx].label,
+      trees: moved.concat(groups[cleaningIdx].trees),
+    };
+  } else {
+    groups.unshift({ label: 'Cleaning up', trees: moved });
+  }
+
+  return { ...data, groups: groups };
 }
 
 function mainCard(d) {
