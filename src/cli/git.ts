@@ -43,8 +43,9 @@ export async function pushBranch(worktreePath: string, branch: string, opts?: { 
   await exec('git', ['push', '-u', 'origin', branch], { cwd: worktreePath, signal: opts?.signal });
 }
 
-export async function pull(worktreePath: string, opts?: { signal?: AbortSignal }): Promise<void> {
-  await exec('git', ['pull'], { cwd: worktreePath, timeout: 60_000, signal: opts?.signal });
+export async function pull(worktreePath: string, branch: string, opts?: { signal?: AbortSignal }): Promise<void> {
+  await exec('git', ['fetch', 'origin', branch], { cwd: worktreePath, signal: opts?.signal });
+  await exec('git', ['merge', '--ff-only', `origin/${branch}`], { cwd: worktreePath, timeout: 60_000, signal: opts?.signal });
 }
 
 export async function pullMerge(worktreePath: string, baseRef: string, opts?: { signal?: AbortSignal }): Promise<void> {

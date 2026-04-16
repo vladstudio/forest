@@ -66,7 +66,7 @@ async function gitAction(
 }
 
 export const pull = (ctx: ForestContext, treeArg?: TreeState) =>
-  gitAction(ctx, treeArg, { action: 'pull', label: 'Pull', busyOperation: 'pulling', gitFn: t => git.pull(t.path!) });
+  gitAction(ctx, treeArg, { action: 'pull', label: 'Pull', busyOperation: 'pulling', gitFn: t => git.pull(t.path!, t.branch) });
 
 export const push = (ctx: ForestContext, treeArg?: TreeState) =>
   gitAction(ctx, treeArg, { action: 'push', label: 'Push', busyOperation: 'pushing', gitFn: t => git.pushBranch(t.path!, t.branch) });

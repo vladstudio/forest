@@ -364,7 +364,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
           vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(repoPath));
           break;
         case 'pull':
-          await this.runPending((signal) => git.pull(repoPath, { signal }));
+          await this.runPending((signal) => git.pull(repoPath, this.config.baseBranch, { signal }));
           break;
         case 'push':
           await this.runPending((signal) => git.pushBranch(repoPath, this.config.baseBranch, { signal }));
@@ -440,7 +440,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
     switch (command) {
       case 'pull':
         if (!tree?.path) { bail(); return; }
-        await runTreeAction('pulling', (signal) => git.pull(tree.path!, { signal }));
+        await runTreeAction('pulling', (signal) => git.pull(tree.path!, tree.branch, { signal }));
         break;
 
       case 'push':
