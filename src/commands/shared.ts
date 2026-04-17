@@ -24,7 +24,7 @@ export function requireTree(ctx: ForestContext, arg: TreeState | string | undefi
 export async function getBlockingTreeOperation(ctx: ForestContext, tree: Pick<TreeState, 'repoPath' | 'branch'>): Promise<string | undefined> {
   const latest = ctx.stateManager.getTree(await ctx.stateManager.load(), tree.repoPath, tree.branch);
   if (!latest) return undefined;
-  if (latest.cleaning) return 'cleaning up';
+  if (latest.cleaning) return 'deleting';
   return latest.busyOperation;
 }
 

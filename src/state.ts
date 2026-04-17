@@ -171,7 +171,7 @@ export class StateManager {
       const tree = state.trees[k];
       if (!tree) return;
       if (tree.cleaning) {
-        active = 'cleaning up';
+        active = 'deleting';
         return;
       }
       if (tree.busyOperation && !this.isTreeOperationStale(tree, now)) {
