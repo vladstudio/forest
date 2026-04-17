@@ -11,7 +11,7 @@ let loadingMessage = null; // string | null
 
 const pendingLabels = {
   pull: 'pulling…', push: 'pushing…', mergeFromMain: 'merging…',
-  commit: 'committing…', discard: 'discarding…', ship: 'shipping…',
+  commit: 'committing…', discard: 'discarding…', ship: 'shipping…', shipMerge: 'shipping…',
   pickBranch: 'loading…', pickIssue: 'loading…', openTicket: 'opening…',
   workingDiff: 'loading…', branchDiff: 'loading…', mainDiff: 'loading…',
 };
@@ -357,7 +357,11 @@ function treeCard(t, d) {
   const doneFlag = isDone ? '1' : '0';
   const lastRow = (isDone || t.prNumber)
     ? '<button class="btn fill" data-cmd="openPR"' + dis(allDisabled) + '>PR#' + (t.prNumber || '?') + '</button>' + btn('delete', ic('trash'), allDisabled, null, { cls: 'danger', attrs: 'data-done="' + doneFlag + '" title="Delete tree"' })
-    : btn('ship', 'Ship - Push and Create PR', allDisabled, pendingCmd, { cls: 'fill' }) + btn('delete', ic('trash'), allDisabled, null, { cls: 'danger', attrs: 'data-done="0" title="Delete tree"' });
+    : (d.hasAutomerge
+        ? btn('ship', 'Ship', allDisabled, pendingCmd, { cls: 'fill', attrs: 'title="Push and create PR"' })
+          + btn('shipMerge', 'Ship + Automerge', allDisabled, pendingCmd, { cls: 'fill', attrs: 'title="Push, create PR, enable auto-merge"' })
+        : btn('ship', 'Ship - Push and Create PR', allDisabled, pendingCmd, { cls: 'fill' }))
+      + btn('delete', ic('trash'), allDisabled, null, { cls: 'danger', attrs: 'data-done="0" title="Delete tree"' });
   return '<div class="card current" data-key="' + h(t.key) + '">' +
     ticket +
     '<div class="row"><span class="branch" title="' + h(t.branch) + '">' + branchLabel + '</span>' + busy + '</div>' +

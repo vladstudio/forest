@@ -202,6 +202,11 @@ export async function activate(context: vscode.ExtensionContext) {
   };
   forestProvider.setContext(ctx);
 
+  // Warm the automerge detection cache so the ship buttons render correctly without a network wait.
+  if (config.github.enabled) {
+    gh.repoHasAutomerge(repoPath).then(() => forestProvider.refresh()).catch(() => {});
+  }
+
   // Register commands — wrap all handlers so unhandled errors become visible
   const reg = (id: string, fn: (...args: any[]) => any) =>
     context.subscriptions.push(vscode.commands.registerCommand(id, async (...args: any[]) => {

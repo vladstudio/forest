@@ -33,19 +33,22 @@ export async function prIsMerged(repoPath: string, branch: string): Promise<bool
   } catch { return false; }
 }
 
-const automergeCache = new Map<string, { value: boolean; time: number }>();
-const AUTOMERGE_TTL = 5 * 60_000;
-export async function repoHasAutomerge(worktreePath: string): Promise<boolean> {
-  const cached = automergeCache.get(worktreePath);
-  if (cached && Date.now() - cached.time < AUTOMERGE_TTL) return cached.value;
+const automergeCache = new Map<string, boolean>();
+export async function repoHasAutomerge(cwd: string): Promise<boolean> {
+  const cached = automergeCache.get(cwd);
+  if (cached !== undefined) return cached;
   try {
-    const { stdout } = await exec('gh', ['api', 'repos/{owner}/{repo}', '--jq', '.allow_auto_merge'], { cwd: worktreePath, timeout: 10_000 });
+    const { stdout } = await exec('gh', ['api', 'repos/{owner}/{repo}', '--jq', '.allow_auto_merge'], { cwd, timeout: 10_000 });
     const value = stdout.trim() === 'true';
-    automergeCache.set(worktreePath, { value, time: Date.now() });
+    automergeCache.set(cwd, value);
     return value;
   } catch {
     return false;
   }
+}
+
+export function repoHasAutomergeCached(cwd: string): boolean | undefined {
+  return automergeCache.get(cwd);
 }
 
 export async function enableAutomerge(worktreePath: string, opts?: { signal?: AbortSignal }): Promise<void> {

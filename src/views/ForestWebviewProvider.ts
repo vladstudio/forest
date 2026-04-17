@@ -40,6 +40,7 @@ interface WebviewData {
   mainIsCurrent: boolean;
   mainBehind: number;
   hasAI: boolean;
+  hasAutomerge: boolean;
   linearEnabled: boolean;
   groups: Array<{ label: string; trees: TreeCardData[] }>;
 }
@@ -277,6 +278,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
       mainIsCurrent,
       mainBehind,
       hasAI: !!this.config.ai,
+      hasAutomerge: this.config.github.enabled && (gh.repoHasAutomergeCached(repoPath) ?? false),
       linearEnabled: this.config.linear.enabled,
       groups,
     };
@@ -559,28 +561,16 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
         break;
       }
 
-      case 'ship': {
+      case 'ship':
+      case 'shipMerge': {
         if (!tree?.path || !ctx) { bail(); return; }
-        // Pre-checks with QuickPick (user interaction before pending work starts)
         if (await git.hasUncommittedChanges(tree.path)) {
           const choice = await vscode.window.showWarningMessage(
             'You have uncommitted changes.', 'Ship Anyway', 'Cancel',
           );
           if (choice !== 'Ship Anyway') { bail(); return; }
         }
-        let automerge = false;
-        const ghEnabled = ctx.config.github.enabled && await gh.isAvailable();
-        if (ghEnabled) {
-          const hasAutomerge = await gh.repoHasAutomerge(tree.path);
-          if (hasAutomerge) {
-            const pick = await vscode.window.showQuickPick(
-              ['Create PR + Automerge', 'Create PR'],
-              { placeHolder: 'Ship — Push & Create PR...' },
-            );
-            if (!pick) { bail(); return; }
-            automerge = pick === 'Create PR + Automerge';
-          }
-        }
+        const automerge = command === 'shipMerge';
         await this.runPending(async (signal) => {
           const prUrl = await withTreeOperation(
             ctx,
