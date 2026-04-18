@@ -132,7 +132,13 @@
       },
       {
         "command": "forest.ship",
-        "title": "Ship — Push & Create PR...",
+        "title": "Ship — Push & Create PR",
+        "category": "Forest",
+        "icon": "$(rocket)"
+      },
+      {
+        "command": "forest.shipMerge",
+        "title": "Ship + Automerge — Push, Create PR & Enable Automerge",
         "category": "Forest",
         "icon": "$(rocket)"
       },

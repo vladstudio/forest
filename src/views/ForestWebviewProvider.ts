@@ -15,15 +15,14 @@ import { executeDeletePlan, type DeletePlan } from '../commands/cleanup';
 import { shipCore } from '../commands/ship';
 import { notify } from '../notify';
 import { pickIssue } from '../commands/create';
+import { linkTicket } from '../commands/linkTicket';
 
 interface TreeCardData {
   key: string;
   branch: string;
-  path?: string;
   ticketId?: string;
   ticketTitle?: string;
   prNumber?: number;
-  prUrl?: string;
   prState?: string;
   behind: number;
   ahead: number;
@@ -57,7 +56,7 @@ function gitRefUri(filePath: string, ref: string): vscode.Uri {
 function baseCard(t: TreeState, isCurrent: boolean): TreeCardData {
   return {
     key: `${t.repoPath}:${t.branch}`,
-    branch: t.branch, path: t.path,
+    branch: t.branch,
     ticketId: t.ticketId, ticketTitle: t.title,
     behind: 0, ahead: 0, remoteBehind: 0, localChanges: null,
     isCurrent, cleaning: false, busyOperation: t.busyOperation,
@@ -217,7 +216,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
       this.stateManager.updateTree(tree.repoPath, tree.branch, { prUrl: pr.url }).catch(() => { });
     }
 
-    return { ...base, prNumber: pr?.number, prUrl: pr?.url ?? tree.prUrl, prState: pr?.state, behind, ahead, remoteBehind, localChanges };
+    return { ...base, prNumber: pr?.number, prState: pr?.state, behind, ahead, remoteBehind, localChanges };
   }
 
   private async buildData(): Promise<WebviewData> {
@@ -490,6 +489,21 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
         break;
       }
 
+      case 'copyTicketDescription': {
+        if (!tree?.ticketId) { bail(); return; }
+        await this.runPending(async (signal) => {
+          try {
+            const desc = await linear.getIssueDescription(tree.ticketId!, { signal });
+            await vscode.env.clipboard.writeText(desc);
+            notify.info(desc ? 'Ticket description copied.' : 'Ticket has no description.');
+          } catch (e: any) {
+            if (signal.aborted) return;
+            notify.warn(`Could not fetch ticket description: ${e.message}`);
+          }
+        });
+        break;
+      }
+
       case 'detachTicket':
         if (!tree) return;
         await this.stateManager.updateTree(repoPath, branch, { ticketId: undefined, title: undefined });
@@ -497,8 +511,12 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
         break;
 
       case 'linkTicket':
-        vscode.commands.executeCommand('forest.linkTicket', branch);
+      case 'newTicket': {
+        const mode = command === 'newTicket' ? 'create' : 'select';
+        await linkTicket(ctx!, branch, mode);
+        this.refresh();
         break;
+      }
 
       case 'switch':
         if (tree?.path) focusOrOpenWindow(vscode.Uri.file(ensureWorkspaceFile(tree)));
@@ -736,6 +754,9 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
     const cssUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'webview.css'),
     );
+    const iconsUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'icons.js'),
+    );
     const jsUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'webview.js'),
     );
@@ -749,6 +770,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
 </head>
 <body>
 <div id="root"><div style="display:flex;flex-direction:column;align-items:center;padding:32px;color:var(--vscode-descriptionForeground)"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style="opacity:0.5;margin-bottom:8px"><path d="M6.5 10.75c.31 0 .587.19.7.479l3.5 9a.75.75 0 0 1-.7 1.021H3a.75.75 0 0 1-.7-1.021l3.5-9a.75.75 0 0 1 .7-.479ZM4.097 19.75h4.806L6.5 13.57l-2.403 6.18Z"/><path d="M17.5 10.75c.31 0 .587.19.7.479l3.5 9a.75.75 0 0 1-.7 1.021H14a.75.75 0 0 1-.7-1.021l3.5-9a.75.75 0 0 1 .7-.479Zm-2.403 9h4.806L17.5 13.57l-2.403 6.18Z"/><path d="M12 .75c.31 0 .587.19.7.479l3.5 9a.75.75 0 0 1-.7 1.021H8.5a.75.75 0 0 1-.7-1.021l3.5-9A.75.75 0 0 1 12 .75ZM9.597 9.75h4.806L12 3.57 9.597 9.75Z"/></svg><span style="font-size:11px">Loading…</span></div></div>
+<script nonce="${nonce}" src="${iconsUri}"></script>
 <script nonce="${nonce}" src="${jsUri}"></script>
 </body>
 </html>`;

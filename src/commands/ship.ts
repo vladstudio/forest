@@ -71,7 +71,7 @@ export async function shipCore(
   return url;
 }
 
-export async function ship(ctx: ForestContext, treeArg?: TreeState): Promise<void> {
+export async function ship(ctx: ForestContext, treeArg: TreeState | undefined, automerge: boolean): Promise<void> {
   const tree = requireTree(ctx, treeArg, 'ship');
   if (!tree) return;
 
@@ -80,21 +80,6 @@ export async function ship(ctx: ForestContext, treeArg?: TreeState): Promise<voi
       'You have uncommitted changes.', 'Ship Anyway', 'Cancel',
     );
     if (choice !== 'Ship Anyway') return;
-  }
-
-  const ghEnabled = ctx.config.github.enabled && await gh.isAvailable();
-
-  let automerge = false;
-  if (ghEnabled) {
-    const hasAutomerge = await gh.repoHasAutomerge(tree.path);
-    if (hasAutomerge) {
-      const pick = await vscode.window.showQuickPick(
-        ['Create PR + Automerge', 'Create PR'],
-        { placeHolder: 'Ship — Push & Create PR...' },
-      );
-      if (!pick) return;
-      automerge = pick === 'Create PR + Automerge';
-    }
   }
 
   const name = displayName(tree);

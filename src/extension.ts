@@ -224,7 +224,8 @@ export async function activate(context: vscode.ExtensionContext) {
   reg('forest.create', () => ctx.forestProvider.showCreateForm());
   reg('forest.start', (arg: { ticketId: string; title: string }) => start(ctx, arg));
   reg('forest.switch', (branch?: string) => switchTree(ctx, branch));
-  reg('forest.ship', (branch?: string) => andRefresh(() => ship(ctx, lookupTree(branch)))());
+  reg('forest.ship', (branch?: string) => andRefresh(() => ship(ctx, lookupTree(branch), false))());
+  reg('forest.shipMerge', (branch?: string) => andRefresh(() => ship(ctx, lookupTree(branch), true))());
   reg('forest.deleteTree', (branch?: string, isDone?: boolean) => deleteTree(ctx, branch, isDone ?? false));
   reg('forest.update', () => andRefresh(() => update(ctx))());
   reg('forest.rebase', () => andRefresh(() => rebase(ctx))());

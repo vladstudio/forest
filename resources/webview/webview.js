@@ -12,7 +12,7 @@ let loadingMessage = null; // string | null
 const pendingLabels = {
   pull: 'pulling…', push: 'pushing…', mergeFromMain: 'merging…',
   commit: 'committing…', discard: 'discarding…', ship: 'shipping…', shipMerge: 'shipping…',
-  pickBranch: 'loading…', pickIssue: 'loading…', openTicket: 'opening…',
+  pickBranch: 'loading…', pickIssue: 'loading…', openTicket: 'opening…', copyTicketDescription: 'copying…',
   workingDiff: 'loading…', branchDiff: 'loading…', mainDiff: 'loading…',
 };
 
@@ -174,7 +174,7 @@ document.getElementById('root').addEventListener('click', e => {
   vscode.postMessage(msg);
 });
 
-const h = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const h = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const dis = v => v ? ' disabled' : '';
 
 function sanitizeBranch(v) {
@@ -198,20 +198,6 @@ function autoFillBranch() {
   }
 }
 
-const icons = {
-  house: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><path d="M219.31,108.68l-80-80a16,16,0,0,0-22.62,0l-80,80A15.87,15.87,0,0,0,32,120v96a8,8,0,0,0,8,8h64a8,8,0,0,0,8-8V160h32v56a8,8,0,0,0,8,8h64a8,8,0,0,0,8-8V120A15.87,15.87,0,0,0,219.31,108.68ZM208,208H160V152a8,8,0,0,0-8-8H104a8,8,0,0,0-8,8v56H48V120l80-80,80,80Z"/></svg>',
-  folderOpen: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><path d="M245,110.64A16,16,0,0,0,232,104H216V88a16,16,0,0,0-16-16H130.67L102.94,51.2a16.14,16.14,0,0,0-9.6-3.2H40A16,16,0,0,0,24,64V208h0a8,8,0,0,0,8,8H211.1a8,8,0,0,0,7.59-5.47l28.49-85.47A16.05,16.05,0,0,0,245,110.64ZM93.34,64,123.2,86.4A8,8,0,0,0,128,88h72v16H69.77a16,16,0,0,0-15.18,10.94L40,158.7V64Zm112,136H43.1l26.67-80H232Z"/></svg>',
-  diff: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><rect width="256" height="256" fill="none"/><path d="M200,168V110.63a16,16,0,0,0-4.69-11.32L144,48" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/><polyline points="144 96 144 48 192 48" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/><path d="M56,88v57.37a16,16,0,0,0,4.69,11.32L112,208" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/><polyline points="112 160 112 208 64 208" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/><circle cx="56" cy="64" r="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/><circle cx="200" cy="192" r="24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/></svg>',
-  x: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><rect width="256" height="256" fill="none"/><line x1="200" y1="56" x2="56" y2="200" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/><line x1="200" y1="200" x2="56" y2="56" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/></svg>',
-  copy: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><path d="M216,32H88a8,8,0,0,0-8,8V80H40a8,8,0,0,0-8,8V216a8,8,0,0,0,8,8H168a8,8,0,0,0,8-8V176h40a8,8,0,0,0,8-8V40A8,8,0,0,0,216,32ZM160,208H48V96H160Zm48-48H176V88a8,8,0,0,0-8-8H96V48H208Z"/></svg>',
-  arrowDown: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><path d="M205.66,149.66l-72,72a8,8,0,0,1-11.32,0l-72-72a8,8,0,0,1,11.32-11.32L120,196.69V40a8,8,0,0,1,16,0V196.69l58.34-58.35a8,8,0,0,1,11.32,11.32Z"/></svg>',
-  arrowUp: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><path d="M205.66,117.66a8,8,0,0,1-11.32,0L136,59.31V216a8,8,0,0,1-16,0V59.31L61.66,117.66a8,8,0,0,1-11.32-11.32l72-72a8,8,0,0,1,11.32,0l72,72A8,8,0,0,1,205.66,117.66Z"/></svg>',
-  trash: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM96,40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96Zm96,168H64V64H192ZM112,104v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Zm48,0v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Z"/></svg>',
-  link: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><path d="M240,88.23a54.43,54.43,0,0,1-16,37L189.25,160a54.27,54.27,0,0,1-38.63,16h-.05A54.63,54.63,0,0,1,96,119.84a8,8,0,0,1,16,.45A38.62,38.62,0,0,0,150.58,160h0a38.39,38.39,0,0,0,27.31-11.31l34.75-34.75a38.63,38.63,0,0,0-54.63-54.63l-11,11A8,8,0,0,1,135.7,59l11-11A54.65,54.65,0,0,1,224,48,54.86,54.86,0,0,1,240,88.23ZM109,185.66l-11,11A38.41,38.41,0,0,1,70.6,208h0a38.63,38.63,0,0,1-27.29-65.94L78,107.31A38.63,38.63,0,0,1,144,135.71a8,8,0,0,0,16,.45A54.86,54.86,0,0,0,144,96a54.65,54.65,0,0,0-77.27,0L32,130.75A54.62,54.62,0,0,0,70.56,224h0a54.28,54.28,0,0,0,38.64-16l11-11A8,8,0,0,0,109,185.66Z"/></svg>',
-  gitBranch: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><path d="M232,64a32,32,0,1,0-40,31v17a8,8,0,0,1-8,8H96a23.84,23.84,0,0,0-8,1.38V95a32,32,0,1,0-16,0v66a32,32,0,1,0,16,0V144a8,8,0,0,1,8-8h88a24,24,0,0,0,24-24V95A32.06,32.06,0,0,0,232,64ZM64,64A16,16,0,1,1,80,80,16,16,0,0,1,64,64ZM96,192a16,16,0,1,1-16-16A16,16,0,0,1,96,192ZM200,80a16,16,0,1,1,16-16A16,16,0,0,1,200,80Z"/></svg>',
-  linear: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><rect width="256" height="256" fill="none"/><polyline points="88 136 112 160 168 104" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/><rect x="40" y="40" width="176" height="176" rx="8" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/></svg>',
-  checkbox: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><rect x="40" y="40" width="176" height="176" rx="8" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/><polyline points="88 136 112 160 168 104" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/></svg>',
-};
 const ic = name => '<span class="icon">' + icons[name] + '</span>';
 
 function renderLoading(message) {
@@ -241,7 +227,7 @@ function radioOption(name, value, currentValue, title, disabled, subtitle) {
     '<span class="radio-body"><div class="radio-title">' + h(title) + '</div>' +
     (subtitle ? '<div class="form-copy" style="opacity:0.7">' + h(subtitle) + '</div>' : '') +
     '</span>' +
-  '</label>';
+    '</label>';
 }
 
 function renderList(d) {
@@ -276,14 +262,14 @@ function withOptimisticCleaning(data) {
 
   if (!moved.length) return data;
 
-  var cleaningIdx = groups.findIndex(function(group) { return group.label === 'Cleaning up'; });
+  var cleaningIdx = groups.findIndex(function (group) { return group.label === 'Deleting'; });
   if (cleaningIdx >= 0) {
     groups[cleaningIdx] = {
       label: groups[cleaningIdx].label,
       trees: moved.concat(groups[cleaningIdx].trees),
     };
   } else {
-    groups.unshift({ label: 'Cleaning up', trees: moved });
+    groups.unshift({ label: 'Deleting', trees: moved });
   }
 
   return { ...data, groups: groups };
@@ -299,8 +285,8 @@ function mainCard(d) {
     var pullLabel = d.mainBehind > 0 ? ic('arrowDown') + d.mainBehind : ic('arrowDown');
     return '<div class="' + cls + '" data-key="__main__"><span class="card-label">' + label + '</span>' +
       '<div class="row">' +
-        '<button class="btn" data-cmd="revealInFinder" title="Reveal in Finder"' + dis(allDis) + '>' + ic('folderOpen') + '</button>' +
-        btn('pull', pullLabel, allDis, pCmd, { attrs: 'title="Pull"' }) +
+      '<button class="btn" data-cmd="revealInFinder" title="Reveal in Finder"' + dis(allDis) + '>' + ic('folderOpen') + '</button>' +
+      btn('pull', pullLabel, allDis, pCmd, { attrs: 'title="Pull"' }) +
       '</div></div>';
   }
   return '<div class="' + cls + '" data-key="__main__"><a class="card-label" data-cmd="switchToMain">' + label + '</a></div>';
@@ -329,28 +315,37 @@ function treeCard(t, d) {
   const pendingCmd = isPending ? pendingAction.cmd : null;
   const allDisabled = !!t.busyOperation || isPending;
   const busy = !isPending && t.busyOperation ? '<span class="dim">' + h(t.busyOperation) + '…</span>' : '';
-  const behind = t.behind > 0 ? btn('mergeFromMain', 'main ↓' + t.behind, allDisabled, pendingCmd, { attrs: 'title="Merge ' + t.behind + ' commits from main"' }) : '';
-  const pushLabel = t.ahead > 0 ? ic('arrowUp') + t.ahead : ic('arrowUp');
+  const behind = t.behind > 0 ? btn('mergeFromMain', ic('gitMerge') + '<span class="label">main</span> ' + t.behind, allDisabled, pendingCmd, { attrs: 'title="Merge ' + t.behind + ' commits from main"' }) : '';
+  const pullLabel = ic('arrowDown') + '<span class="label">Pull</span>' + (t.remoteBehind > 0 ? ' ' + t.remoteBehind : '');
+  const pushLabel = ic('arrowUp') + '<span class="label">Push</span>' + (t.ahead > 0 ? ' ' + t.ahead : '');
   let ticket = '';
   if (d.linearEnabled) {
     if (t.ticketId) {
       const lbl = t.ticketId + (t.ticketTitle ? ': ' + t.ticketTitle : '');
-      const ticketLink = pendingCmd === 'openTicket'
-        ? '<span class="ticket dim">' + (pendingLabels.openTicket || 'loading…') + '</span>'
+      const ticketPending = pendingCmd === 'openTicket' || pendingCmd === 'copyTicketDescription';
+      const ticketLink = ticketPending
+        ? '<span class="ticket dim">' + (pendingLabels[pendingCmd] || 'loading…') + '</span>'
         : '<a class="ticket" data-cmd="openTicket" title="' + h(lbl) + '"' + (allDisabled ? ' style="pointer-events:none;opacity:0.5"' : '') + '>' + h(lbl) + '</a>';
-      ticket = '<div class="row">' + ticketLink + (pendingCmd === 'openTicket' ? '<button class="btn" data-cmd="cancelPending" title="Cancel">' + ic('x') + '</button>' : '<button class="btn" data-cmd="detachTicket"' + dis(allDisabled) + '>detach</button>') + '</div>';
+      const ticketActions = ticketPending
+        ? '<button class="btn" data-cmd="cancelPending" title="Cancel">' + ic('x') + '</button>'
+        : '<button class="btn" data-cmd="copyTicketDescription"' + dis(allDisabled) + ' title="Copy description">' + ic('copy') + '</button>'
+          + '<button class="btn" data-cmd="detachTicket"' + dis(allDisabled) + '>detach</button>';
+      ticket = '<div class="field-label">Linear</div><div class="row">' + ticketLink + ticketActions + '</div>';
     } else {
-      ticket = '<div class="row"><button class="btn faint" data-cmd="linkTicket" style="flex:1"' + dis(allDisabled) + '>No ticket</button></div>';
+      ticket = '<div class="field-label">Linear</div><div class="row equal-fill">'
+        + '<button class="btn" data-cmd="linkTicket"' + dis(allDisabled) + '>Link issue</button>'
+        + '<button class="btn" data-cmd="newTicket"' + dis(allDisabled) + '>New issue</button>'
+        + '</div>';
     }
   }
   let changes = '';
   if (t.localChanges) {
     const lc = t.localChanges;
     const stats = [lc.added ? '<span class="add">+' + lc.added + '</span>' : '', lc.removed ? '<span class="del">-' + lc.removed + '</span>' : '', lc.modified ? '<span class="mod">~' + lc.modified + '</span>' : ''].filter(Boolean).join(' ');
-    changes = '<div class="row"><span class="stats">' + stats + '</span>' +
-      btn('workingDiff', ic('diff'), allDisabled, pendingCmd, { attrs: 'title="Diff working changes"' }) +
-      btn('branchDiff', 'Diff branch', allDisabled, pendingCmd, { attrs: 'title="Diff branch changes"' }) +
-      (d.hasAI ? btn('commit', 'commit', allDisabled, pendingCmd) : '') +
+    changes = '<div class="row equal-fill">' +
+      btn('workingDiff', '<span class="stats">' + stats + '</span>' + ic('diff'), allDisabled, pendingCmd, { attrs: 'title="Diff working changes"' }) +
+      btn('branchDiff', ic('diff') + '<span class="label">branch</span>', allDisabled, pendingCmd, { attrs: 'title="Diff branch changes"' }) +
+      btn('mainDiff', ic('diff') + '<span class="label">main</span>', allDisabled, pendingCmd, { attrs: 'title="Diff main against branch"' }) +
       btn('discard', ic('x'), allDisabled, pendingCmd, { cls: 'danger', attrs: 'title="Discard changes"' }) + '</div>';
   }
   const isDone = t.prState === 'MERGED' || t.prState === 'CLOSED';
@@ -358,24 +353,26 @@ function treeCard(t, d) {
   const lastRow = (isDone || t.prNumber)
     ? '<button class="btn fill" data-cmd="openPR"' + dis(allDisabled) + '>PR#' + (t.prNumber || '?') + '</button>' + btn('delete', ic('trash'), allDisabled, null, { cls: 'danger', attrs: 'data-done="' + doneFlag + '" title="Delete tree"' })
     : (d.hasAutomerge
-        ? btn('ship', 'Ship', allDisabled, pendingCmd, { cls: 'fill', attrs: 'title="Push and create PR"' })
-          + btn('shipMerge', 'Ship + Automerge', allDisabled, pendingCmd, { cls: 'fill', attrs: 'title="Push, create PR, enable auto-merge"' })
-        : btn('ship', 'Ship - Push and Create PR', allDisabled, pendingCmd, { cls: 'fill' }))
-      + btn('delete', ic('trash'), allDisabled, null, { cls: 'danger', attrs: 'data-done="0" title="Delete tree"' });
+      ? btn('ship', 'Push + PR', allDisabled, pendingCmd, { cls: 'fill primary', attrs: 'title="Push and create PR"' })
+      + btn('shipMerge', '+ Automerge', allDisabled, pendingCmd, { cls: 'fill primary', attrs: 'title="Push, create PR, enable auto-merge"' })
+      : btn('ship', 'Ship - Push and Create PR', allDisabled, pendingCmd, { cls: 'fill primary' }))
+    + btn('delete', ic('trash'), allDisabled, null, { cls: 'danger', attrs: 'data-done="0" title="Delete tree"' });
   return '<div class="card current" data-key="' + h(t.key) + '">' +
     ticket +
-    '<div class="row"><span class="branch" title="' + h(t.branch) + '">' + branchLabel + '</span>' + busy + '</div>' +
-    '<div class="row">' +
-      '<button class="btn" data-cmd="revealInFinder" title="Reveal in Finder"' + dis(allDisabled) + '>' + ic('folderOpen') + '</button>' +
-      '<button class="btn" data-cmd="copyBranch" title="Copy branch name"' + dis(allDisabled) + '>' + ic('copy') + '</button>' +
-      btn('pull', t.remoteBehind > 0 ? ic('arrowDown') + t.remoteBehind : ic('arrowDown'), allDisabled, pendingCmd, { attrs: 'title="Pull from remote"' }) +
-      behind +
-      btn('push', pushLabel, allDisabled, pendingCmd, { attrs: 'title="Push to remote"' }) +
-      btn('mainDiff', 'Diff main', allDisabled, pendingCmd, { attrs: 'title="Diff main against branch"' }) +
+    '<div class="field-label">Branch</div><div class="row"><span class="branch" title="' + h(t.branch) + '">' + branchLabel + '</span>' + busy +
+    '<button class="btn" data-cmd="revealInFinder" title="Reveal in Finder"' + dis(allDisabled) + '>' + ic('folderOpen') + '</button>' +
+    '<button class="btn" data-cmd="copyBranch" title="Copy branch name"' + dis(allDisabled) + '>' + ic('copy') + '</button>' +
+    '</div>' +
+    '<div class="row equal-fill">' +
+    btn('pull', pullLabel, allDisabled, pendingCmd, { attrs: 'title="Pull from remote"' }) +
+    behind +
+    (d.hasAI ? btn('commit', ic('gitCommit') + '<span class="label">Commit</span>', allDisabled, pendingCmd) : '') +
+    btn('push', pushLabel, allDisabled, pendingCmd, { attrs: 'title="Push to remote"' }) +
     '</div>' +
     changes +
+    '<div class="field-label">Tree</div>' +
     '<div class="row">' + lastRow + '</div>' +
-  '</div>';
+    '</div>';
 }
 
 function renderDeleteForm() {
@@ -548,20 +545,20 @@ function renderCreateForm() {
 
 function setupDeleteListeners() {
   var branchRadios = document.querySelectorAll('input[name="delete-branches"]');
-  branchRadios.forEach(function(input) {
-    input.addEventListener('change', function(e) {
+  branchRadios.forEach(function (input) {
+    input.addEventListener('change', function (e) {
       deleteState.branches = e.target.value;
     });
   });
   var linearRadios = document.querySelectorAll('input[name="delete-linear"]');
-  linearRadios.forEach(function(input) {
-    input.addEventListener('change', function(e) {
+  linearRadios.forEach(function (input) {
+    input.addEventListener('change', function (e) {
       deleteState.linear = e.target.value;
     });
   });
   var prRadios = document.querySelectorAll('input[name="delete-pr"]');
-  prRadios.forEach(function(input) {
-    input.addEventListener('change', function(e) {
+  prRadios.forEach(function (input) {
+    input.addEventListener('change', function (e) {
       deleteState.pr = e.target.value;
     });
   });
@@ -570,7 +567,7 @@ function setupDeleteListeners() {
 function setupFormListeners() {
   var branchInput = document.getElementById('branchNameInput');
   if (branchInput) {
-    branchInput.addEventListener('input', function(e) {
+    branchInput.addEventListener('input', function (e) {
       formState.branchName = e.target.value;
       formState.branchManuallyEdited = e.target.value.length > 0;
       updateFormHints();
@@ -579,7 +576,7 @@ function setupFormListeners() {
   }
   var ticketInput = document.getElementById('ticketTitleInput');
   if (ticketInput) {
-    ticketInput.addEventListener('input', function(e) {
+    ticketInput.addEventListener('input', function (e) {
       formState.newTicketTitle = e.target.value;
       autoFillBranch();
       var bi = document.getElementById('branchNameInput');
@@ -590,13 +587,13 @@ function setupFormListeners() {
   }
   var prioritySelect = document.getElementById('prioritySelect');
   if (prioritySelect) {
-    prioritySelect.addEventListener('change', function(e) {
+    prioritySelect.addEventListener('change', function (e) {
       formState.priority = parseInt(e.target.value, 10);
     });
   }
   var teamSelect = document.getElementById('teamSelect');
   if (teamSelect) {
-    teamSelect.addEventListener('change', function(e) {
+    teamSelect.addEventListener('change', function (e) {
       formState.team = e.target.value;
     });
   }

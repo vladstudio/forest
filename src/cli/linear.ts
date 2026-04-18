@@ -123,6 +123,15 @@ export async function getIssue(issueId: string, opts?: { signal?: AbortSignal })
   } catch { return null; }
 }
 
+export async function getIssueDescription(issueId: string, opts?: { signal?: AbortSignal }): Promise<string> {
+  const data = await gql<{ issue: { description: string | null } }>(
+    `query($id: String!) { issue(id: $id) { description } }`,
+    { id: issueId },
+    opts?.signal,
+  );
+  return data.issue.description ?? '';
+}
+
 export async function createIssue(opts: {
   title: string;
   priority?: number;

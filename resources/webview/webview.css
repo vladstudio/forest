@@ -1,65 +1,412 @@
-* { box-sizing: border-box; }
-body { margin: 0; padding: 0; font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); color: var(--vscode-foreground); background: var(--vscode-sideBar-background); }
-#root { padding: 4px 0 8px; }
-.empty { padding: 12px; color: var(--vscode-descriptionForeground); font-size: 12px; margin: 0; }
-.group { padding: 6px 12px 2px; font-size: 11px; text-transform: uppercase; opacity: 0.6; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.card { margin: 2px 8px; padding: 8px 10px; border: 1px solid var(--vscode-activityBar-border, rgba(128,128,128,0.2)); border-radius: 4px; background: transparent; }
-.card.current { background: var(--vscode-editor-background); }
-.card.card-main { display: flex; align-items: center; gap: 6px; margin: 4px 8px 6px; padding: 5px 10px; }
-.card-label { flex: 1; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 4px; }
-.branch { font-size: 12px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 3px; }
-[data-cmd] { cursor: pointer; text-decoration: none; color: inherit; }
-a[data-cmd] { color: inherit; }
-a[data-cmd]:hover { opacity: 0.7; }
-.row { display: flex; align-items: center; gap: 3px; margin-bottom: 5px; min-height: 20px; flex-wrap: wrap; }
-.row:last-child { margin-bottom: 0; }
-.dim { color: var(--vscode-descriptionForeground); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.ticket { cursor: pointer; font-size: 11px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ticket:hover { text-decoration: underline; }
-.stats { font-size: 11px; font-family: var(--vscode-editor-font-family, monospace); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.add { color: var(--vscode-gitDecoration-addedResourceForeground, #81b88b); }
-.del { color: var(--vscode-gitDecoration-deletedResourceForeground, #c74e39); }
-.mod { color: var(--vscode-gitDecoration-modifiedResourceForeground, #e2c08d); }
-.icon { display: inline-flex; align-items: center; }
-.icon svg { width: 14px; height: 14px; fill: currentColor; }
-.icon svg[stroke] { fill: none; }
-button { cursor: pointer; font-family: var(--vscode-font-family); border: none; border-radius: 3px; }
-.btn { background: none; color: var(--vscode-foreground); padding: 2px 4px; font-size: 12px; border: 1px solid var(--vscode-activityBar-border, rgba(128,128,128,0.3)); opacity: 0.9; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 2px; min-height: 20px; text-align: center; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.btn:hover:not(:disabled) { opacity: 1; background: var(--vscode-toolbar-hoverBackground); }
-.btn:disabled { opacity: 0.5; cursor: default; }
-.btn.faint { opacity: 0.45; }
-.btn.faint:hover:not(:disabled) { opacity: 0.8; }
-.btn.danger { color: var(--vscode-errorForeground, #f44736) !important; }
-.fill { flex: 1; }
-.form { padding: 8px; }
-.form-section { margin-bottom: 14px; }
-.form-row { display: flex; align-items: center; gap: 4px; margin-bottom: 6px; }
-.form-input { width: 100%; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border, transparent); border-radius: 3px; padding: 4px 6px; font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); outline: none; }
-.form-input:focus { border-color: var(--vscode-focusBorder); }
-.form-input::placeholder { color: var(--vscode-input-placeholderForeground); }
-.form-select { background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground); border: 1px solid var(--vscode-dropdown-border, transparent); border-radius: 3px; padding: 3px 4px; font-family: var(--vscode-font-family); font-size: 11px; outline: none; flex: 1; }
-.form-select:focus { border-color: var(--vscode-focusBorder); }
-.form-value { font-size: 12px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 3px; }
-.form-hint { font-size: 11px; color: var(--vscode-descriptionForeground); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.form-error { font-size: 11px; color: var(--vscode-errorForeground); margin-bottom: 6px; padding: 4px 8px; border-radius: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.form-actions { display: flex; gap: 4px; margin-top: 12px; }
-.btn-create { flex: 1; background: var(--vscode-button-background); color: var(--vscode-button-foreground); padding: 6px 8px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.btn-create:hover:not(:disabled) { background: var(--vscode-button-hoverBackground); }
-.btn-create:disabled { opacity: 0.5; cursor: default; }
-.btn-cancel { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); padding: 6px 12px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.btn-cancel:hover { background: var(--vscode-button-secondaryHoverBackground); }
-.btn-toggle.active { background: var(--vscode-selection-background); color: var(--vscode-button-secondaryForeground); opacity: 1; }
-.form-title { display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.form-copy { color: var(--vscode-descriptionForeground); font-size: 11px; line-height: 1.45; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.radio-group { display: flex; flex-direction: column; margin-top: 6px; border: 1px solid var(--vscode-activityBar-border, rgba(128,128,128,0.2)); border-radius: 4px; overflow: hidden; }
-.radio-option { display: flex; gap: 8px; padding: 8px; background: transparent; cursor: pointer; border-bottom: 1px solid var(--vscode-activityBar-border, rgba(128,128,128,0.2)); }
-.radio-option:last-child { border-bottom: none; }
-.radio-option:hover { background: var(--vscode-list-hoverBackground, rgba(128,128,128,0.08)); }
-.radio-option input { margin: 2px 0 0; accent-color: var(--vscode-button-background); }
-.radio-option input:focus, .radio-option input:focus-visible { outline: none; box-shadow: none; }
-.radio-option:focus-within { outline: none; }
-.radio-option.disabled { opacity: 0.6; cursor: default; }
-.radio-body { min-width: 0; flex: 1; }
-.radio-title { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-@keyframes pulse { 0%,100% { opacity: 0.7; } 50% { opacity: 0.4; } }
-.btn-pending { animation: pulse 1.5s ease-in-out infinite; border-style: dashed; }
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--vscode-font-family);
+  font-size: 12px;
+  color: var(--vscode-foreground);
+  background: var(--vscode-sideBar-background);
+}
+
+#root {
+  padding: 4px 0 8px;
+}
+
+.group,
+.card-label,
+.branch,
+.dim,
+.ticket,
+.btn,
+.btn-create,
+.btn-cancel,
+.form-value,
+.form-hint,
+.form-error,
+.form-title,
+.form-copy,
+.radio-title {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.empty,
+.dim,
+.field-label,
+.form-hint,
+.form-copy {
+  color: var(--vscode-descriptionForeground);
+}
+
+.empty {
+  padding: 12px;
+  margin: 0;
+}
+
+.group {
+  padding: 6px 12px 2px;
+  text-transform: uppercase;
+  opacity: 0.6;
+  margin-top: 4px;
+}
+
+.card,
+.radio-group {
+  border: 1px solid var(--vscode-activityBar-border, rgba(128, 128, 128, 0.2));
+  border-radius: 4px;
+}
+
+.card {
+  margin: 2px 8px;
+  padding: 8px 10px;
+  background: transparent;
+}
+
+.card.current {
+  background: var(--vscode-editor-background);
+}
+
+.card.card-main {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 8px 6px;
+  padding: 5px 10px;
+}
+
+.card-label {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.branch {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+
+[data-cmd] {
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+}
+
+a[data-cmd]:hover {
+  opacity: 0.7;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-bottom: 5px;
+  min-height: 20px;
+  flex-wrap: wrap;
+}
+
+.row:last-child {
+  margin-bottom: 0;
+}
+
+.dim {
+  min-width: 0;
+}
+
+.field-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+  letter-spacing: 0.3px;
+}
+
+.row + .field-label {
+  margin-top: 10px;
+}
+
+@media (max-width: 300px) {
+  .label {
+    display: none;
+  }
+}
+
+.ticket {
+  cursor: pointer;
+  flex: 1;
+}
+
+.ticket:hover {
+  text-decoration: underline;
+}
+
+.row.equal-fill .btn:not(.danger) {
+  flex: 1;
+}
+
+.stats {
+  font-family: var(--vscode-editor-font-family, monospace);
+  white-space: nowrap;
+  display: inline;
+}
+
+.add {
+  color: var(--vscode-gitDecoration-addedResourceForeground, #81b88b);
+}
+
+.del {
+  color: var(--vscode-gitDecoration-deletedResourceForeground, #c74e39);
+}
+
+.mod {
+  color: var(--vscode-gitDecoration-modifiedResourceForeground, #e2c08d);
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+}
+
+.icon svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+
+.icon svg[stroke] {
+  fill: none;
+}
+
+button {
+  cursor: pointer;
+  font-family: var(--vscode-font-family);
+  border: none;
+  border-radius: 3px;
+}
+
+.btn {
+  background: none;
+  color: var(--vscode-foreground);
+  padding: 2px 4px;
+  border: 1px solid var(--vscode-activityBar-border, rgba(128, 128, 128, 0.3));
+  opacity: 0.9;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 20px;
+  text-align: center;
+  min-width: 0;
+}
+
+.btn:hover:not(:disabled) {
+  opacity: 1;
+  background: var(--vscode-toolbar-hoverBackground);
+}
+
+.btn:disabled,
+.btn-create:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.btn.faint {
+  opacity: 0.45;
+}
+
+.btn.faint:hover:not(:disabled) {
+  opacity: 0.8;
+}
+
+.btn.danger {
+  color: var(--vscode-errorForeground, #f44736) !important;
+}
+
+.btn.primary {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border-color: transparent;
+  opacity: 1;
+}
+
+.btn.primary:hover:not(:disabled) {
+  background: var(--vscode-button-hoverBackground);
+}
+
+.fill {
+  flex: 1;
+}
+
+.form {
+  padding: 8px;
+}
+
+.form-section {
+  margin-bottom: 14px;
+}
+
+.form-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.form-input {
+  width: 100%;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 3px;
+  padding: 4px 6px;
+  font-family: var(--vscode-font-family);
+  outline: none;
+}
+
+.form-input::placeholder {
+  color: var(--vscode-input-placeholderForeground);
+}
+
+.form-select {
+  background: var(--vscode-dropdown-background);
+  color: var(--vscode-dropdown-foreground);
+  border: 1px solid var(--vscode-dropdown-border, transparent);
+  border-radius: 3px;
+  padding: 3px 4px;
+  font-family: var(--vscode-font-family);
+  outline: none;
+  flex: 1;
+}
+
+.form-input:focus,
+.form-select:focus {
+  border-color: var(--vscode-focusBorder);
+}
+
+.form-value {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.form-hint {
+  margin-top: 2px;
+}
+
+.form-error {
+  color: var(--vscode-errorForeground);
+  margin-bottom: 6px;
+  padding: 4px 8px;
+  border-radius: 3px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 12px;
+}
+
+.btn-create {
+  flex: 1;
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  padding: 6px 8px;
+  min-width: 0;
+}
+
+.btn-create:hover:not(:disabled) {
+  background: var(--vscode-button-hoverBackground);
+}
+
+.btn-cancel {
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  padding: 6px 12px;
+}
+
+.btn-cancel:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.btn-toggle.active {
+  background: var(--vscode-selection-background);
+  color: var(--vscode-button-secondaryForeground);
+  opacity: 1;
+}
+
+.form-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  min-width: 0;
+}
+
+.form-copy {
+  line-height: 1.45;
+}
+
+.radio-group {
+  display: flex;
+  flex-direction: column;
+  margin-top: 6px;
+  overflow: hidden;
+}
+
+.radio-option {
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  background: transparent;
+  cursor: pointer;
+  border-bottom: 1px solid var(--vscode-activityBar-border, rgba(128, 128, 128, 0.2));
+}
+
+.radio-option:last-child {
+  border-bottom: none;
+}
+
+.radio-option:hover {
+  background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.08));
+}
+
+.radio-option input {
+  margin: 2px 0 0;
+  accent-color: var(--vscode-button-background);
+}
+
+.radio-option input:focus,
+.radio-option input:focus-visible,
+.radio-option:focus-within {
+  outline: none;
+  box-shadow: none;
+}
+
+.radio-option.disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.radio-body {
+  min-width: 0;
+  flex: 1;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 0.4; }
+}
+
+.btn-pending {
+  animation: pulse 1.5s ease-in-out infinite;
+  border-style: dashed;
+}
