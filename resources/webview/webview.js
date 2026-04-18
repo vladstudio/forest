@@ -359,8 +359,7 @@ function treeCard(t, d) {
     + btn('delete', ic('trash'), allDisabled, null, { cls: 'danger', attrs: 'data-done="0" title="Delete tree"' });
   return '<div class="card current" data-key="' + h(t.key) + '">' +
     ticket +
-    '<div class="field-label">Branch</div><div class="row"><span class="branch" title="' + h(t.branch) + '">' + branchLabel + '</span>' + busy +
-    '<button class="btn" data-cmd="revealInFinder" title="Reveal in Finder"' + dis(allDisabled) + '>' + ic('folderOpen') + '</button>' +
+    '<div class="field-label">Branch</div><div class="row"><span class="branch" data-cmd="revealInFinder" title="Reveal in Finder: ' + h(t.branch) + '">' + branchLabel + '</span>' + busy +
     '<button class="btn" data-cmd="copyBranch" title="Copy branch name"' + dis(allDisabled) + '>' + ic('copy') + '</button>' +
     '</div>' +
     '<div class="row equal-fill">' +

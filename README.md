@@ -12,14 +12,14 @@ VSCode extension for parallel feature development using git worktrees. One Linea
 
 ## Concepts
 
-| Term                        | Action                                                              |
-| --------------------------- | ------------------------------------------------------------------- |
-| **New Tree**                | Unified wizard: pick new or existing branch, optionally link a Linear ticket |
-| **Ship**                    | Push branch + create PR (with optional automerge) + move ticket to configured status |
-| **Cleanup**                 | Auto-triggered when PR is merged: remove worktree + branches + move ticket to configured status |
-| **Delete Tree**             | Interactive form: choose branch cleanup (keep / local only / all), Linear status, and PR handling |
-| **Update**                  | Merge from main + re-copy env files                                 |
-| **List**                    | Quick-pick list of all active trees                                 |
+| Term            | Action                                                                                            |
+| --------------- | ------------------------------------------------------------------------------------------------- |
+| **New Tree**    | Unified wizard: pick new or existing branch, optionally link a Linear ticket                      |
+| **Ship**        | Push branch + create PR (with optional automerge) + move ticket to configured status              |
+| **Cleanup**     | Auto-triggered when PR is merged: remove worktree + branches + move ticket to configured status   |
+| **Delete Tree** | Interactive form: choose branch cleanup (keep / local only / all), Linear status, and PR handling |
+| **Update**      | Merge from main + re-copy env files                                                               |
+| **List**        | Quick-pick list of all active trees                                                               |
 
 ## Prerequisites
 
@@ -80,20 +80,20 @@ To set up Forest, ask Claude (or any AI) to read this README and generate `.fore
 
 ### Config reference
 
-| Field          | Required | Default               | Description                                                                                                                                                                                                                                                                                                               |
-| -------------- | -------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `version`      | yes      | —                     | Always `1`                                                                                                                                                                                                                                                                                                                |
-| `copy`         | no       | `[]`                  | Files to copy from repo root into each tree                                                                                                                                                                                                                                                                               |
-| `shortcuts`    | no       | `[]`                  | Terminals, browsers, files to open per tree                                                                                                                                                                                                                                                                               |
+| Field          | Required | Default               | Description                                                                                                                                                                                                                                                                                                                          |
+| -------------- | -------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `version`      | yes      | —                     | Always `1`                                                                                                                                                                                                                                                                                                                           |
+| `copy`         | no       | `[]`                  | Files to copy from repo root into each tree                                                                                                                                                                                                                                                                                          |
+| `shortcuts`    | no       | `[]`                  | Terminals, browsers, files to open per tree                                                                                                                                                                                                                                                                                          |
 | `linear`       | no       | disabled              | Linear integration. Auto-enabled when `teams` or `apiKey` is set. `teams` is an array of team **keys** (e.g. `["ENG"]` or `["ENG", "UX"]`). `statuses` controls issue list and lifecycle transitions including `onCancel` (**must use lowercase** state names: `triage`, `backlog`, `unstarted`, `started`, `completed`, `canceled`) |
-| `github`       | no       | `true`                | GitHub integration toggle. Set `false` to disable                                                                                                                                                                                                                                                                         |
-| `branchFormat` | no       | `${ticketId}-${slug}` | Branch naming. Supports `${ticketId}`, `${slug}`                                                                                                                                                                                                                                                                          |
-| `baseBranch`   | no       | `main`                | Base branch name (`origin/` prefix is added automatically)                                                                                                                                                                                                                                                                |
-| `maxTrees`     | no       | `10`                  | Max concurrent worktrees                                                                                                                                                                                                                                                                                                  |
-| `ai`           | no       | disabled              | AI-generated PR descriptions and commit messages. Set `provider` (`anthropic`, `openai`, `gemini`), `model`, and `apiKey`. Best placed in `local.json`                                                                                                                                                                    |
-| `logging`      | no       | `true`                | File-based logging to `~/.forest/forest.log`. Rotates at 5 MB                                                                                                                                                                                                                                                            |
-| `browser`      | no       | `["integrated"]`      | Browser app list. First item is the default; right-click a shortcut to pick another. Values: `integrated` (VS Code integrated browser), `external` (system default), or an app name (e.g. `"Firefox"`)                                                                                                                            |
-| `terminal`     | no       | `["integrated"]`      | Terminal app list. First item is the default; right-click to pick another. Values: `integrated` (VS Code terminal), or an external app (`iTerm`, `Terminal`, `Ghostty`). External terminals receive the shortcut command automatically                                                                                     |
+| `github`       | no       | `true`                | GitHub integration toggle. Set `false` to disable                                                                                                                                                                                                                                                                                    |
+| `branchFormat` | no       | `${ticketId}-${slug}` | Branch naming. Supports `${ticketId}`, `${slug}`                                                                                                                                                                                                                                                                                     |
+| `baseBranch`   | no       | `main`                | Base branch name (`origin/` prefix is added automatically)                                                                                                                                                                                                                                                                           |
+| `maxTrees`     | no       | `10`                  | Max concurrent worktrees                                                                                                                                                                                                                                                                                                             |
+| `ai`           | no       | disabled              | AI-generated PR descriptions and commit messages. Set `provider` (`anthropic`, `openai`, `gemini`), `model`, and `apiKey`. Best placed in `local.json`                                                                                                                                                                               |
+| `logging`      | no       | `true`                | File-based logging to `~/.forest/forest.log`. Rotates at 5 MB                                                                                                                                                                                                                                                                        |
+| `browser`      | no       | `["integrated"]`      | Browser app list. First item is the default; right-click a shortcut to pick another. Values: `integrated` (VS Code integrated browser), `external` (system default), or an app name (e.g. `"Firefox"`)                                                                                                                               |
+| `terminal`     | no       | `["integrated"]`      | Terminal app list. First item is the default; right-click to pick another. Values: `integrated` (VS Code terminal), or an external app (`iTerm`, `Terminal`, `Ghostty`). External terminals receive the shortcut command automatically                                                                                               |
 
 **Shortcut types** are inferred from fields: `url` → browser, `path` → file, otherwise → terminal (explicit `type` still accepted). Shortcuts support `onNewTree: true` to auto-open when a tree is first created (e.g. for dependency installation). Terminals also accept `command` and `env`. Browser shortcuts accept a per-shortcut `browser` override (same values as the top-level `browser` setting). Shortcut values are treated literally: Forest does not expand `${...}` placeholders inside shortcut commands, URLs, env vars, or file paths. Both `browser` and `terminal` accept a single string for backward compatibility.
 
@@ -181,23 +181,23 @@ Switch between trees from the sidebar. All processes keep running in background 
 
 ## Commands
 
-| Command                           | Description                             |
-| --------------------------------- | --------------------------------------- |
-| `Forest: New Tree`                | Create tree (unified wizard)            |
-| `Forest: Switch Tree`             | Open another tree's window              |
-| `Forest: Ship`                    | Push + create PR (offers automerge if repo supports it) |
-| `Forest: Delete Tree`             | Interactive deletion with branch/ticket/PR options |
-| `Forest: Update`                  | Merge from main + re-copy config files  |
-| `Forest: Rebase`                  | Rebase onto main                        |
-| `Forest: Pull`                    | Pull latest changes                     |
-| `Forest: Push`                    | Push to remote                          |
-| `Forest: List`                    | List all trees                          |
-| `Forest: Open Main`               | Open main repo window                   |
-| `Forest: View Pull Request`       | Open PR in browser                      |
-| `Forest: View Linear Ticket`      | Open Linear ticket in browser           |
-| `Forest: Reveal in Finder`        | Open worktree directory in Finder       |
-| `Forest: Copy Branch Name`        | Copy current tree's branch to clipboard |
-| `Forest: Copy Setup Prompt`       | Copy AI setup prompt to clipboard       |
+| Command                      | Description                                             |
+| ---------------------------- | ------------------------------------------------------- |
+| `Forest: New Tree`           | Create tree (unified wizard)                            |
+| `Forest: Switch Tree`        | Open another tree's window                              |
+| `Forest: Ship`               | Push + create PR (offers automerge if repo supports it) |
+| `Forest: Delete Tree`        | Interactive deletion with branch/ticket/PR options      |
+| `Forest: Update`             | Merge from main + re-copy config files                  |
+| `Forest: Rebase`             | Rebase onto main                                        |
+| `Forest: Pull`               | Pull latest changes                                     |
+| `Forest: Push`               | Push to remote                                          |
+| `Forest: List`               | List all trees                                          |
+| `Forest: Open Main`          | Open main repo window                                   |
+| `Forest: View Pull Request`  | Open PR in browser                                      |
+| `Forest: View Linear Ticket` | Open Linear ticket in browser                           |
+| `Forest: Reveal in Finder`   | Open worktree directory in Finder                       |
+| `Forest: Copy Branch Name`   | Copy current tree's branch to clipboard                 |
+| `Forest: Copy Setup Prompt`  | Copy AI setup prompt to clipboard                       |
 
 ## Recommended VS Code Settings
 
@@ -217,6 +217,19 @@ To open terminals as editor tabs (instead of the bottom panel), add this keybind
 {
   "key": "cmd+t",
   "command": "workbench.action.createTerminalEditor"
+}
+```
+
+To use Shift+Enter for new lines inside terminal, add this keybinding:
+
+```json
+{
+  "key": "shift+enter",
+  "command": "workbench.action.terminal.sendSequence",
+  "args": {
+    "text": "\u001b[13;2u"
+  },
+  "when": "terminalFocus"
 }
 ```
 
