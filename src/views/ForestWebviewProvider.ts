@@ -265,11 +265,11 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
     });
 
     const groups: WebviewData['groups'] = [];
-    if (cleaning.length) groups.push({ label: 'Deleting', trees: cleaning });
     if (inProgress.length) groups.push({ label: 'In progress', trees: inProgress });
     if (inReview.length) groups.push({ label: 'In review', trees: inReview });
     if (done.length) groups.push({ label: 'Done', trees: done });
     if (closed.length) groups.push({ label: 'Closed', trees: closed });
+    if (cleaning.length) groups.push({ label: 'Deleting', trees: cleaning });
 
     return {
       repoName: path.basename(repoPath),

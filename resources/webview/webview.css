@@ -220,17 +220,10 @@ button {
 }
 
 .btn:disabled,
-.btn-create:disabled {
+.btn-create:disabled,
+.btn-cancel:disabled {
   opacity: 0.5;
   cursor: default;
-}
-
-.btn.faint {
-  opacity: 0.45;
-}
-
-.btn.faint:hover:not(:disabled) {
-  opacity: 0.8;
 }
 
 .btn.danger {
@@ -267,15 +260,19 @@ button {
   margin-bottom: 6px;
 }
 
+.form-input,
+.form-select {
+  border-radius: 3px;
+  font-family: var(--vscode-font-family);
+  outline: none;
+}
+
 .form-input {
   width: 100%;
   background: var(--vscode-input-background);
   color: var(--vscode-input-foreground);
   border: 1px solid var(--vscode-input-border, transparent);
-  border-radius: 3px;
   padding: 4px 6px;
-  font-family: var(--vscode-font-family);
-  outline: none;
 }
 
 .form-input::placeholder {
@@ -286,10 +283,7 @@ button {
   background: var(--vscode-dropdown-background);
   color: var(--vscode-dropdown-foreground);
   border: 1px solid var(--vscode-dropdown-border, transparent);
-  border-radius: 3px;
   padding: 3px 4px;
-  font-family: var(--vscode-font-family);
-  outline: none;
   flex: 1;
 }
 
