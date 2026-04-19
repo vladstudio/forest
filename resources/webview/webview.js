@@ -269,7 +269,7 @@ function withOptimisticCleaning(data) {
       trees: moved.concat(groups[cleaningIdx].trees),
     };
   } else {
-    groups.unshift({ label: 'Deleting', trees: moved });
+    groups.push({ label: 'Deleting', trees: moved });
   }
 
   return { ...data, groups: groups };
