@@ -1,24 +1,20 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs';
 import * as path from 'path';
-import { loadConfig, getTreesDir } from './config';
-import { ShortcutItem, ShortcutsTreeProvider } from './views/ShortcutsTreeProvider';
+import { loadConfig } from './config';
+import { ShortcutsTreeProvider } from './views/ShortcutsTreeProvider';
 import { StateManager } from './state';
-import { ForestContext, getRepoPath } from './context';
+import { ForestContext } from './context';
+import { getRepoPath } from './utils/repo';
 import { ShortcutManager } from './managers/ShortcutManager';
 import { StatusBarManager } from './managers/StatusBarManager';
 import { ForestWebviewProvider } from './views/ForestWebviewProvider';
-import { start } from './commands/create';
-import { linkTicket } from './commands/linkTicket';
-import { switchTree } from './commands/switch';
-import { ship } from './commands/ship';
-import { cleanupMerged, deleteTree } from './commands/cleanup';
-import { update, rebase, pull, push } from './commands/update';
-import { list } from './commands/list';
-import { deleteWorkspaceFiles, focusOrOpenWindow } from './commands/shared';
 import * as gh from './cli/gh';
 import * as linear from './cli/linear';
-import { notify } from './notify';
+import { initializeState, pruneOrphans } from './bootstrap/state';
+import { startPolling } from './bootstrap/polling';
+import { registerCommands } from './bootstrap/commands';
+import { deleteWorkspaceFiles } from './commands/shared';
+import { focusOrOpenWindow } from './commands/shared';
 
 const emptyProvider: vscode.TreeDataProvider<never> = {
   getTreeItem: () => { throw new Error('no items'); },
@@ -42,7 +38,6 @@ export async function activate(context: vscode.ExtensionContext) {
   }
 
   vscode.commands.executeCommand('setContext', 'forest.active', true);
-  // When GitHub integration is disabled, keep the full UI active without requiring gh.
   const ghReady = !config.github.enabled || await gh.isAvailable();
   vscode.commands.executeCommand('setContext', 'forest.ghAvailable', ghReady);
   if (!ghReady) {
@@ -58,7 +53,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   const repoPath = getRepoPath();
 
-  // Validate Linear config statuses against actual workflow states
+  // Validate Linear config statuses
   if (config.linear.enabled && config.linear.teams?.length) {
     linear.validateStatuses(config.linear.statuses, config.linear.teams).then(problems => {
       if (!problems.length) return;
@@ -100,81 +95,12 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(configWatcher, { dispose: () => clearTimeout(configDebounce) });
 
   const stateManager = new StateManager();
-  await stateManager.initialize();
-
   const outputChannel = vscode.window.createOutputChannel('Forest');
 
-  // On startup, clear stale cleaning flags from crashed teardowns.
-  // cleaning:true + path exists  → teardown never ran; clear the flag so the user can retry.
-  // cleaning:true + path missing → handled by pruneOrphans below (orphan removal).
-  {
-    await stateManager.clearStaleTreeOperations(repoPath);
-    const s = await stateManager.load();
-    for (const tree of stateManager.getTreesForRepo(s, repoPath)) {
-      if (tree.cleaning && tree.path && fs.existsSync(tree.path)) {
-        await stateManager.updateTree(tree.repoPath, tree.branch, { cleaning: undefined });
-      }
-    }
-  }
+  // State init + orphan recovery
+  const postPruneState = await initializeState({ config, repoPath, stateManager, outputChannel } as ForestContext);
 
-  /** Prune trees whose worktree folders no longer exist on disk. Returns latest state. */
-  const pruneOrphans = async (): Promise<import('./state').ForestState> => {
-    // Clean up stale .removing directories from interrupted deletions
-    const treesDir = getTreesDir(repoPath);
-    if (fs.existsSync(treesDir)) {
-      for (const entry of fs.readdirSync(treesDir)) {
-        if (entry.includes('.removing.')) {
-          await fs.promises.rm(path.join(treesDir, entry), { recursive: true, force: true }).catch(() => { });
-        }
-      }
-    }
-    const s = await stateManager.load();
-    const trees = stateManager.getTreesForRepo(s, repoPath);
-    for (const tree of trees) {
-      if (tree.path && !fs.existsSync(tree.path)) {
-        outputChannel.appendLine(`[Forest] Pruning orphan: ${tree.branch} (${tree.path} missing)`);
-        await stateManager.removeTree(tree.repoPath, tree.branch);
-        deleteWorkspaceFiles(tree);
-      }
-    }
-    return stateManager.load();
-  };
-
-  /** Recover worktrees that exist on disk but are missing from state. */
-  const recoverOrphanWorktrees = async (state: import('./state').ForestState): Promise<import('./state').ForestState> => {
-    const treesDir = getTreesDir(repoPath);
-    if (!fs.existsSync(treesDir)) return state;
-    const knownPaths = new Set(
-      stateManager.getTreesForRepo(state, repoPath).map(t => t.path).filter(Boolean),
-    );
-    for (const entry of fs.readdirSync(treesDir)) {
-      if (entry.startsWith('.')) continue;
-      const dirPath = path.join(treesDir, entry);
-      if (!fs.statSync(dirPath).isDirectory()) continue;
-      if (knownPaths.has(dirPath)) continue;
-      // Check if it's a valid git worktree
-      const gitFile = path.join(dirPath, '.git');
-      if (!fs.existsSync(gitFile)) continue;
-      try {
-        // Read branch from git worktree HEAD
-        const gitContent = fs.readFileSync(gitFile, 'utf8').trim();
-        const gitdir = path.resolve(dirPath, gitContent.replace('gitdir: ', ''));
-        const head = fs.readFileSync(path.join(gitdir, 'HEAD'), 'utf8').trim();
-        const branch = head.startsWith('ref: refs/heads/') ? head.replace('ref: refs/heads/', '') : '';
-        if (!branch) continue;
-        outputChannel.appendLine(`[Forest] Recovered orphan worktree: ${branch} at ${dirPath}`);
-        await stateManager.addTree(repoPath, {
-          branch, repoPath, path: dirPath,
-          createdAt: new Date(fs.statSync(dirPath).birthtimeMs).toISOString(),
-        });
-      } catch { /* not a valid worktree, skip */ }
-    }
-    return stateManager.load();
-  };
-
-  const postPruneState = await recoverOrphanWorktrees(await pruneOrphans());
-
-  // Detect if current workspace is a tree (reuse state after pruning)
+  // Detect current tree
   const curPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   const currentTree = curPath ? Object.values(postPruneState.trees).find(t => t.path === curPath) : undefined;
   vscode.commands.executeCommand('setContext', 'forest.isTree', !!currentTree);
@@ -202,61 +128,16 @@ export async function activate(context: vscode.ExtensionContext) {
   };
   forestProvider.setContext(ctx);
 
-  // Warm the automerge detection cache so the ship buttons render correctly without a network wait.
+  // Warm-up automerge detection cache
   if (config.github.enabled) {
     gh.repoHasAutomerge(repoPath).then(() => forestProvider.refresh()).catch(() => {});
   }
 
-  // Register commands — wrap all handlers so unhandled errors become visible
-  const reg = (id: string, fn: (...args: any[]) => any) =>
-    context.subscriptions.push(vscode.commands.registerCommand(id, async (...args: any[]) => {
-      try { return await fn(...args); } catch (e: any) {
-        outputChannel.appendLine(`[Forest] Command ${id} failed: ${e.stack ?? e.message}`);
-        outputChannel.show(true);
-        notify.error(`Forest: ${e.message}`);
-      }
-    }));
-
-  const lookupTree = (branch?: string) =>
-    branch ? stateManager.getTree(stateManager.loadSync(), repoPath, branch) : undefined;
-  const andRefresh = <T>(fn: () => Promise<T>) => async () => { await fn(); forestProvider.refreshTrees(); };
-
-  reg('forest.create', () => ctx.forestProvider.showCreateForm());
-  reg('forest.start', (arg: { ticketId: string; title: string }) => start(ctx, arg));
-  reg('forest.switch', (branch?: string) => switchTree(ctx, branch));
-  reg('forest.ship', (branch?: string) => andRefresh(() => ship(ctx, lookupTree(branch), false))());
-  reg('forest.shipMerge', (branch?: string) => andRefresh(() => ship(ctx, lookupTree(branch), true))());
-  reg('forest.deleteTree', (branch?: string, isDone?: boolean) => deleteTree(ctx, branch, isDone ?? false));
-  reg('forest.update', () => andRefresh(() => update(ctx))());
-  reg('forest.rebase', () => andRefresh(() => rebase(ctx))());
-  reg('forest.pull', () => andRefresh(() => pull(ctx))());
-  reg('forest.push', () => andRefresh(() => push(ctx))());
-  reg('forest.list', () => list(ctx));
-  reg('forest.openMain', () => focusOrOpenWindow(vscode.Uri.file(repoPath)));
-  reg('forest.refresh', () => forestProvider.refresh());
-  reg('forest.copyBranch', () => {
-    if (ctx.currentTree) vscode.env.clipboard.writeText(ctx.currentTree.branch);
-  });
-  reg('forest.revealInFinder', () => {
-    if (ctx.currentTree?.path) vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(ctx.currentTree.path));
-  });
-  reg('forest.openPR', () => {
-    if (ctx.currentTree?.prUrl) vscode.env.openExternal(vscode.Uri.parse(ctx.currentTree.prUrl));
-  });
-  reg('forest.openTicket', async () => {
-    if (!ctx.currentTree?.ticketId) return;
-    const issue = await linear.getIssue(ctx.currentTree.ticketId);
-    if (issue?.url) vscode.env.openExternal(vscode.Uri.parse(issue.url));
-  });
-  reg('forest.linkTicket', (branch?: string) => {
-    const b = branch ?? ctx.currentTree?.branch;
-    if (b) return andRefresh(() => linkTicket(ctx, b))();
-  });
-  const unwrap = (arg: any) => arg instanceof ShortcutItem ? arg.shortcut : arg;
-  reg('forest.openShortcut', (arg: any) => shortcutManager.open(unwrap(arg)));
-  reg('forest.openShortcutWith', (arg: any) => shortcutManager.openWith(unwrap(arg)));
-  reg('forest.stopShortcut', (arg: any) => shortcutManager.stop(unwrap(arg)));
-  reg('forest.restartShortcut', (arg: any) => shortcutManager.restart(unwrap(arg)));
+  // Commands, polling, state watching
+  context.subscriptions.push(
+    ...registerCommands(ctx, outputChannel, shortcutsProvider),
+    ...startPolling(ctx, () => pruneOrphans(stateManager, repoPath, outputChannel)),
+  );
 
   // Refresh when window gains focus (cross-window coordination)
   context.subscriptions.push(
@@ -265,7 +146,7 @@ export async function activate(context: vscode.ExtensionContext) {
     }),
   );
 
-  // Adopt existing terminals so shortcut state is tracked across reloads
+  // Adopt existing terminals
   shortcutManager.adoptTerminals();
 
   // If this is a tree window, run onNewTree shortcuts
@@ -278,58 +159,6 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.executeCommand('forest.trees.focus');
   }
 
-  // Helper: setInterval with a guard flag to prevent overlapping runs
-  const guardedInterval = (fn: () => Promise<void>, ms: number) => {
-    let running = false;
-    const id = setInterval(async () => {
-      if (running) return;
-      running = true;
-      try { await fn(); } catch { /* guarded */ } finally { running = false; }
-    }, ms);
-    return { dispose: () => clearInterval(id) };
-  };
-
-  // Auto-cleanup polling: check merged PRs every 5 minutes
-  // Only notify in the tree's own window or the main (non-tree) window.
-  context.subscriptions.push(guardedInterval(async () => {
-    if (!(await gh.isAvailable())) return;
-    const s = await stateManager.load();
-    const trees = stateManager.getTreesForRepo(s, repoPath);
-    const candidates = trees.filter(tree => {
-      if (!tree.prUrl || !tree.path || tree.mergeNotified) return false;
-      return ctx.currentTree?.branch === tree.branch || !ctx.currentTree;
-    });
-    if (!candidates.length) return;
-    const mergedResults = await Promise.allSettled(
-      candidates.map(tree => gh.prIsMerged(tree.repoPath, tree.branch).then(merged => ({ tree, merged }))),
-    );
-    for (const result of mergedResults) {
-      if (result.status !== 'fulfilled' || !result.value.merged) continue;
-      const tree = result.value.tree;
-      const isOwnWindow = ctx.currentTree?.branch === tree.branch;
-      await stateManager.updateTree(tree.repoPath, tree.branch, { mergeNotified: true });
-      const name = tree.ticketId ?? tree.branch;
-      const detail = [tree.ticketId && config.linear.enabled && `move ${tree.ticketId} → ${config.linear.statuses.onCleanup}`, 'remove worktree + branch', isOwnWindow && 'close window'].filter(Boolean).join(', ');
-      const action = await vscode.window.showInformationMessage(
-        `${name} PR was merged. Cleanup will ${detail}.`,
-        'Cleanup', 'Dismiss',
-      );
-      if (action === 'Cleanup') await cleanupMerged(ctx, tree);
-    }
-  }, 5 * 60 * 1000));
-
-  // Periodic orphan check: detect worktree folders deleted externally
-  context.subscriptions.push(guardedInterval(async () => {
-    const before = stateManager.getTreesForRepo(await stateManager.load(), repoPath).length;
-    const afterState = await pruneOrphans();
-    const after = stateManager.getTreesForRepo(afterState, repoPath).length;
-    if (after < before) forestProvider.refresh();
-  }, 60_000));
-
-  // Auto-refresh tree health every 3 minutes (PR status, commits behind, age)
-  const healthId = setInterval(() => forestProvider.refreshTrees(), 3 * 60 * 1000);
-  context.subscriptions.push({ dispose: () => clearInterval(healthId) });
-
   // Watch state for changes from other windows
   let previousTrees = stateManager.getTreesForRepo(postPruneState, repoPath);
   stateManager.onDidChange(({ state: newState, isLocal }) => {
@@ -340,14 +169,11 @@ export async function activate(context: vscode.ExtensionContext) {
         statusBarManager.update(updated);
         shortcutManager.updateTree(updated);
       } else {
-        // Our tree was removed by another window — close this window
         vscode.commands.executeCommand('workbench.action.closeWindow');
         return;
       }
     }
     const currentTrees = stateManager.getTreesForRepo(newState, repoPath);
-    // Clean up workspace files for trees removed by another window.
-    // Skip for local writes — the initiating command handles its own cleanup.
     if (!isLocal) {
       const currentBranches = new Set(currentTrees.map(t => t.branch));
       for (const prev of previousTrees) {

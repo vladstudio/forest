@@ -8,7 +8,7 @@ import { notify } from '../notify';
 
 async function syncTree(ctx: ForestContext, treeArg: TreeState | undefined, mode: 'merge' | 'rebase'): Promise<void> {
   const label = mode === 'merge' ? 'Update' : 'Rebase';
-  const tree = requireTree(ctx, treeArg, label.toLowerCase());
+  const tree = await requireTree(ctx, treeArg, label.toLowerCase());
   if (!tree) return;
   const config = ctx.config;
 
@@ -43,7 +43,7 @@ async function gitAction(
   ctx: ForestContext, treeArg: TreeState | undefined,
   opts: { action: string; label: string; busyOperation: string; gitFn: (tree: TreeState) => Promise<void> },
 ): Promise<void> {
-  const tree = requireTree(ctx, treeArg, opts.action);
+  const tree = await requireTree(ctx, treeArg, opts.action);
   if (!tree) return;
 
   await withTreeOperation(

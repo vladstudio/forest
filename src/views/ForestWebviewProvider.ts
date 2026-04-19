@@ -12,7 +12,8 @@ import * as ai from '../cli/ai';
 import { formatBranch } from '../utils/slug';
 import { copyConfigFiles, createTree, ensureTreeIdle, ensureWorkspaceFile, focusOrOpenWindow, getBlockingTreeOperation, updateLinear, withTreeOperation } from '../commands/shared';
 import { executeDeletePlan, type DeletePlan } from '../commands/cleanup';
-import { shipCore } from '../commands/ship';
+import { ship } from '../commands/ship';
+import { pull, push, update, rebase } from '../commands/update';
 import { notify } from '../notify';
 import { pickIssue } from '../commands/create';
 import { linkTicket } from '../commands/linkTicket';
@@ -167,6 +168,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
 
   /** Run an async operation with inline pending state in the webview. */
   private async runPending(fn: (signal: AbortSignal) => Promise<void>): Promise<void> {
+    this.pendingAbort?.abort(); // Cancel any in-flight operation
     const ac = new AbortController();
     this.pendingAbort = ac;
     try {
@@ -174,7 +176,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
     } catch (e: any) {
       if (!ac.signal.aborted) notify.error(`Forest: ${e.message}`);
     } finally {
-      this.pendingAbort = null;
+      if (this.pendingAbort === ac) this.pendingAbort = null;
       this.postMessage({ type: 'pendingDone' });
       this.refresh();
     }
@@ -374,19 +376,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
     }
 
     if (key === '__main__') {
-      const repoPath = this.repoPath;
-      switch (command) {
-        case 'revealInFinder':
-          vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(repoPath));
-          break;
-        case 'pull':
-          await this.runPending((signal) => git.pull(repoPath, this.config.baseBranch, { signal }));
-          break;
-        case 'push':
-          await this.runPending((signal) => git.pushBranch(repoPath, this.config.baseBranch, { signal }));
-          break;
-      }
-      return;
+      return this.handleMainCommand(command);
     }
 
     if (command === 'cancelPending') {
@@ -394,30 +384,13 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
-    // Create form commands (no key needed)
     if (command === 'pickBranch') {
-      await this.runPending(async (signal) => {
-        const branches = await git.listBranches(this.repoPath, this.config.baseBranch, { signal });
-        if (!branches.length) {
-          notify.info('No available branches.');
-          this.postMessage({ type: 'branchPickResult', branch: null });
-          return;
-        }
-        const picked = await vscode.window.showQuickPick(
-          branches.map(b => ({ label: b })),
-          { placeHolder: 'Select a branch' },
-        );
-        this.postMessage({ type: 'branchPickResult', branch: picked?.label ?? null });
-      });
+      await this.handlePickBranch();
       return;
     }
 
     if (command === 'pickIssue') {
-      if (!this.ctx) return;
-      await this.runPending(async (signal) => {
-        const result = await pickIssue(this.ctx!, { signal });
-        this.postMessage({ type: 'issuePickResult', issue: result ?? null });
-      });
+      await this.handlePickIssue();
       return;
     }
 
@@ -431,190 +404,196 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
-    if (!key) return;
+    if (key && this.treeHandlers[command]) {
+      return this.handleTreeCommand(command, key);
+    }
+  }
+
+  private async handleMainCommand(command: string): Promise<void> {
+    const repoPath = this.repoPath;
+    switch (command) {
+      case 'revealInFinder':
+        vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(repoPath));
+        break;
+      case 'pull':
+        await this.runPending((signal) => git.pull(repoPath, this.config.baseBranch, { signal }));
+        break;
+      case 'push':
+        await this.runPending((signal) => git.pushBranch(repoPath, this.config.baseBranch, { signal }));
+        break;
+    }
+  }
+
+  private async handlePickBranch(): Promise<void> {
+    await this.runPending(async (signal) => {
+      const branches = await git.listBranches(this.repoPath, this.config.baseBranch, { signal });
+      if (!branches.length) {
+        notify.info('No available branches.');
+        this.postMessage({ type: 'branchPickResult', branch: null });
+        return;
+      }
+      const picked = await vscode.window.showQuickPick(
+        branches.map(b => ({ label: b })),
+        { placeHolder: 'Select a branch' },
+      );
+      this.postMessage({ type: 'branchPickResult', branch: picked?.label ?? null });
+    });
+  }
+
+  private async handlePickIssue(): Promise<void> {
+    if (!this.ctx) return;
+    await this.runPending(async (signal) => {
+      const result = await pickIssue(this.ctx!, { signal });
+      this.postMessage({ type: 'issuePickResult', issue: result ?? null });
+    });
+  }
+
+  private async handleTreeCommand(command: string, key: string): Promise<void> {
     const colonIdx = key.indexOf(':');
     const repoPath = key.slice(0, colonIdx);
     const branch = key.slice(colonIdx + 1);
     const state = await this.stateManager.load();
     const tree = this.stateManager.getTree(state, repoPath, branch);
-    const ctx = this.ctx;
 
-    /** Run a tree-level git operation with inline pending state. */
-    const runTreeAction = (busyOperation: string, fn: (signal: AbortSignal) => Promise<void>) =>
-      this.runPending(async (signal) => {
-        await withTreeOperation(
-          ctx!,
-          tree as TreeState & { path: string },
-          busyOperation,
-          () => fn(signal),
-        );
-      });
-
-    /** Send pendingDone if the command had a pending label but won't reach runPending. */
-    const bail = () => { this.postMessage({ type: 'pendingDone' }); };
-
-    switch (command) {
-      case 'pull':
-        if (!tree?.path) { bail(); return; }
-        await runTreeAction('pulling', (signal) => git.pull(tree.path!, tree.branch, { signal }));
-        break;
-
-      case 'push':
-        if (!tree?.path) { bail(); return; }
-        await runTreeAction('pushing', (signal) => git.pushBranch(tree.path!, tree.branch, { signal }));
-        break;
-
-      case 'mergeFromMain':
-        if (!tree?.path) { bail(); return; }
-        await runTreeAction('merging', async (signal) => {
-          await git.pullMerge(tree.path!, this.config.baseBranch, { signal });
-          copyConfigFiles(this.config, tree.repoPath, tree.path!);
-        });
-        break;
-
-      case 'revealInFinder':
-        if (tree?.path) vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(tree.path));
-        break;
-
-      case 'copyBranch':
-        if (tree) vscode.env.clipboard.writeText(tree.branch);
-        break;
-
-      case 'openTicket': {
-        if (!tree?.ticketId) { bail(); return; }
-        await this.runPending(async (signal) => {
-          const issue = await linear.getIssue(tree.ticketId!, { signal }).catch(() => null);
-          if (issue?.url) vscode.env.openExternal(vscode.Uri.parse(issue.url));
-        });
-        break;
-      }
-
-      case 'copyTicketDescription': {
-        if (!tree?.ticketId) { bail(); return; }
-        await this.runPending(async (signal) => {
-          try {
-            const desc = await linear.getIssueDescription(tree.ticketId!, { signal });
-            await vscode.env.clipboard.writeText(desc);
-            notify.info(desc ? 'Ticket description copied.' : 'Ticket has no description.');
-          } catch (e: any) {
-            if (signal.aborted) return;
-            notify.warn(`Could not fetch ticket description: ${e.message}`);
-          }
-        });
-        break;
-      }
-
-      case 'detachTicket':
-        if (!tree) return;
-        await this.stateManager.updateTree(repoPath, branch, { ticketId: undefined, title: undefined });
-        this.refresh();
-        break;
-
-      case 'linkTicket':
-      case 'newTicket': {
-        const mode = command === 'newTicket' ? 'create' : 'select';
-        await linkTicket(ctx!, branch, mode);
-        this.refresh();
-        break;
-      }
-
-      case 'switch':
-        if (tree?.path) focusOrOpenWindow(vscode.Uri.file(ensureWorkspaceFile(tree)));
-        break;
-
-      case 'workingDiff': {
-        if (!tree || !tree.path) { bail(); return; }
-        await this.runPending(async () => {
-          const hasChanges = await git.hasUncommittedChanges(tree.path!);
-          if (!hasChanges) { notify.info('No working changes.'); return; }
-          await vscode.commands.executeCommand('git.viewChanges', vscode.Uri.file(tree.path!));
-        });
-        break;
-      }
-
-      case 'branchDiff': {
-        if (!tree || !tree.path) { bail(); return; }
-        await this.runPending(async () => { await this.openBaseDiff(tree); });
-        break;
-      }
-
-      case 'mainDiff': {
-        if (!tree || !tree.path) { bail(); return; }
-        await this.runPending(async () => { await this.openMainDiff(tree); });
-        break;
-      }
-
-      case 'commit': {
-        if (!tree || !tree.path || !this.config.ai) { bail(); return; }
-        await this.runPending(async (signal) => {
-          const commitDiff = await git.workingDiff(tree.path!);
-          if (!commitDiff.trim()) { notify.info('No working changes to commit.'); return; }
-          const message = await ai.generateCommitMessage(this.config.ai!, commitDiff, { signal });
-          const confirmed = await vscode.window.showInputBox({
-            value: message,
-            prompt: 'Commit message — all changes will be staged',
-            ignoreFocusOut: true,
-          });
-          if (!confirmed) return;
-          await withTreeOperation(
-            ctx!,
-            tree as TreeState & { path: string },
-            'committing',
-            () => git.commitAll(tree.path!, confirmed, { signal }),
-          );
-        });
-        break;
-      }
-
-      case 'discard': {
-        if (!tree || !tree.path) { bail(); return; }
-        const pick = await vscode.window.showQuickPick(
-          [{ label: 'Discard unstaged', id: 'unstaged' }, { label: 'Discard all (including staged)', id: 'all' }],
-          { placeHolder: 'What to discard?' },
-        );
-        if (!pick) { bail(); return; }
-        await runTreeAction('discarding', (signal) =>
-          pick.id === 'unstaged' ? git.discardUnstaged(tree.path!, { signal }) : git.discardChanges(tree.path!, { signal }),
-        );
-        break;
-      }
-
-      case 'ship':
-      case 'shipMerge': {
-        if (!tree?.path || !ctx) { bail(); return; }
-        if (await git.hasUncommittedChanges(tree.path)) {
-          const choice = await vscode.window.showWarningMessage(
-            'You have uncommitted changes.', 'Ship Anyway', 'Cancel',
-          );
-          if (choice !== 'Ship Anyway') { bail(); return; }
-        }
-        const automerge = command === 'shipMerge';
-        await this.runPending(async (signal) => {
-          const prUrl = await withTreeOperation(
-            ctx,
-            tree as TreeState & { path: string },
-            'shipping',
-            () => shipCore(ctx, tree as TreeState & { path: string }, automerge, signal),
-          );
-          if (prUrl) {
-            notify.info(`Shipped! PR: ${prUrl}`);
-            vscode.env.openExternal(vscode.Uri.parse(prUrl));
-          } else if (prUrl !== undefined) {
-            notify.info('Shipped!');
-          }
-        });
-        break;
-      }
-
-      case 'delete':
-        await this.showDeleteForm(branch);
-        break;
-
-      case 'openPR':
-        if (tree?.prUrl) vscode.env.openExternal(vscode.Uri.parse(tree.prUrl));
-        break;
+    const handler = this.treeHandlers[command];
+    if (handler) {
+      await handler(tree, this.ctx);
+    }
+    // Ensure the webview hides its pending spinner even if the handler
+    // bailed without entering runPending (which sends pendingDone in its finally).
+    if (!this.pendingAbort) {
+      this.postMessage({ type: 'pendingDone' });
     }
   }
+
+  private readonly treeHandlers: Record<string, (tree: TreeState | undefined, ctx: ForestContext | undefined) => Promise<void>> = {
+    // --- Git operations (delegated to command functions) ---
+    pull: async (tree, ctx) => {
+      if (!ctx) return;
+      await pull(ctx, tree);
+    },
+    push: async (tree, ctx) => {
+      if (!ctx) return;
+      await push(ctx, tree);
+    },
+    mergeFromMain: async (tree, ctx) => {
+      if (!ctx) return;
+      await update(ctx, tree);
+    },
+    ship: async (tree, ctx) => {
+      if (!ctx) return;
+      await ship(ctx, tree, false);
+    },
+    shipMerge: async (tree, ctx) => {
+      if (!ctx) return;
+      await ship(ctx, tree, true);
+    },
+
+    // --- Inline webview-only operations ---
+    revealInFinder: async (tree) => {
+      if (tree?.path) vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(tree.path));
+    },
+    copyBranch: async (tree) => {
+      if (tree) vscode.env.clipboard.writeText(tree.branch);
+    },
+    openPR: async (tree) => {
+      if (tree?.prUrl) vscode.env.openExternal(vscode.Uri.parse(tree.prUrl));
+    },
+    switch: async (tree) => {
+      if (tree?.path) focusOrOpenWindow(vscode.Uri.file(ensureWorkspaceFile(tree)));
+    },
+    delete: async (tree) => {
+      if (!tree) return;
+      await this.showDeleteForm(tree.branch);
+    },
+
+    // --- Ticket operations ---
+    openTicket: async (tree) => {
+      if (!tree?.ticketId) return;
+      const issue = await linear.getIssue(tree.ticketId).catch(() => null);
+      if (issue?.url) vscode.env.openExternal(vscode.Uri.parse(issue.url));
+    },
+    copyTicketDescription: async (tree) => {
+      if (!tree?.ticketId) return;
+      try {
+        const desc = await linear.getIssueDescription(tree.ticketId);
+        await vscode.env.clipboard.writeText(desc);
+        notify.info(desc ? 'Ticket description copied.' : 'Ticket has no description.');
+      } catch (e: any) {
+        notify.warn(`Could not fetch ticket description: ${e.message}`);
+      }
+    },
+    detachTicket: async (tree) => {
+      if (!tree) return;
+      await this.stateManager.updateTree(tree.repoPath, tree.branch, { ticketId: undefined, title: undefined });
+      this.refresh();
+    },
+    linkTicket: async (tree, ctx) => {
+      if (!ctx || !tree) return;
+      await linkTicket(ctx, tree.branch, 'select');
+      this.refresh();
+    },
+    newTicket: async (tree, ctx) => {
+      if (!ctx || !tree) return;
+      await linkTicket(ctx, tree.branch, 'create');
+      this.refresh();
+    },
+
+    // --- Operations with runPending ---
+    workingDiff: async (tree) => {
+      if (!tree || !tree.path) return;
+      const hasChanges = await git.hasUncommittedChanges(tree.path);
+      if (!hasChanges) { notify.info('No working changes.'); return; }
+      await vscode.commands.executeCommand('git.viewChanges', vscode.Uri.file(tree.path));
+    },
+    branchDiff: async (tree) => {
+      if (!tree || !tree.path) return;
+      await this.openBaseDiff(tree);
+    },
+    mainDiff: async (tree) => {
+      if (!tree || !tree.path) return;
+      await this.openMainDiff(tree);
+    },
+    commit: async (tree, ctx) => {
+      if (!tree || !tree.path || !ctx || !this.config.ai) return;
+      const treeWithPath = tree as TreeState & { path: string };
+      const aiConfig = this.config.ai;
+      await this.runPending(async (signal) => {
+        const commitDiff = await git.workingDiff(treeWithPath.path);
+        if (!commitDiff.trim()) { notify.info('No working changes to commit.'); return; }
+        const message = await ai.generateCommitMessage(aiConfig, commitDiff, { signal });
+        const confirmed = await vscode.window.showInputBox({
+          value: message,
+          prompt: 'Commit message — all changes will be staged',
+          ignoreFocusOut: true,
+        });
+        if (!confirmed) return;
+        await withTreeOperation(
+          ctx,
+          treeWithPath,
+          'committing',
+          () => git.commitAll(treeWithPath.path, confirmed, { signal }),
+        );
+      });
+    },
+    discard: async (tree, ctx) => {
+      if (!tree || !tree.path || !ctx) return;
+      const treeWithPath = tree as TreeState & { path: string };
+      const pick = await vscode.window.showQuickPick(
+        [{ label: 'Discard unstaged', id: 'unstaged' }, { label: 'Discard all (including staged)', id: 'all' }],
+        { placeHolder: 'What to discard?' },
+      );
+      if (!pick) return;
+      await this.runPending(async (signal) => {
+        await withTreeOperation(
+          ctx,
+          treeWithPath,
+          'discarding',
+          () => pick.id === 'unstaged' ? git.discardUnstaged(treeWithPath.path, { signal }) : git.discardChanges(treeWithPath.path, { signal }),
+        );
+      });
+    },
+  };
 
   private async handleCreateSubmit(msg: Record<string, any>): Promise<void> {
     if (!this.ctx) return;

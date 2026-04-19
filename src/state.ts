@@ -89,14 +89,6 @@ export class StateManager {
     }
   }
 
-  loadSync(): ForestState {
-    try {
-      return JSON.parse(fs.readFileSync(this.statePath, 'utf8')) as ForestState;
-    } catch {
-      return { version: 1, trees: {} };
-    }
-  }
-
   private async save(state: ForestState): Promise<void> {
     const data = JSON.stringify(state, null, 2);
     this.lastWrittenContent = data;

@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { repoHash, tryUnlinkSync } from '../utils/fs';
+import { sanitizeForFilePath } from '../utils/slug';
 import { type ForestConfig, getTreesDir } from '../config';
 import type { ForestContext } from '../context';
 import { TREE_OPERATION_HEARTBEAT_MS, displayName, type TreeState, type StateManager } from '../state';
@@ -12,9 +13,9 @@ import { exec, execShell } from '../utils/exec';
 import { notify } from '../notify';
 
 /** Resolve tree from arg or current context, showing an error if not found or missing path. */
-export function requireTree(ctx: ForestContext, arg: TreeState | string | undefined, action: string): (TreeState & { path: string }) | undefined {
+export async function requireTree(ctx: ForestContext, arg: TreeState | string | undefined, action: string): Promise<(TreeState & { path: string }) | undefined> {
   const tree = typeof arg === 'string'
-    ? ctx.stateManager.getTree(ctx.stateManager.loadSync(), ctx.repoPath, arg)
+    ? ctx.stateManager.getTree(await ctx.stateManager.load(), ctx.repoPath, arg)
     : arg ?? ctx.currentTree;
   if (!tree) { notify.error(`No tree to ${action}. Run from a tree window or select from sidebar.`); return undefined; }
   if (!tree.path) { notify.error(`Cannot ${action}: tree has no worktree path.`); return undefined; }
@@ -137,18 +138,10 @@ async function postWorktreeSetup(config: ForestConfig, repoPath: string, treePat
   }
 }
 
-/** Sanitize branch name for use as filename. */
-function sanitizeBranchForPath(branch: string): string {
-  return branch
-    .replace(/\.\./g, '')
-    .replace(/\//g, '--')
-    .replace(/[<>:"|?*\x00-\x1f]/g, '-');
-}
-
 function resolveTreePath(repoPath: string, branch: string, ticketId?: string): string {
   const treesDir = getTreesDir(repoPath);
   fs.mkdirSync(treesDir, { recursive: true });
-  return path.join(treesDir, ticketId ?? sanitizeBranchForPath(branch));
+  return path.join(treesDir, ticketId ?? sanitizeForFilePath(branch));
 }
 
 function checkMaxTrees(stateManager: StateManager, state: import('../state').ForestState, repoPath: string, max: number): void {
@@ -169,8 +162,6 @@ export async function promptUncommittedChanges(repoPath: string): Promise<string
   return false;
 }
 
-const createInProgress = new Set<string>();
-
 /** Shared tree creation logic. */
 export async function createTree(opts: {
   branch: string;
@@ -183,9 +174,11 @@ export async function createTree(opts: {
   carryChanges?: string | false;
 }): Promise<TreeState> {
   const { branch, config, stateManager, repoPath, ticketId, title, existingBranch, carryChanges } = opts;
-  const createKey = `${repoPath}:${branch}`;
-  if (createInProgress.has(createKey)) throw new Error('Tree creation already in progress.');
-  createInProgress.add(createKey);
+
+  const lockResult = await stateManager.tryStartTreeOperation(repoPath, branch, 'creating');
+  if (!lockResult.started) {
+    throw new Error(`Tree is already ${lockResult.active}.`);
+  }
   try {
     // Check existing
     const state = await stateManager.load();
@@ -244,19 +237,21 @@ export async function createTree(opts: {
       if (!existingBranch) await git.deleteBranch(repoPath, branch).catch(() => {});
       throw e;
     }
-  } finally { createInProgress.delete(createKey); }
+  } finally {
+    await stateManager.clearTreeOperation(repoPath, branch, 'creating').catch(() => {});
+  }
 }
 
 
 export function workspaceFilePath(tree: Pick<TreeState, 'repoPath' | 'branch' | 'ticketId'>): string {
   // Include repo identity so identical branch/ticket names across repos do not collide.
   const repoName = path.basename(tree.repoPath);
-  const fileName = `${repoName}-${repoHash(tree.repoPath)}-${tree.ticketId ?? sanitizeBranchForPath(tree.branch)}.code-workspace`;
+  const fileName = `${repoName}-${repoHash(tree.repoPath)}-${tree.ticketId ?? sanitizeForFilePath(tree.branch)}.code-workspace`;
   return path.join(os.homedir(), '.forest', 'workspaces', fileName);
 }
 
 function legacyWorkspaceFilePath(tree: Pick<TreeState, 'branch' | 'ticketId'>): string {
-  return path.join(os.homedir(), '.forest', 'workspaces', `${tree.ticketId ?? sanitizeBranchForPath(tree.branch)}.code-workspace`);
+  return path.join(os.homedir(), '.forest', 'workspaces', `${tree.ticketId ?? sanitizeForFilePath(tree.branch)}.code-workspace`);
 }
 
 export function deleteWorkspaceFiles(tree: Pick<TreeState, 'repoPath' | 'branch' | 'ticketId'>): void {

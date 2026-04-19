@@ -7,17 +7,12 @@ import * as gh from '../cli/gh';
 import { deleteWorkspaceFiles, ensureTreeIdle, requireTree, runStep, updateLinear } from './shared';
 import { notify } from '../notify';
 
-const teardownInProgress = new Set<string>();
-
 interface TeardownOpts {
   deleteLocal?: boolean;
   deleteRemote?: boolean;
 }
 
 async function teardownTree(ctx: ForestContext, tree: TreeState, opts: TeardownOpts = {}): Promise<boolean> {
-  const key = `${tree.repoPath}:${tree.branch}`;
-  if (teardownInProgress.has(key)) return false;
-  teardownInProgress.add(key);
   let removedFromState = false;
   const clearCleaning = () => ctx.stateManager.updateTree(tree.repoPath, tree.branch, { cleaning: undefined });
   try {
@@ -48,8 +43,6 @@ async function teardownTree(ctx: ForestContext, tree: TreeState, opts: TeardownO
       await clearCleaning().catch(() => {});
     }
     throw e;
-  } finally {
-    teardownInProgress.delete(key);
   }
 }
 
@@ -195,7 +188,7 @@ export async function executeDeletePlan(
 }
 
 export async function deleteTree(ctx: ForestContext, branchArg?: string, isDone?: boolean): Promise<void> {
-  const tree = requireTree(ctx, branchArg, 'delete');
+  const tree = await requireTree(ctx, branchArg, 'delete');
   if (!tree) return;
   if (!await ensureTreeIdle(ctx, tree)) return;
 

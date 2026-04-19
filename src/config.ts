@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { repoHash } from './utils/fs';
-import { resolveMainRepo } from './context';
+import { resolveMainRepo } from './utils/repo';
 import { notify } from './notify';
 
 interface ShortcutBase { name: string; onNewTree?: boolean; }
@@ -12,12 +12,26 @@ interface BrowserShortcut extends ShortcutBase { type: 'browser'; url: string; b
 interface FileShortcut extends ShortcutBase { type: 'file'; path: string; }
 export type ShortcutConfig = TerminalShortcut | BrowserShortcut | FileShortcut;
 
+interface RawShortcut {
+  name: string;
+  type?: 'terminal' | 'browser' | 'file';
+  command?: string;
+  url?: string;
+  path?: string;
+  onNewTree?: boolean;
+  env?: Record<string, string>;
+  browser?: string;
+}
+
 /** Infer shortcut type from fields when not explicitly set. */
-function normalizeShortcut(raw: any): any {
-  if (raw.type) return raw;
-  if (raw.url) return { ...raw, type: 'browser' };
-  if (raw.path) return { ...raw, type: 'file' };
-  return { ...raw, type: 'terminal' };
+function normalizeShortcut(raw: RawShortcut): ShortcutConfig {
+  const { type, ...rest } = raw;
+  if (type === 'browser' && raw.url) return { type: 'browser', url: raw.url, ...rest } as BrowserShortcut;
+  if (type === 'file' && raw.path) return { type: 'file', path: raw.path, ...rest } as FileShortcut;
+  if (type === 'terminal') return { type: 'terminal', ...rest } as TerminalShortcut;
+  if (raw.url) return { type: 'browser', url: raw.url, ...rest } as BrowserShortcut;
+  if (raw.path) return { type: 'file', path: raw.path, ...rest } as FileShortcut;
+  return { type: 'terminal', ...rest } as TerminalShortcut;
 }
 
 export interface AIConfig {
@@ -102,6 +116,16 @@ export async function loadConfig(): Promise<ForestConfig | null> {
     merged.github = { enabled: merged.github };
   }
 
+  // Validate required fields
+  if (!merged.baseBranch || typeof merged.baseBranch !== 'string') {
+    notify.error('Forest config: "baseBranch" is required and must be a string.');
+    return null;
+  }
+  if (!Array.isArray(merged.shortcuts)) {
+    notify.error('Forest config: "shortcuts" must be an array.');
+    return null;
+  }
+
   return merged as ForestConfig;
 }
 
@@ -118,23 +142,26 @@ export function getTreesDir(repoPath: string): string {
   return dir;
 }
 
-function mergeConfig(base: any, local: any): any {
-  const result = { ...base };
+function mergeConfig<T extends Record<string, any>>(base: T, local: Partial<T>): T {
+  const result = { ...base } as Record<string, any>;
   for (const key of Object.keys(local)) {
-    if (key === 'shortcuts' && Array.isArray(local[key])) {
+    const localVal = local[key as keyof T];
+    if (localVal === null) continue;
+
+    if (key === 'shortcuts' && Array.isArray(localVal)) {
       // Merge named arrays by name
-      const baseArr = [...(base[key] || [])];
-      for (const item of local[key]) {
+      const baseArr = [...(result[key] || [])];
+      for (const item of localVal as any[]) {
         const idx = baseArr.findIndex((b: any) => b.name === item.name);
         if (idx >= 0) baseArr[idx] = { ...baseArr[idx], ...item };
         else baseArr.push(item);
       }
       result[key] = baseArr;
-    } else if (typeof local[key] === 'object' && !Array.isArray(local[key]) && local[key] !== null) {
-      result[key] = mergeConfig(base[key] || {}, local[key]);
-    } else if (local[key] !== null) {
-      result[key] = local[key];
+    } else if (typeof localVal === 'object' && !Array.isArray(localVal)) {
+      result[key] = mergeConfig(result[key] || {}, localVal);
+    } else {
+      result[key] = localVal;
     }
   }
-  return result;
+  return result as T;
 }

@@ -12,6 +12,14 @@ export function sanitizeBranch(value: string): string {
     .replace(/^[-./]+|[-./]+$/g, '');
 }
 
+/** Sanitize a string for use as a directory/file name (replaces /, .., special chars). */
+export function sanitizeForFilePath(value: string): string {
+  return value
+    .replace(/\.\./g, '')
+    .replace(/\//g, '--')
+    .replace(/[<>:"|?*\x00-\x1f]/g, '-');
+}
+
 /** Expand branchFormat template with ticketId and title. */
 export function formatBranch(branchFormat: string, ticketId: string, title: string): string {
   return branchFormat

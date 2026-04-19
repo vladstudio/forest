@@ -72,7 +72,7 @@ export async function shipCore(
 }
 
 export async function ship(ctx: ForestContext, treeArg: TreeState | undefined, automerge: boolean): Promise<void> {
-  const tree = requireTree(ctx, treeArg, 'ship');
+  const tree = await requireTree(ctx, treeArg, 'ship');
   if (!tree) return;
 
   if (await git.hasUncommittedChanges(tree.path)) {

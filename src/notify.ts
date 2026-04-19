@@ -1,5 +1,8 @@
 import * as vscode from 'vscode';
 
+// VS Code has no native auto-dismiss API for info/warn messages.
+// We abuse withProgress to get a timed notification. The spinner is an
+// acceptable trade-off for auto-dismiss behavior.
 const auto = (title: string, ms: number) =>
   void vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title },

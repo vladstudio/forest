@@ -12,17 +12,13 @@ export async function exec(
   args: string[],
   opts?: { cwd?: string; timeout?: number; signal?: AbortSignal },
 ): Promise<ExecResult> {
-  try {
-    const r = await execFileAsync(command, args, {
-      cwd: opts?.cwd,
-      timeout: opts?.timeout ?? 30_000,
-      maxBuffer: 10 * 1024 * 1024,
-      signal: opts?.signal,
-    });
-    return { stdout: r.stdout.trim(), stderr: r.stderr.trim() };
-  } catch (e: any) {
-    throw e;
-  }
+  const r = await execFileAsync(command, args, {
+    cwd: opts?.cwd,
+    timeout: opts?.timeout ?? 30_000,
+    maxBuffer: 10 * 1024 * 1024,
+    signal: opts?.signal,
+  });
+  return { stdout: r.stdout.trim(), stderr: r.stderr.trim() };
 }
 
 /** Shell exec for user-defined commands that need shell interpretation. */
@@ -30,17 +26,13 @@ export async function execShell(
   command: string,
   opts?: { cwd?: string; timeout?: number; signal?: AbortSignal },
 ): Promise<ExecResult> {
-  try {
-    const r = await execAsync(command, {
-      cwd: opts?.cwd,
-      timeout: opts?.timeout ?? 30_000,
-      maxBuffer: 10 * 1024 * 1024,
-      signal: opts?.signal,
-    });
-    return { stdout: r.stdout.trim(), stderr: r.stderr.trim() };
-  } catch (e: any) {
-    throw e;
-  }
+  const r = await execAsync(command, {
+    cwd: opts?.cwd,
+    timeout: opts?.timeout ?? 30_000,
+    maxBuffer: 10 * 1024 * 1024,
+    signal: opts?.signal,
+  });
+  return { stdout: r.stdout.trim(), stderr: r.stderr.trim() };
 }
 
 export async function commandExists(name: string): Promise<boolean> {
