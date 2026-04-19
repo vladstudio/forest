@@ -63,12 +63,13 @@ body {
 
 .card {
   margin: 2px 8px;
-  padding: 8px 10px;
+  padding: 5px 10px;
   background: transparent;
 }
 
 .card.current {
   background: var(--vscode-editor-background);
+  padding: 8px 10px;
 }
 
 .card.card-main {
@@ -76,7 +77,14 @@ body {
   align-items: center;
   gap: 6px;
   margin: 4px 8px 6px;
-  padding: 5px 10px;
+}
+
+.card:not(.current) {
+  cursor: pointer;
+}
+
+.card:not(.current):hover {
+  background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.08));
 }
 
 .card-label {

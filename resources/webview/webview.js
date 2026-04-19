@@ -289,7 +289,7 @@ function mainCard(d) {
       btn('pull', pullLabel, allDis, pCmd, { attrs: 'title="Pull"' }) +
       '</div></div>';
   }
-  return '<div class="' + cls + '" data-key="__main__"><a class="card-label" data-cmd="switchToMain">' + label + '</a></div>';
+  return '<div class="' + cls + '" data-key="__main__" data-cmd="switchToMain"><span class="card-label">' + label + '</span></div>';
 }
 
 function pendingBtn(label) {
@@ -309,7 +309,7 @@ function treeCard(t, d) {
   if (!t.isCurrent) {
     const isDoneOrClosed = t.prState === 'MERGED' || t.prState === 'CLOSED';
     const deleteBtn = isDoneOrClosed ? '<button class="btn danger" data-cmd="delete" data-done="1" title="Delete tree">' + ic('trash') + '</button>' : '';
-    return '<div class="card" data-key="' + h(t.key) + '"><div class="row"><a class="branch" data-cmd="switch" title="' + h(t.branch) + '">' + branchLabel + '</a>' + deleteBtn + '</div></div>';
+    return '<div class="card" data-key="' + h(t.key) + '" data-cmd="switch"><div class="row"><span class="branch">' + branchLabel + '</span>' + deleteBtn + '</div></div>';
   }
   const isPending = pendingAction && pendingAction.key === t.key;
   const pendingCmd = isPending ? pendingAction.cmd : null;
