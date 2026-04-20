@@ -225,7 +225,7 @@ button {
 .btn:disabled,
 .btn-create:disabled,
 .btn-cancel:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: default;
 }
 
@@ -404,5 +404,19 @@ button {
 .radio-body {
   min-width: 0;
   flex: 1;
+}
+
+.spinner {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid var(--vscode-descriptionForeground);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 

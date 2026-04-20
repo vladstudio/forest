@@ -281,7 +281,7 @@ function mainCard(d) {
   if (d.mainIsCurrent) {
     const isPending = pendingAction && pendingAction.key === '__main__';
     const allDis = isPending;
-    const statusBar = isPending ? '<div class="row status-bar"><span class="dim">' + h(pendingLabels[pendingAction.cmd] || 'loading…') + '</span>' + btn('cancelPending', ic('x'), false, { attrs: 'title="Cancel"' }) + '</div>' : '';
+    const statusBar = isPending ? '<div class="row status-bar"><span class="spinner"></span><span class="dim">' + h(pendingLabels[pendingAction.cmd] || 'loading…') + '</span>' + btn('cancelPending', ic('x'), false, { attrs: 'title="Cancel"' }) + '</div>' : '';
     return '<div class="' + cls + '" data-key="__main__"><span class="card-label">' + label + '</span>' +
       '<div class="row">' +
       '<button class="btn" data-cmd="revealInFinder" title="Reveal in Finder"' + dis(allDis) + '>' + ic('folderOpen') + '</button>' +
@@ -323,7 +323,7 @@ function treeCard(t, d) {
       : btn('ship', 'Ship - Push and Create PR', allDis, { cls: 'fill primary' }))
     + btn('delete', ic('trash'), allDis, { cls: 'danger', attrs: 'data-done="0" title="Delete tree"' });
   const busyLabel = isPending ? (pendingLabels[pendingAction.cmd] || 'loading…') : (t.busyOperation ? t.busyOperation + '…' : '');
-  const statusBar = busyLabel ? '<div class="row status-bar"><span class="dim">' + h(busyLabel) + '</span>' + (isPending ? btn('cancelPending', ic('x'), false, { attrs: 'title="Cancel"' }) : '') + '</div>' : '';
+  const statusBar = busyLabel ? '<div class="row status-bar"><span class="spinner"></span><span class="dim">' + h(busyLabel) + '</span>' + (isPending ? btn('cancelPending', ic('x'), false, { attrs: 'title="Cancel"' }) : '') + '</div>' : '';
   return '<div class="card current" data-key="' + h(t.key) + '">' +
     ticket +
     '<div class="field-label">Branch</div><div class="row"><span class="branch" data-cmd="revealInFinder" title="Reveal in Finder: ' + h(t.branch) + '">' + bl + '</span>' + btn('copyBranch', ic('copy'), allDis, { attrs: 'title="Copy branch name"' }) + '</div>' +
@@ -394,9 +394,10 @@ function renderDeleteForm() {
     out += '</div>';
   }
 
+  var canDelete = !dis && !pendingAction;
   out += '<div class="form-actions">';
-  out += '<button class="btn-create" id="deleteSubmitBtn" data-cmd="deleteForm:submit"' + (dis ? ' disabled' : '') + '>' + (dis ? 'Deleting…' : 'Delete tree') + '</button>';
-  out += '<button class="btn-cancel" data-form="cancel"' + (dis ? ' disabled' : '') + '>Cancel</button>';
+  out += '<button class="btn-create" id="deleteSubmitBtn" data-cmd="deleteForm:submit"' + (canDelete ? '' : ' disabled') + '>' + (dis ? '<span class="spinner"></span> Deleting…' : 'Delete tree') + '</button>';
+  out += '<button class="btn-cancel" data-form="cancel"' + (canDelete ? '' : ' disabled') + '>Cancel</button>';
   out += '</div>';
 
   out += '</div>';
@@ -498,12 +499,12 @@ function renderCreateForm() {
   }
 
   // Action buttons
-  var canSubmit = !dis && (
+  var canSubmit = !dis && !pendingAction && (
     (fs.branchMode === 'new' ? !!sanitizeBranch(fs.branchName) : !!fs.existingBranch) &&
     (fs.ticketMode !== 'new' || !!fs.newTicketTitle.trim())
   );
   out += '<div class="form-actions">';
-  out += '<button class="btn-create" id="submitBtn" data-cmd="createForm:submit"' + (canSubmit ? '' : ' disabled') + '>' + (dis ? 'Creating…' : 'Create tree') + '</button>';
+  out += '<button class="btn-create" id="submitBtn" data-cmd="createForm:submit"' + (canSubmit ? '' : ' disabled') + '>' + (dis ? '<span class="spinner"></span> Creating…' : 'Create tree') + '</button>';
   out += '<button class="btn-cancel" data-form="cancel"' + (dis ? ' disabled' : '') + '>Cancel</button>';
   out += '</div>';
 
@@ -582,7 +583,7 @@ function updateFormHints() {
   }
   var submitBtn = document.getElementById('submitBtn');
   if (submitBtn) {
-    var canSubmit = !formState.submitting && (
+    var canSubmit = !formState.submitting && !pendingAction && (
       (formState.branchMode === 'new' ? !!sanitizeBranch(formState.branchName) : !!formState.existingBranch) &&
       (formState.ticketMode !== 'new' || !!formState.newTicketTitle.trim())
     );
