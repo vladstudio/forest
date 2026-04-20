@@ -142,7 +142,10 @@ a[data-cmd]:hover {
 
 @media (max-width: 300px) {
   .label {
-    display: none;
+    font-size: 0;
+  }
+  .label::first-letter {
+    font-size: 12px;
   }
 }
 
@@ -403,12 +406,3 @@ button {
   flex: 1;
 }
 
-@keyframes pulse {
-  0%, 100% { opacity: 0.7; }
-  50% { opacity: 0.4; }
-}
-
-.btn-pending {
-  animation: pulse 1.5s ease-in-out infinite;
-  border-style: dashed;
-}

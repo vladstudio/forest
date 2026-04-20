@@ -202,7 +202,7 @@ const ic = name => '<span class="icon">' + icons[name] + '</span>';
 
 function renderLoading(message) {
   document.getElementById('root').innerHTML =
-    '<div class="form"><div class="form-section"><div class="form-title"><span class="btn-pending" style="border:none;padding:0">' + h(message) + '</span></div></div>' +
+    '<div class="form"><div class="form-section"><div class="form-title"><span class="dim">' + h(message) + '</span></div></div>' +
     '<div class="form-actions"><button class="btn-cancel" data-form="cancel">Cancel</button></div></div>';
 }
 
@@ -279,98 +279,68 @@ function mainCard(d) {
   const cls = 'card card-main' + (d.mainIsCurrent ? ' current' : '');
   const label = h(d.baseBranch) + ' · ' + h(d.repoName);
   if (d.mainIsCurrent) {
-    var isPending = pendingAction && pendingAction.key === '__main__';
-    var pCmd = isPending ? pendingAction.cmd : null;
-    var allDis = isPending;
-    var pullLabel = d.mainBehind > 0 ? ic('arrowDown') + d.mainBehind : ic('arrowDown');
+    const isPending = pendingAction && pendingAction.key === '__main__';
+    const allDis = isPending;
+    const statusBar = isPending ? '<div class="row status-bar"><span class="dim">' + h(pendingLabels[pendingAction.cmd] || 'loading…') + '</span>' + btn('cancelPending', ic('x'), false, { attrs: 'title="Cancel"' }) + '</div>' : '';
     return '<div class="' + cls + '" data-key="__main__"><span class="card-label">' + label + '</span>' +
       '<div class="row">' +
       '<button class="btn" data-cmd="revealInFinder" title="Reveal in Finder"' + dis(allDis) + '>' + ic('folderOpen') + '</button>' +
-      btn('pull', pullLabel, allDis, pCmd, { attrs: 'title="Pull"' }) +
-      '</div></div>';
+      btn('pull', ic('arrowDown') + (d.mainBehind > 0 ? d.mainBehind : ''), allDis, { attrs: 'title="Pull"' }) +
+      '</div>' + statusBar + '</div>';
   }
   return '<div class="' + cls + '" data-key="__main__" data-cmd="switchToMain"><span class="card-label">' + label + '</span></div>';
 }
 
-function pendingBtn(label) {
-  return '<button class="btn btn-pending" disabled>' + label + '</button><button class="btn" data-cmd="cancelPending" title="Cancel">' + ic('x') + '</button>';
-}
-
-function btn(cmd, label, allDisabled, pendingCmd, opts) {
-  if (pendingCmd === cmd) return pendingBtn(pendingLabels[cmd] || 'loading…');
+function btn(cmd, label, allDisabled, opts) {
   var cls = 'btn' + (opts && opts.cls ? ' ' + opts.cls : '');
   var extra = opts && opts.attrs ? ' ' + opts.attrs : '';
   return '<button class="' + cls + '" data-cmd="' + h(cmd) + '"' + extra + dis(allDisabled) + '>' + label + '</button>';
 }
 
 function treeCard(t, d) {
-  const branchLabel = h(t.branch);
-  if (t.cleaning) return '<div class="card" data-key="' + h(t.key) + '"><div class="row"><span class="branch">' + branchLabel + '</span><span class="dim">cleaning up…</span></div></div>';
+  const bl = h(t.branch);
+  if (t.cleaning) return '<div class="card" data-key="' + h(t.key) + '"><div class="row"><span class="branch">' + bl + '</span><span class="dim">cleaning up…</span></div></div>';
   if (!t.isCurrent) {
-    const isDoneOrClosed = t.prState === 'MERGED' || t.prState === 'CLOSED';
-    const deleteBtn = isDoneOrClosed ? '<button class="btn danger" data-cmd="delete" data-done="1" title="Delete tree">' + ic('trash') + '</button>' : '';
-    return '<div class="card" data-key="' + h(t.key) + '" data-cmd="switch"><div class="row"><span class="branch">' + branchLabel + '</span>' + deleteBtn + '</div></div>';
+    const done = t.prState === 'MERGED' || t.prState === 'CLOSED';
+    return '<div class="card" data-key="' + h(t.key) + '" data-cmd="switch"><div class="row"><span class="branch">' + bl + '</span>' + (done ? '<button class="btn danger" data-cmd="delete" data-done="1" title="Delete tree">' + ic('trash') + '</button>' : '') + '</div></div>';
   }
   const isPending = pendingAction && pendingAction.key === t.key;
-  const pendingCmd = isPending ? pendingAction.cmd : null;
-  const allDisabled = !!t.busyOperation || isPending;
-  const busy = !isPending && t.busyOperation ? '<span class="dim">' + h(t.busyOperation) + '…</span>' : '';
-  const behind = t.behind > 0 ? btn('mergeFromMain', ic('gitMerge') + '<span class="label">main</span> ' + t.behind, allDisabled, pendingCmd, { attrs: 'title="Merge ' + t.behind + ' commits from main"' }) : '';
-  const pullLabel = ic('arrowDown') + '<span class="label">Pull</span>' + (t.remoteBehind > 0 ? ' ' + t.remoteBehind : '');
-  const pushLabel = ic('arrowUp') + '<span class="label">Push</span>' + (t.ahead > 0 ? ' ' + t.ahead : '');
+  const allDis = !!t.busyOperation || isPending;
+  const lc = t.localChanges;
+  const stats = lc ? [lc.added && '<span class="add">+' + lc.added + '</span>', lc.removed && '<span class="del">-' + lc.removed + '</span>', lc.modified && '<span class="mod">~' + lc.modified + '</span>'].filter(Boolean).join(' ') : '';
+  const isDone = t.prState === 'MERGED' || t.prState === 'CLOSED';
   let ticket = '';
   if (d.linearEnabled) {
-    if (t.ticketId) {
-      const lbl = t.ticketId + (t.ticketTitle ? ': ' + t.ticketTitle : '');
-      const ticketPending = pendingCmd === 'openTicket' || pendingCmd === 'copyTicketDescription';
-      const ticketLink = ticketPending
-        ? '<span class="ticket dim">' + (pendingLabels[pendingCmd] || 'loading…') + '</span>'
-        : '<a class="ticket" data-cmd="openTicket" title="' + h(lbl) + '"' + (allDisabled ? ' style="pointer-events:none;opacity:0.5"' : '') + '>' + h(lbl) + '</a>';
-      const ticketActions = ticketPending
-        ? '<button class="btn" data-cmd="cancelPending" title="Cancel">' + ic('x') + '</button>'
-        : '<button class="btn" data-cmd="copyTicketDescription"' + dis(allDisabled) + ' title="Copy description">' + ic('copy') + '</button>'
-          + '<button class="btn" data-cmd="detachTicket"' + dis(allDisabled) + '>detach</button>';
-      ticket = '<div class="field-label">Linear</div><div class="row">' + ticketLink + ticketActions + '</div>';
-    } else {
-      ticket = '<div class="field-label">Linear</div><div class="row equal-fill">'
-        + '<button class="btn" data-cmd="linkTicket"' + dis(allDisabled) + '>Link issue</button>'
-        + '<button class="btn" data-cmd="newTicket"' + dis(allDisabled) + '>New issue</button>'
-        + '</div>';
-    }
+    const lbl = t.ticketId ? h(t.ticketId + (t.ticketTitle ? ': ' + t.ticketTitle : '')) : '';
+    ticket = t.ticketId
+      ? '<div class="field-label">Linear</div><div class="row"><a class="ticket" data-cmd="openTicket" title="' + lbl + '"' + (allDis ? ' style="pointer-events:none;opacity:0.5"' : '') + '>' + lbl + '</a>' + btn('copyTicketDescription', ic('copy'), allDis, { attrs: 'title="Copy description"' }) + btn('detachTicket', 'detach', allDis) + '</div>'
+      : '<div class="field-label">Linear</div><div class="row equal-fill">' + btn('linkTicket', 'Link issue', allDis) + btn('newTicket', 'New issue', allDis) + '</div>';
   }
-  let changes = '';
-  if (t.localChanges) {
-    const lc = t.localChanges;
-    const stats = [lc.added ? '<span class="add">+' + lc.added + '</span>' : '', lc.removed ? '<span class="del">-' + lc.removed + '</span>' : '', lc.modified ? '<span class="mod">~' + lc.modified + '</span>' : ''].filter(Boolean).join(' ');
-    changes = '<div class="row equal-fill">' +
-      btn('workingDiff', '<span class="stats">' + stats + '</span>' + ic('diff'), allDisabled, pendingCmd, { attrs: 'title="Diff working changes"' }) +
-      btn('branchDiff', ic('diff') + '<span class="label">branch</span>', allDisabled, pendingCmd, { attrs: 'title="Diff branch changes"' }) +
-      btn('mainDiff', ic('diff') + '<span class="label">main</span>', allDisabled, pendingCmd, { attrs: 'title="Diff main against branch"' }) +
-      btn('discard', ic('x'), allDisabled, pendingCmd, { cls: 'danger', attrs: 'title="Discard changes"' }) + '</div>';
-  }
-  const isDone = t.prState === 'MERGED' || t.prState === 'CLOSED';
-  const doneFlag = isDone ? '1' : '0';
   const lastRow = (isDone || t.prNumber)
-    ? '<button class="btn fill" data-cmd="openPR"' + dis(allDisabled) + '>PR#' + (t.prNumber || '?') + '</button>' + btn('delete', ic('trash'), allDisabled, null, { cls: 'danger', attrs: 'data-done="' + doneFlag + '" title="Delete tree"' })
+    ? '<button class="btn fill" data-cmd="openPR"' + dis(allDis) + '>PR#' + (t.prNumber || '?') + '</button>' + btn('delete', ic('trash'), allDis, { cls: 'danger', attrs: 'data-done="' + (isDone ? '1' : '0') + '" title="Delete tree"' })
     : (d.hasAutomerge
-      ? btn('ship', 'Push + PR', allDisabled, pendingCmd, { cls: 'fill primary', attrs: 'title="Push and create PR"' })
-      + btn('shipMerge', '+ Automerge', allDisabled, pendingCmd, { cls: 'fill primary', attrs: 'title="Push, create PR, enable auto-merge"' })
-      : btn('ship', 'Ship - Push and Create PR', allDisabled, pendingCmd, { cls: 'fill primary' }))
-    + btn('delete', ic('trash'), allDisabled, null, { cls: 'danger', attrs: 'data-done="0" title="Delete tree"' });
+      ? btn('ship', 'Push + PR', allDis, { cls: 'fill primary', attrs: 'title="Push and create PR"' }) + btn('shipMerge', '+ Automerge', allDis, { cls: 'fill primary', attrs: 'title="Push, create PR, enable auto-merge"' })
+      : btn('ship', 'Ship - Push and Create PR', allDis, { cls: 'fill primary' }))
+    + btn('delete', ic('trash'), allDis, { cls: 'danger', attrs: 'data-done="0" title="Delete tree"' });
+  const busyLabel = isPending ? (pendingLabels[pendingAction.cmd] || 'loading…') : (t.busyOperation ? t.busyOperation + '…' : '');
+  const statusBar = busyLabel ? '<div class="row status-bar"><span class="dim">' + h(busyLabel) + '</span>' + (isPending ? btn('cancelPending', ic('x'), false, { attrs: 'title="Cancel"' }) : '') + '</div>' : '';
   return '<div class="card current" data-key="' + h(t.key) + '">' +
     ticket +
-    '<div class="field-label">Branch</div><div class="row"><span class="branch" data-cmd="revealInFinder" title="Reveal in Finder: ' + h(t.branch) + '">' + branchLabel + '</span>' + busy +
-    '<button class="btn" data-cmd="copyBranch" title="Copy branch name"' + dis(allDisabled) + '>' + ic('copy') + '</button>' +
+    '<div class="field-label">Branch</div><div class="row"><span class="branch" data-cmd="revealInFinder" title="Reveal in Finder: ' + h(t.branch) + '">' + bl + '</span>' + btn('copyBranch', ic('copy'), allDis, { attrs: 'title="Copy branch name"' }) + '</div>' +
+    '<div class="row equal-fill">' +
+    btn('pull', ic('arrowDown') + '<span class="label">Pull</span>' + (t.remoteBehind > 0 ? ' ' + t.remoteBehind : ''), allDis, { attrs: 'title="Pull from remote"' }) +
+    btn('mergeFromMain', ic('gitMerge') + '<span class="label">main</span>' + (t.behind > 0 ? ' ' + t.behind : ''), allDis || !t.behind, { attrs: 'title="Merge from main"' }) +
+    (d.hasAI ? btn('commit', ic('gitCommit') + '<span class="label">Commit</span>', allDis) : '') +
+    btn('push', ic('arrowUp') + '<span class="label">Push</span>' + (t.ahead > 0 ? ' ' + t.ahead : ''), allDis, { attrs: 'title="Push to remote"' }) +
     '</div>' +
     '<div class="row equal-fill">' +
-    btn('pull', pullLabel, allDisabled, pendingCmd, { attrs: 'title="Pull from remote"' }) +
-    behind +
-    (d.hasAI ? btn('commit', ic('gitCommit') + '<span class="label">Commit</span>', allDisabled, pendingCmd) : '') +
-    btn('push', pushLabel, allDisabled, pendingCmd, { attrs: 'title="Push to remote"' }) +
+    btn('workingDiff', (stats ? '<span class="stats">' + stats + '</span>' : '') + ic('diff'), allDis || !lc, { attrs: 'title="Diff working changes"' }) +
+    btn('branchDiff', ic('diff') + '<span class="label">branch</span>', allDis, { attrs: 'title="Diff branch changes"' }) +
+    btn('mainDiff', ic('diff') + '<span class="label">main</span>', allDis, { attrs: 'title="Diff main against branch"' }) +
+    btn('discard', ic('x'), allDis || !lc, { cls: 'danger', attrs: 'title="Discard changes"' }) +
     '</div>' +
-    changes +
-    '<div class="field-label">Tree</div>' +
-    '<div class="row">' + lastRow + '</div>' +
+    '<div class="field-label">Tree</div><div class="row">' + lastRow + '</div>' +
+    statusBar +
     '</div>';
 }
 
