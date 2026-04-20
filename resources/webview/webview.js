@@ -313,8 +313,8 @@ function treeCard(t, d) {
   if (d.linearEnabled) {
     const lbl = t.ticketId ? h(t.ticketId + (t.ticketTitle ? ': ' + t.ticketTitle : '')) : '';
     ticket = t.ticketId
-      ? '<div class="field-label">Linear</div><div class="row"><a class="ticket" data-cmd="openTicket" title="' + lbl + '"' + (allDis ? ' style="pointer-events:none;opacity:0.5"' : '') + '>' + lbl + '</a>' + btn('copyTicketDescription', ic('copy'), allDis, { attrs: 'title="Copy description"' }) + btn('detachTicket', 'detach', allDis) + '</div>'
-      : '<div class="field-label">Linear</div><div class="row equal-fill">' + btn('linkTicket', 'Link issue', allDis) + btn('newTicket', 'New issue', allDis) + '</div>';
+      ? '<div class="field-label">Linear</div><div class="row"><a class="ticket" data-cmd="openTicket" title="' + lbl + '"' + (allDis ? ' style="pointer-events:none;opacity:0.5"' : '') + '>' + lbl + '</a>' + btn('copyTicketDescription', ic('copy'), allDis, { attrs: 'title="Copy description"' }) + btn('detachTicket', 'Detach', allDis) + '</div>'
+      : '<div class="field-label">Linear</div><div class="row equal-fill">' + btn('linkTicket', 'Link Issue', allDis) + btn('newTicket', 'New Issue', allDis) + '</div>';
   }
   const lastRow = (isDone || t.prNumber)
     ? '<button class="btn fill" data-cmd="openPR"' + dis(allDis) + '>PR#' + (t.prNumber || '?') + '</button>' + btn('delete', ic('trash'), allDis, { cls: 'danger', attrs: 'data-done="' + (isDone ? '1' : '0') + '" title="Delete tree"' })
@@ -329,14 +329,14 @@ function treeCard(t, d) {
     '<div class="field-label">Branch</div><div class="row"><span class="branch" data-cmd="revealInFinder" title="Reveal in Finder: ' + h(t.branch) + '">' + bl + '</span>' + btn('copyBranch', ic('copy'), allDis, { attrs: 'title="Copy branch name"' }) + '</div>' +
     '<div class="row equal-fill">' +
     btn('pull', ic('arrowDown') + '<span class="label">Pull</span>' + (t.remoteBehind > 0 ? ' ' + t.remoteBehind : ''), allDis, { attrs: 'title="Pull from remote"' }) +
-    btn('mergeFromMain', ic('gitMerge') + '<span class="label">main</span>' + (t.behind > 0 ? ' ' + t.behind : ''), allDis || !t.behind, { attrs: 'title="Merge from main"' }) +
+    btn('mergeFromMain', ic('gitMerge') + '<span class="label">Main</span>' + (t.behind > 0 ? ' ' + t.behind : ''), allDis || !t.behind, { attrs: 'title="Merge from main"' }) +
     (d.hasAI ? btn('commit', ic('gitCommit') + '<span class="label">Commit</span>', allDis) : '') +
     btn('push', ic('arrowUp') + '<span class="label">Push</span>' + (t.ahead > 0 ? ' ' + t.ahead : ''), allDis, { attrs: 'title="Push to remote"' }) +
     '</div>' +
     '<div class="row equal-fill">' +
     btn('workingDiff', (stats ? '<span class="stats">' + stats + '</span>' : '') + ic('diff'), allDis || !lc, { attrs: 'title="Diff working changes"' }) +
-    btn('branchDiff', ic('diff') + '<span class="label">branch</span>', allDis, { attrs: 'title="Diff branch changes"' }) +
-    btn('mainDiff', ic('diff') + '<span class="label">main</span>', allDis, { attrs: 'title="Diff main against branch"' }) +
+    btn('branchDiff', ic('diff') + '<span class="label">Branch</span>', allDis, { attrs: 'title="Diff branch changes"' }) +
+    btn('mainDiff', ic('diff') + '<span class="label">Main</span>', allDis, { attrs: 'title="Diff main against branch"' }) +
     btn('discard', ic('x'), allDis || !lc, { cls: 'danger', attrs: 'title="Discard changes"' }) +
     '</div>' +
     '<div class="field-label">Tree</div><div class="row">' + lastRow + '</div>' +
@@ -421,19 +421,19 @@ function renderCreateForm() {
     if (fs.ticketMode === 'existing' && fs.ticketId) {
       out += '<span class="form-value">' + h(fs.ticketId + (fs.ticketTitle ? ': ' + fs.ticketTitle : '')) + '</span>';
     } else if (fs.ticketMode === 'new') {
-      out += '<span class="form-value dim">New Linear ticket</span>';
+      out += '<span class="form-value dim">New Linear Ticket</span>';
     } else {
-      out += '<span class="form-value dim">No Linear ticket</span>';
+      out += '<span class="form-value dim">No Linear Ticket</span>';
     }
     out += '</div>';
     out += '<div class="form-row">';
     if (pendingAction && pendingAction.cmd === 'pickIssue') {
       out += '<button class="btn btn-pending" disabled>loading…</button><button class="btn" data-cmd="cancelPending" title="Cancel">' + ic('x') + '</button>';
     } else {
-      out += '<button class="btn" data-cmd="pickIssue"' + (dis || pendingAction ? ' disabled' : '') + '>Select ticket</button>';
+      out += '<button class="btn" data-cmd="pickIssue"' + (dis || pendingAction ? ' disabled' : '') + '>Select Ticket</button>';
     }
-    out += '<button class="btn' + (fs.ticketMode === 'new' ? ' btn-toggle active' : '') + '" data-form="ticketNew"' + (dis || pendingAction ? ' disabled' : '') + '>Create new</button>';
-    out += '<button class="btn' + (fs.ticketMode === 'none' ? ' btn-toggle active' : '') + '" data-form="ticketNone"' + (dis || pendingAction ? ' disabled' : '') + '>No ticket</button>';
+    out += '<button class="btn' + (fs.ticketMode === 'new' ? ' btn-toggle active' : '') + '" data-form="ticketNew"' + (dis || pendingAction ? ' disabled' : '') + '>Create New</button>';
+    out += '<button class="btn' + (fs.ticketMode === 'none' ? ' btn-toggle active' : '') + '" data-form="ticketNone"' + (dis || pendingAction ? ' disabled' : '') + '>No Ticket</button>';
     out += '</div>';
 
     if (fs.ticketMode === 'new') {
@@ -464,17 +464,17 @@ function renderCreateForm() {
   if (fs.branchMode === 'existing' && fs.existingBranch) {
     out += '<span class="form-value">' + h(fs.existingBranch) + '</span>';
   } else {
-    out += '<span class="form-value dim">New branch</span>';
+    out += '<span class="form-value dim">New Branch</span>';
   }
   out += '</div>';
   out += '<div class="form-row">';
   if (pendingAction && pendingAction.cmd === 'pickBranch') {
     out += '<button class="btn btn-pending" disabled>loading…</button><button class="btn" data-cmd="cancelPending" title="Cancel">' + ic('x') + '</button>';
   } else {
-    out += '<button class="btn" data-cmd="pickBranch"' + (dis || pendingAction ? ' disabled' : '') + '>Select branch</button>';
+    out += '<button class="btn" data-cmd="pickBranch"' + (dis || pendingAction ? ' disabled' : '') + '>Select Branch</button>';
   }
   if (fs.branchMode === 'existing') {
-    out += '<button class="btn" data-form="branchNew"' + (dis ? ' disabled' : '') + '>Create new</button>';
+    out += '<button class="btn" data-form="branchNew"' + (dis ? ' disabled' : '') + '>Create New</button>';
   }
   out += '</div>';
   if (fs.branchMode === 'new') {
