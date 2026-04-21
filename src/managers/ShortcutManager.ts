@@ -6,26 +6,12 @@ import type { TreeState } from '../state';
 import { shellEscape } from '../utils/slug';
 import { notify } from '../notify';
 
-export class ShortcutManager {
-  private terminals = new Map<string, vscode.Terminal[]>();
-  private pendingRestarts = new Map<string, vscode.Disposable>();
-  private disposables: vscode.Disposable[] = [];
+export class ShortcutManager implements vscode.Disposable {
 
   private _onDidChange = new vscode.EventEmitter<void>();
   readonly onDidChange = this._onDidChange.event;
 
-  constructor(private config: ForestConfig, private currentTree: TreeState | undefined) {
-    this.disposables.push(
-      vscode.window.onDidCloseTerminal(t => this.handleTerminalClose(t)),
-      this._onDidChange,
-    );
-  }
-
-  getState(sc: ShortcutConfig): 'running' | 'stopped' | 'idle' {
-    if (sc.type !== 'terminal') return 'idle';
-    const list = this.terminals.get(sc.name);
-    return list && list.length > 0 ? 'running' : 'stopped';
-  }
+  constructor(private config: ForestConfig, private currentTree: TreeState | undefined) {}
 
   async open(sc: ShortcutConfig, viewColumn?: vscode.ViewColumn): Promise<void> {
     switch (sc.type) {
@@ -44,41 +30,6 @@ export class ShortcutManager {
     else if (sc.type === 'terminal') await this.openTerminal(sc, undefined, picked);
   }
 
-  stop(sc: ShortcutConfig): void {
-    if (sc.type !== 'terminal') return;
-    const list = this.terminals.get(sc.name);
-    if (list) for (const t of [...list]) t.dispose();
-  }
-
-  restart(sc: ShortcutConfig): void {
-    if (sc.type !== 'terminal') return;
-    this.pendingRestarts.get(sc.name)?.dispose();
-    const sub = vscode.window.onDidCloseTerminal(t => {
-      if (t.name === sc.name) {
-        sub.dispose();
-        this.pendingRestarts.delete(sc.name);
-        this.open(sc);
-      }
-    });
-    this.pendingRestarts.set(sc.name, sub);
-    this.stop(sc);
-  }
-
-  /** Adopt already-open terminals so state tracking works across window reloads. */
-  adoptTerminals(): void {
-    for (const sc of this.config.shortcuts) {
-      if (sc.type !== 'terminal') continue;
-      const adopted: vscode.Terminal[] = [];
-      for (const t of vscode.window.terminals) {
-        if (t.name === sc.name || t.name.startsWith(`${sc.name} `)) {
-          adopted.push(t);
-        }
-      }
-      if (adopted.length > 0) this.terminals.set(sc.name, adopted);
-    }
-    this._onDidChange.fire();
-  }
-
   /** Open shortcuts marked with onNewTree. */
   async openNewTreeShortcuts(): Promise<void> {
     await Promise.all(this.config.shortcuts.filter(s => s.onNewTree).map(s => this.open(s)));
@@ -90,8 +41,6 @@ export class ShortcutManager {
       this.openExternalTerminal(sc, terminalApp);
       return;
     }
-
-    const list = this.terminals.get(sc.name) ?? [];
 
     const env: Record<string, string> = {};
     if (sc.env) {
@@ -108,9 +57,6 @@ export class ShortcutManager {
     terminal.show(false);
     vscode.commands.executeCommand('workbench.action.terminal.focus');
     if (sc.command) terminal.sendText(sc.command);
-    list.push(terminal);
-    this.terminals.set(sc.name, list);
-    this._onDidChange.fire();
   }
 
   private openExternalTerminal(sc: ShortcutConfig & { type: 'terminal' }, app: string): void {
@@ -166,25 +112,11 @@ export class ShortcutManager {
     await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath));
   }
 
-  private handleTerminalClose(terminal: vscode.Terminal): void {
-    for (const [name, list] of this.terminals) {
-      const idx = list.indexOf(terminal);
-      if (idx < 0) continue;
-      list.splice(idx, 1);
-      if (list.length === 0) this.terminals.delete(name);
-      this._onDidChange.fire();
-      break;
-    }
-  }
-
   updateTree(tree: TreeState): void {
     this.currentTree = tree;
-    this._onDidChange.fire();
   }
 
   dispose(): void {
-    this.pendingRestarts.forEach(d => d.dispose());
-    this.pendingRestarts.clear();
-    this.disposables.forEach(d => d.dispose());
+    this._onDidChange.dispose();
   }
 }

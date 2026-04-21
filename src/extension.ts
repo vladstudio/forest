@@ -182,7 +182,7 @@ export async function activate(context: vscode.ExtensionContext) {
   const shortcutManager = new ShortcutManager(config, currentTree);
   const statusBarManager = new StatusBarManager(currentTree);
   const forestProvider = new ForestWebviewProvider(stateManager, config, context.extensionUri);
-  const shortcutsProvider = new ShortcutsTreeProvider(config, shortcutManager);
+  const shortcutsProvider = new ShortcutsTreeProvider(config);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider('forest.trees', forestProvider),
     vscode.window.registerTreeDataProvider('forest.shortcuts', shortcutsProvider),
@@ -255,8 +255,7 @@ export async function activate(context: vscode.ExtensionContext) {
   const unwrap = (arg: any) => arg instanceof ShortcutItem ? arg.shortcut : arg;
   reg('forest.openShortcut', (arg: any) => shortcutManager.open(unwrap(arg)));
   reg('forest.openShortcutWith', (arg: any) => shortcutManager.openWith(unwrap(arg)));
-  reg('forest.stopShortcut', (arg: any) => shortcutManager.stop(unwrap(arg)));
-  reg('forest.restartShortcut', (arg: any) => shortcutManager.restart(unwrap(arg)));
+
 
   // Refresh when window gains focus (cross-window coordination)
   context.subscriptions.push(
@@ -264,9 +263,6 @@ export async function activate(context: vscode.ExtensionContext) {
       if (e.focused) { forestProvider.refresh(); }
     }),
   );
-
-  // Adopt existing terminals so shortcut state is tracked across reloads
-  shortcutManager.adoptTerminals();
 
   // If this is a tree window, run onNewTree shortcuts
   if (currentTree) {
