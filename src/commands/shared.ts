@@ -115,7 +115,7 @@ export function copyConfigFiles(config: ForestConfig, repoPath: string, treePath
     const dst = path.join(treePath, file);
     try {
       fs.mkdirSync(path.dirname(dst), { recursive: true });
-      fs.copyFileSync(src, dst);
+      fs.cpSync(src, dst, { recursive: true });
     } catch (e: any) {
       if (e.code !== 'ENOENT') throw e;
     }
