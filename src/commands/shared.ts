@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { repoHash, tryUnlinkSync } from '../utils/fs';
-import { type ForestConfig, getTreesDir } from '../config';
+import { type ForestConfig, getTreesDir, allShortcuts } from '../config';
 import type { ForestContext } from '../context';
 import { TREE_OPERATION_HEARTBEAT_MS, displayName, type TreeState, type StateManager } from '../state';
 import * as git from '../cli/git';
@@ -199,7 +199,7 @@ export async function createTree(opts: {
     checkMaxTrees(stateManager, state, repoPath, config.maxTrees);
     const treePath = resolveTreePath(repoPath, branch, ticketId);
 
-    const hasNewTreeShortcuts = config.shortcuts.some(s => s.onNewTree);
+    const hasNewTreeShortcuts = allShortcuts(config.shortcuts).some(s => s.onNewTree);
     const tree: TreeState = {
       branch, repoPath, path: treePath,
       createdAt: new Date().toISOString(),

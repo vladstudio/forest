@@ -549,7 +549,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
         await this.runPending(async (signal) => {
           const commitDiff = await git.workingDiff(tree.path!);
           if (!commitDiff.trim()) { notify.info('No working changes to commit.'); return; }
-          const message = await ai.generateCommitMessage(this.config.ai!, commitDiff, { signal });
+          const message = await ai.generateCommitMessage(commitDiff, { signal });
           const confirmed = await vscode.window.showInputBox({
             value: message,
             prompt: 'Commit message — all changes will be staged',

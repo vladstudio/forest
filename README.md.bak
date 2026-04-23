@@ -60,6 +60,11 @@ Per-developer overrides go in `.forest/local.json` (should be gitignored):
   "linear": {
     "apiKey": "lin_api_YOUR_KEY"
   },
+  "ai": {
+    "provider": "gemini",
+    "model": "gemini-2.5-flash",
+    "apiKey": "YOUR_KEY"
+  },
   "browser": ["external", "Firefox"],
   "terminal": ["iTerm", "integrated"]
 }
@@ -85,14 +90,14 @@ To set up Forest, ask Claude (or any AI) to read this README and generate `.fore
 | `branchFormat` | no       | `${ticketId}-${slug}` | Branch naming. Supports `${ticketId}`, `${slug}`                                                                                                                                                                                                                                                                                     |
 | `baseBranch`   | no       | `main`                | Base branch name (`origin/` prefix is added automatically)                                                                                                                                                                                                                                                                           |
 | `maxTrees`     | no       | `10`                  | Max concurrent worktrees                                                                                                                                                                                                                                                                                                             |
-| `ai`           | no       | `false`               | AI-generated PR descriptions using Tetra. Set `true` to enable. Requires Tetra to be running with AI commands configured (see below).                                                                                                                                                                                                 |
+| `ai`           | no       | disabled              | AI-generated PR descriptions and commit messages. Set `provider` (`anthropic`, `openai`, `gemini`), `model`, and `apiKey`. Best placed in `local.json`                                                                                                                                                                               |
 | `logging`      | no       | `true`                | File-based logging to `~/.forest/forest.log`. Rotates at 5 MB                                                                                                                                                                                                                                                                        |
 | `browser`      | no       | `["integrated"]`      | Browser app list. First item is the default; right-click a shortcut to pick another. Values: `integrated` (VS Code integrated browser), `external` (system default), or an app name (e.g. `"Firefox"`)                                                                                                                               |
 | `terminal`     | no       | `["integrated"]`      | Terminal app list. First item is the default; right-click to pick another. Values: `integrated` (VS Code terminal), or an external app (`iTerm`, `Terminal`, `Ghostty`). External terminals receive the shortcut command automatically                                                                                               |
 
 Shortcuts support `onNewTree: true` to auto-open when a tree is first created (e.g. for dependency installation). Terminals also accept `command` and `env`. Browser shortcuts accept a per-shortcut `browser` override (same values as the top-level `browser` setting). Shortcut values are treated literally: Forest does not expand `${...}` placeholders inside shortcut commands, URLs, env vars, or file paths.
 
-**`local.json`** (gitignored) merges over `config.json` — use for per-dev overrides.
+**`local.json`** (gitignored) merges over `config.json` — use for per-dev AI keys and overrides.
 
 ## Features
 
@@ -126,34 +131,6 @@ When a PR is merged, you get a notification: *"ENG-1234 PR was merged. Clean up?
 ### Direnv Support
 
 If a `.envrc` file exists in the tree, Forest automatically runs `direnv allow` during tree creation.
-
-### AI Integration
-
-Forest uses **Tetra** for AI-generated PR descriptions. To enable:
-
-1. Install [Tetra](https://apps.vlad.studio/tetra) (a macOS menu bar app)
-2. Add Tetra commands to `~/.config/tetra/commands/`:
-   - `AI Generate commit message.prompt.md` — generates commit messages
-   - `AI Generate PR description.prompt.md` — generates PR descriptions
-3. Set `"ai": true` in your `.forest/config.json`
-
-Example Tetra command (`~/.config/tetra/commands/AI Generate PR description.prompt.md`):
-
-```markdown
----
-llm: cerebras_qwen
-temperature: 0.2
----
-
-Write a concise pull request description for the following diff. Use markdown. Start with a short summary paragraph, then a bullet list of key changes if needed. Do not include a title. Keep the total response under 500 words.
-
-PR title: {{title}}
-
-Diff:
-{{text}}
-
-OUTPUT ONLY THE PR DESCRIPTION.
-```
 
 ### Claude Code Trust
 
@@ -196,7 +173,7 @@ All commands are available from the Forest sidebar (tree icon in activity bar) o
 1. **New Tree** from a Linear ticket (or **New Linear Issue + Tree** to create a new ticket)
 2. A new VSCode window opens with terminals running
 3. Code, test, iterate — each tree is fully isolated
-4. **Ship** when ready — pushes and creates a PR (with AI-generated description if enabled)
+4. **Ship** when ready — pushes and creates a PR
 5. **Cleanup** after merge — removes worktree, branch, and ticket
 6. **Delete** to remove a tree (keep branches, delete local only, or delete all)
 

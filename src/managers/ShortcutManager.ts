@@ -1,7 +1,7 @@
 import * as cp from 'child_process';
 import * as vscode from 'vscode';
 import * as path from 'path';
-import type { ForestConfig, ShortcutConfig } from '../config';
+import { type ForestConfig, type ShortcutConfig, allShortcuts } from '../config';
 import type { TreeState } from '../state';
 import { shellEscape } from '../utils/slug';
 import { notify } from '../notify';
@@ -32,7 +32,7 @@ export class ShortcutManager implements vscode.Disposable {
 
   /** Open shortcuts marked with onNewTree. */
   async openNewTreeShortcuts(): Promise<void> {
-    await Promise.all(this.config.shortcuts.filter(s => s.onNewTree).map(s => this.open(s)));
+    await Promise.all(allShortcuts(this.config.shortcuts).filter(s => s.onNewTree).map(s => this.open(s)));
   }
 
   private async openTerminal(sc: ShortcutConfig & { type: 'terminal' }, location?: vscode.ViewColumn, terminalApp?: string): Promise<void> {

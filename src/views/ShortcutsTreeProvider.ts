@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import type { ForestConfig, ShortcutConfig } from '../config';
+import { type ForestConfig, type ShortcutConfig, allShortcuts } from '../config';
 
 export class ShortcutItem extends vscode.TreeItem {
   constructor(public readonly shortcut: ShortcutConfig) {
@@ -27,7 +27,7 @@ export class ShortcutsTreeProvider implements vscode.TreeDataProvider<ShortcutIt
   constructor(private config: ForestConfig) {}
 
   getChildren(): ShortcutItem[] {
-    return this.config.shortcuts.map(sc => new ShortcutItem(sc));
+    return allShortcuts(this.config.shortcuts).map(sc => new ShortcutItem(sc));
   }
 
   getTreeItem(el: ShortcutItem): vscode.TreeItem { return el; }

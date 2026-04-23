@@ -12,24 +12,25 @@ interface BrowserShortcut extends ShortcutBase { type: 'browser'; url: string; b
 interface FileShortcut extends ShortcutBase { type: 'file'; path: string; }
 export type ShortcutConfig = TerminalShortcut | BrowserShortcut | FileShortcut;
 
-/** Infer shortcut type from fields when not explicitly set. */
-function normalizeShortcut(raw: any): any {
-  if (raw.type) return raw;
-  if (raw.url) return { ...raw, type: 'browser' };
-  if (raw.path) return { ...raw, type: 'file' };
-  return { ...raw, type: 'terminal' };
+const SHORTCUT_CATEGORIES = {
+  cli: 'terminal' as const,
+  web: 'browser' as const,
+  files: 'file' as const,
+};
+
+export type ShortcutsConfig = { [K in keyof typeof SHORTCUT_CATEGORIES]: (typeof SHORTCUT_CATEGORIES[K] extends 'terminal' ? TerminalShortcut : typeof SHORTCUT_CATEGORIES[K] extends 'browser' ? BrowserShortcut : FileShortcut)[] };
+
+/** Flattens all shortcut categories into a single array. */
+export function allShortcuts(s: ShortcutsConfig): ShortcutConfig[] {
+  return [...s.cli, ...s.web, ...s.files];
 }
 
-export interface AIConfig {
-  provider: 'anthropic' | 'openai' | 'gemini';
-  model: string;
-  apiKey: string;
-}
+export type AIConfig = boolean;
 
 export interface ForestConfig {
   version: number;
   copy: string[];
-  shortcuts: ShortcutConfig[];
+  shortcuts: ShortcutsConfig;
   linear: { enabled: boolean; apiKey?: string; teams?: string[]; statuses: { issueList: string[]; onNew: string; onShip: string; onCleanup: string; onCancel: string } };
   github: { enabled: boolean };
   ai?: AIConfig;
@@ -42,7 +43,7 @@ export interface ForestConfig {
 
 const DEFAULTS: Partial<ForestConfig> = {
   copy: [],
-  shortcuts: [],
+  shortcuts: { cli: [], web: [], files: [] },
   linear: { enabled: false, statuses: { issueList: ['triage', 'backlog', 'unstarted', 'started'], onNew: 'started', onShip: 'in review', onCleanup: 'completed', onCancel: 'canceled' } },
   github: { enabled: true },
   branchFormat: '${ticketId}-${slug}',
@@ -89,10 +90,13 @@ export async function loadConfig(): Promise<ForestConfig | null> {
   if (typeof merged.browser === 'string') merged.browser = [merged.browser];
   if (typeof merged.terminal === 'string') merged.terminal = [merged.terminal];
 
-  // Normalize shortcuts: infer type from fields
-  if (Array.isArray(merged.shortcuts)) {
-    merged.shortcuts = merged.shortcuts.map(normalizeShortcut);
-  }
+  // Inject shortcut types
+  const s = merged.shortcuts || {};
+  merged.shortcuts = Object.fromEntries(
+    (Object.keys(SHORTCUT_CATEGORIES) as (keyof typeof SHORTCUT_CATEGORIES)[]).map(
+      key => [key, (s[key] || []).map((x: any) => ({ ...x, type: SHORTCUT_CATEGORIES[key] }))],
+    ),
+  ) as ShortcutsConfig;
 
   // Normalize baseBranch: strip any origin/ prefix — callers prepend when needed
   merged.baseBranch = (merged.baseBranch?.trim() || 'main').replace(/^origin\//, '');
@@ -121,15 +125,17 @@ export function getTreesDir(repoPath: string): string {
 function mergeConfig(base: any, local: any): any {
   const result = { ...base };
   for (const key of Object.keys(local)) {
-    if (key === 'shortcuts' && Array.isArray(local[key])) {
-      // Merge named arrays by name
-      const baseArr = [...(base[key] || [])];
-      for (const item of local[key]) {
-        const idx = baseArr.findIndex((b: any) => b.name === item.name);
-        if (idx >= 0) baseArr[idx] = { ...baseArr[idx], ...item };
-        else baseArr.push(item);
+    if (key === 'shortcuts') {
+      result[key] = {};
+      for (const sub of Object.keys(SHORTCUT_CATEGORIES) as (keyof typeof SHORTCUT_CATEGORIES)[]) {
+        const arr = [...(base[key]?.[sub] || [])];
+        for (const item of local[key]?.[sub] || []) {
+          const idx = arr.findIndex((b: any) => b.name === item.name);
+          if (idx >= 0) arr[idx] = { ...arr[idx], ...item };
+          else arr.push(item);
+        }
+        result[key][sub] = arr;
       }
-      result[key] = baseArr;
     } else if (typeof local[key] === 'object' && !Array.isArray(local[key]) && local[key] !== null) {
       result[key] = mergeConfig(base[key] || {}, local[key]);
     } else if (local[key] !== null) {

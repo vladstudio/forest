@@ -41,7 +41,7 @@ export async function shipCore(
         if (config.ai) {
           try {
             const diff = await diffPromise ?? '';
-            prBody = await generatePRBody(config.ai, diff, prTitle, { signal });
+            prBody = await generatePRBody(diff, prTitle, { signal });
           } catch (e: any) {
             if (signal?.aborted) throw e;
             notify.warn(`AI description failed, using commits. ${e.message}`);
