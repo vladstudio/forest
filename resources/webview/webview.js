@@ -203,7 +203,7 @@ const ic = name => '<span class="icon">' + icons[name] + '</span>';
 function renderLoading(message) {
   document.getElementById('root').innerHTML =
     '<div class="form"><div class="form-section"><div class="form-title"><span class="dim">' + h(message) + '</span></div></div>' +
-    '<div class="form-actions"><button class="btn-cancel" data-form="cancel">Cancel</button></div></div>';
+    '<div class="form-actions"><button class="btn secondary" data-form="cancel">Cancel</button></div></div>';
 }
 
 function renderCurrentMode() {
@@ -282,8 +282,7 @@ function mainCard(d) {
     const isPending = pendingAction && pendingAction.key === '__main__';
     const allDis = isPending;
     const statusBar = isPending ? '<div class="row status-bar"><span class="spinner"></span><span class="dim">' + h(pendingLabels[pendingAction.cmd] || 'loading…') + '</span>' + btn('cancelPending', ic('x'), false, { attrs: 'title="Cancel"' }) + '</div>' : '';
-    return '<div class="' + cls + '" data-key="__main__"><span class="card-label">' + label + '</span>' +
-      '<div class="row">' +
+    return '<div class="' + cls + '" data-key="__main__"><div class="row"><span class="card-label">' + label + '</span>' +
       '<button class="btn" data-cmd="revealInFinder" title="Reveal in Finder"' + dis(allDis) + '>' + ic('folderOpen') + '</button>' +
       btn('pull', ic('arrowDown') + (d.mainBehind > 0 ? d.mainBehind : ''), allDis, { attrs: 'title="Pull"' }) +
       '</div>' + statusBar + '</div>';
@@ -396,8 +395,8 @@ function renderDeleteForm() {
 
   var canDelete = !dis && !pendingAction;
   out += '<div class="form-actions">';
-  out += '<button class="btn-create" id="deleteSubmitBtn" data-cmd="deleteForm:submit"' + (canDelete ? '' : ' disabled') + '>' + (dis ? '<span class="spinner"></span> Deleting…' : 'Delete tree') + '</button>';
-  out += '<button class="btn-cancel" data-form="cancel"' + (canDelete ? '' : ' disabled') + '>Cancel</button>';
+  out += '<button class="btn primary fill" id="deleteSubmitBtn" data-cmd="deleteForm:submit"' + (canDelete ? '' : ' disabled') + '>' + (dis ? '<span class="spinner"></span> Deleting…' : 'Delete tree') + '</button>';
+  out += '<button class="btn secondary" data-form="cancel"' + (canDelete ? '' : ' disabled') + '>Cancel</button>';
   out += '</div>';
 
   out += '</div>';
@@ -504,8 +503,8 @@ function renderCreateForm() {
     (fs.ticketMode !== 'new' || !!fs.newTicketTitle.trim())
   );
   out += '<div class="form-actions">';
-  out += '<button class="btn-create" id="submitBtn" data-cmd="createForm:submit"' + (canSubmit ? '' : ' disabled') + '>' + (dis ? '<span class="spinner"></span> Creating…' : 'Create tree') + '</button>';
-  out += '<button class="btn-cancel" data-form="cancel"' + (dis ? ' disabled' : '') + '>Cancel</button>';
+  out += '<button class="btn primary fill" id="submitBtn" data-cmd="createForm:submit"' + (canSubmit ? '' : ' disabled') + '>' + (dis ? '<span class="spinner"></span> Creating…' : 'Create tree') + '</button>';
+  out += '<button class="btn secondary" data-form="cancel"' + (dis ? ' disabled' : '') + '>Cancel</button>';
   out += '</div>';
 
   out += '</div>';

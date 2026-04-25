@@ -1,3 +1,8 @@
+:root {
+  --forest-border: var(--vscode-activityBar-border, rgba(128, 128, 128, 0.2));
+  --forest-hover: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.08));
+}
+
 * {
   box-sizing: border-box;
 }
@@ -21,15 +26,9 @@ body {
 .dim,
 .ticket,
 .btn,
-.btn-create,
-.btn-cancel,
 .form-value,
-.form-hint,
-.form-error,
 .form-title,
-.form-copy,
 .radio-title {
-  font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -57,7 +56,7 @@ body {
 
 .card,
 .radio-group {
-  border: 1px solid var(--vscode-activityBar-border, rgba(128, 128, 128, 0.2));
+  border: 1px solid var(--forest-border);
   border-radius: 4px;
 }
 
@@ -74,9 +73,20 @@ body {
 
 .card.card-main {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 6px;
   margin: 4px 8px 6px;
+}
+
+.card.card-main:has(> .status-bar) {
+  padding-bottom: 0;
+}
+
+.card.card-main > .status-bar {
+  margin: 0 -10px;
+  padding: 4px 10px;
+  border-top: 1px solid var(--forest-border);
+  border-radius: 0 0 4px 4px;
 }
 
 .card:not(.current) {
@@ -84,7 +94,7 @@ body {
 }
 
 .card:not(.current):hover {
-  background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.08));
+  background: var(--forest-hover);
 }
 
 .card-label {
@@ -206,7 +216,7 @@ button {
   background: none;
   color: var(--vscode-foreground);
   padding: 2px 4px;
-  border: 1px solid var(--vscode-activityBar-border, rgba(128, 128, 128, 0.3));
+  border: 1px solid var(--forest-border);
   opacity: 0.9;
   display: inline-flex;
   align-items: center;
@@ -222,15 +232,13 @@ button {
   background: var(--vscode-toolbar-hoverBackground);
 }
 
-.btn:disabled,
-.btn-create:disabled,
-.btn-cancel:disabled {
+.btn:disabled {
   opacity: 0.4;
   cursor: default;
 }
 
 .btn.danger {
-  color: var(--vscode-errorForeground, #f44736) !important;
+  color: var(--vscode-errorForeground, #f44736);
 }
 
 .btn.primary {
@@ -242,6 +250,23 @@ button {
 
 .btn.primary:hover:not(:disabled) {
   background: var(--vscode-button-hoverBackground);
+}
+
+.btn.secondary {
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  border-color: transparent;
+  opacity: 1;
+}
+
+.btn.secondary:hover:not(:disabled) {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.btn-toggle.active {
+  background: var(--vscode-selection-background);
+  color: var(--vscode-button-secondaryForeground);
+  opacity: 1;
 }
 
 .fill {
@@ -319,32 +344,8 @@ button {
   margin-top: 12px;
 }
 
-.btn-create {
-  flex: 1;
-  background: var(--vscode-button-background);
-  color: var(--vscode-button-foreground);
-  padding: 6px 8px;
-  min-width: 0;
-}
-
-.btn-create:hover:not(:disabled) {
-  background: var(--vscode-button-hoverBackground);
-}
-
-.btn-cancel {
-  background: var(--vscode-button-secondaryBackground);
-  color: var(--vscode-button-secondaryForeground);
+.form-actions .btn {
   padding: 6px 12px;
-}
-
-.btn-cancel:hover {
-  background: var(--vscode-button-secondaryHoverBackground);
-}
-
-.btn-toggle.active {
-  background: var(--vscode-selection-background);
-  color: var(--vscode-button-secondaryForeground);
-  opacity: 1;
 }
 
 .form-title {
@@ -373,7 +374,7 @@ button {
   padding: 8px;
   background: transparent;
   cursor: pointer;
-  border-bottom: 1px solid var(--vscode-activityBar-border, rgba(128, 128, 128, 0.2));
+  border-bottom: 1px solid var(--forest-border);
 }
 
 .radio-option:last-child {
@@ -381,7 +382,7 @@ button {
 }
 
 .radio-option:hover {
-  background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.08));
+  background: var(--forest-hover);
 }
 
 .radio-option input {
@@ -419,4 +420,3 @@ button {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
-
