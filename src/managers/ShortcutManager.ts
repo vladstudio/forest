@@ -37,9 +37,16 @@ export class ShortcutManager implements vscode.Disposable {
 
   private async openTerminal(sc: ShortcutConfig & { type: 'terminal' }, location?: vscode.ViewColumn, terminalApp?: string): Promise<void> {
     terminalApp ??= this.config.terminal[0];
+    const wsFolder = vscode.workspace.workspaceFolders?.[0];
+    const isRemoteWs = !!wsFolder && wsFolder.uri.scheme !== 'file';
+
     if (terminalApp !== 'integrated') {
-      this.openExternalTerminal(sc, terminalApp);
-      return;
+      if (isRemoteWs) {
+        notify.info(`External terminal "${terminalApp}" can't reach the dev container — using integrated.`);
+      } else {
+        this.openExternalTerminal(sc, terminalApp);
+        return;
+      }
     }
 
     const env: Record<string, string> = {};
@@ -48,9 +55,12 @@ export class ShortcutManager implements vscode.Disposable {
         env[k] = v;
       }
     }
+    // Pass the workspace folder URI so VS Code spawns the terminal on the correct side
+    // (host or inside the dev container) — passing a host path string would fall back to host.
+    const cwd: vscode.Uri | string | undefined = wsFolder?.uri ?? this.currentTree?.path;
     const terminal = vscode.window.createTerminal({
       name: sc.name,
-      cwd: this.currentTree?.path,
+      cwd,
       env,
       ...(location ? { location: { viewColumn: location } } : {}),
     });
@@ -106,10 +116,14 @@ export class ShortcutManager implements vscode.Disposable {
   }
 
   private async openFile(sc: ShortcutConfig & { type: 'file' }): Promise<void> {
-    const base = this.currentTree?.path ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (!base) return;
-    const filePath = path.isAbsolute(sc.path) ? sc.path : path.join(base, sc.path);
-    await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath));
+    const wsFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!wsFolder) return;
+    // Use the workspace folder URI as base so the path resolves on the right side
+    // (host vs dev container) and preserves URI scheme.
+    const target = path.isAbsolute(sc.path)
+      ? vscode.Uri.file(sc.path)
+      : vscode.Uri.joinPath(wsFolder.uri, sc.path);
+    await vscode.commands.executeCommand('vscode.open', target);
   }
 
   updateTree(tree: TreeState): void {

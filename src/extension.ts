@@ -4,7 +4,7 @@ import * as path from 'path';
 import { loadConfig, getTreesDir } from './config';
 import { ShortcutItem, ShortcutsTreeProvider } from './views/ShortcutsTreeProvider';
 import { StateManager } from './state';
-import { ForestContext, getRepoPath } from './context';
+import { ForestContext, getHostWorkspacePath, getRepoPath } from './context';
 import { ShortcutManager } from './managers/ShortcutManager';
 import { StatusBarManager } from './managers/StatusBarManager';
 import { ForestWebviewProvider } from './views/ForestWebviewProvider';
@@ -174,8 +174,9 @@ export async function activate(context: vscode.ExtensionContext) {
 
   const postPruneState = await recoverOrphanWorktrees(await pruneOrphans());
 
-  // Detect if current workspace is a tree (reuse state after pruning)
-  const curPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  // Detect if current workspace is a tree (reuse state after pruning).
+  // getHostWorkspacePath maps remote (dev container) workspace URIs back to the host tree path.
+  const curPath = getHostWorkspacePath();
   const currentTree = curPath ? Object.values(postPruneState.trees).find(t => t.path === curPath) : undefined;
   vscode.commands.executeCommand('setContext', 'forest.isTree', !!currentTree);
 

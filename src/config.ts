@@ -1,9 +1,8 @@
-import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { repoHash } from './utils/fs';
-import { resolveMainRepo } from './context';
+import { getHostWorkspacePath, resolveMainRepo } from './context';
 import { notify } from './notify';
 
 interface ShortcutBase { name: string; onNewTree?: boolean; }
@@ -54,10 +53,10 @@ const DEFAULTS: Partial<ForestConfig> = {
 };
 
 export async function loadConfig(): Promise<ForestConfig | null> {
-  const ws = vscode.workspace.workspaceFolders?.[0];
-  if (!ws) return null;
+  const wsPath = getHostWorkspacePath();
+  if (!wsPath) return null;
 
-  const repoRoot = resolveMainRepo(ws.uri.fsPath);
+  const repoRoot = resolveMainRepo(wsPath);
   const configPath = path.join(repoRoot, '.forest', 'config.json');
   if (!fs.existsSync(configPath)) return null;
 

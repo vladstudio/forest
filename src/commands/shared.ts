@@ -294,7 +294,8 @@ export async function openTreeWindow(tree: TreeState, opts?: { forceNewWindow?: 
   if (tree.useDevcontainer && fs.existsSync(devcontainerJson)) {
     const cmds = await vscode.commands.getCommands(true);
     if (cmds.includes('remote-containers.openFolder')) {
-      await vscode.commands.executeCommand('remote-containers.openFolder', vscode.Uri.file(tree.path), { forceNewWindow: !!opts?.forceNewWindow });
+      // Always new window: Dev Containers has no focus-existing-window equivalent of `open -a Code`.
+      await vscode.commands.executeCommand('remote-containers.openFolder', vscode.Uri.file(tree.path), { forceNewWindow: true });
       return;
     }
     notify.warn('Dev Containers extension not installed — opening without sandbox.');
