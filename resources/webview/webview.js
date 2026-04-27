@@ -29,6 +29,7 @@ function defaultFormState(init) {
     priority: 2,
     team: init.teams && init.teams[0] || '',
     carryChanges: init.uncommittedCount > 0,
+    useDevcontainer: !!init.hasDevcontainer,
     submitting: false,
     error: null,
   };
@@ -138,6 +139,7 @@ document.getElementById('root').addEventListener('click', e => {
       priority: formState.priority,
       team: formState.team,
       carryChanges: formState.carryChanges,
+      useDevcontainer: formState.useDevcontainer,
       branchManuallyEdited: formState.branchManuallyEdited,
     });
     return;
@@ -497,6 +499,17 @@ function renderCreateForm() {
     out += '</div>';
   }
 
+  // Dev container toggle
+  if (init.hasDevcontainer) {
+    out += '<div class="form-section">';
+    out += '<div class="form-row">';
+    out += '<span class="form-value dim">Dev container</span>';
+    out += '<button class="btn btn-toggle' + (fs.useDevcontainer ? ' active' : '') + '" data-form="devcontainerYes"' + (dis ? ' disabled' : '') + '>Sandbox</button>';
+    out += '<button class="btn btn-toggle' + (!fs.useDevcontainer ? ' active' : '') + '" data-form="devcontainerNo"' + (dis ? ' disabled' : '') + '>Direct</button>';
+    out += '</div>';
+    out += '</div>';
+  }
+
   // Action buttons
   var canSubmit = !dis && !pendingAction && (
     (fs.branchMode === 'new' ? !!sanitizeBranch(fs.branchName) : !!fs.existingBranch) &&
@@ -615,6 +628,12 @@ function handleFormAction(action) {
       break;
     case 'carryNo':
       formState.carryChanges = false;
+      break;
+    case 'devcontainerYes':
+      formState.useDevcontainer = true;
+      break;
+    case 'devcontainerNo':
+      formState.useDevcontainer = false;
       break;
     case 'cancel':
       mode = 'list';

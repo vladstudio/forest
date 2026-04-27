@@ -181,8 +181,9 @@ export async function createTree(opts: {
   title?: string;
   existingBranch?: boolean;
   carryChanges?: string | false;
+  useDevcontainer?: boolean;
 }): Promise<TreeState> {
-  const { branch, config, stateManager, repoPath, ticketId, title, existingBranch, carryChanges } = opts;
+  const { branch, config, stateManager, repoPath, ticketId, title, existingBranch, carryChanges, useDevcontainer } = opts;
   const createKey = `${repoPath}:${branch}`;
   if (createInProgress.has(createKey)) throw new Error('Tree creation already in progress.');
   createInProgress.add(createKey);
@@ -206,6 +207,7 @@ export async function createTree(opts: {
       ...(ticketId ? { ticketId } : {}),
       ...(title ? { title } : {}),
       ...(hasNewTreeShortcuts ? { needsSetup: true } : {}),
+      ...(useDevcontainer ? { useDevcontainer: true } : {}),
     };
 
     // Save state early to prevent duplicates across windows.
@@ -232,8 +234,7 @@ export async function createTree(opts: {
           await postWorktreeSetup(config, repoPath, treePath, tree, progress);
 
           progress.report({ message: 'Opening window...' });
-          const wsFile = workspaceFilePath(tree);
-          await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(wsFile), { forceNewWindow: true });
+          await openTreeWindow(tree, { forceNewWindow: true });
 
           return tree;
         },
@@ -284,6 +285,26 @@ export function ensureWorkspaceFile(tree: TreeState): string {
     tryUnlinkSync(legacyPath);
   }
   return wsPath;
+}
+
+/** Open a tree's window, dispatching to Dev Containers if the tree opted in. */
+export async function openTreeWindow(tree: TreeState, opts?: { forceNewWindow?: boolean }): Promise<void> {
+  if (!tree.path) throw new Error('Tree has no worktree path.');
+  const devcontainerJson = path.join(tree.path, '.devcontainer', 'devcontainer.json');
+  if (tree.useDevcontainer && fs.existsSync(devcontainerJson)) {
+    const cmds = await vscode.commands.getCommands(true);
+    if (cmds.includes('remote-containers.openFolder')) {
+      await vscode.commands.executeCommand('remote-containers.openFolder', vscode.Uri.file(tree.path), { forceNewWindow: !!opts?.forceNewWindow });
+      return;
+    }
+    notify.warn('Dev Containers extension not installed — opening without sandbox.');
+  }
+  const wsFile = ensureWorkspaceFile(tree);
+  if (opts?.forceNewWindow) {
+    await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(wsFile), { forceNewWindow: true });
+  } else {
+    await focusOrOpenWindow(vscode.Uri.file(wsFile));
+  }
 }
 
 /** On macOS, `open -a` deduplicates windows natively. Falls back to forceNewWindow elsewhere. */

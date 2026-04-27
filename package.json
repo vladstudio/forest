@@ -28,6 +28,7 @@
     "monorepo"
   ],
   "main": "./dist/extension.js",
+  "extensionKind": ["ui"],
   "activationEvents": [
     "workspaceContains:.forest/config.json",
     "onView:forest.setup"

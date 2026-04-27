@@ -4,6 +4,7 @@ import type { TreeState } from '../state';
 import { displayName } from '../state';
 import * as git from '../cli/git';
 import * as gh from '../cli/gh';
+import * as devcontainer from '../cli/devcontainer';
 import { deleteWorkspaceFiles, ensureTreeIdle, requireTree, runStep, updateLinear } from './shared';
 import { notify } from '../notify';
 
@@ -24,6 +25,11 @@ async function teardownTree(ctx: ForestContext, tree: TreeState, opts: TeardownO
     await ctx.stateManager.updateTree(tree.repoPath, tree.branch, { cleaning: true });
     const shouldClose = ctx.currentTree?.branch === tree.branch;
     if (tree.path) {
+      // Tear down dev container before removing the worktree — its label points at this path.
+      await runStep(ctx, 'Remove dev container', async () => {
+        const { removed } = await devcontainer.cleanup(tree.path!);
+        if (removed > 0) ctx.outputChannel.appendLine(`[Forest] Removed ${removed} dev container(s).`);
+      });
       const removed = await runStep(ctx, 'Remove worktree', () => git.removeWorktree(tree.repoPath, tree.path!));
       if (!removed) {
         // Fail closed: keep the tree in state so the user can retry cleanup.

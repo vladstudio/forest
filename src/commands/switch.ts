@@ -4,7 +4,7 @@ import * as path from 'path';
 import type { ForestContext } from '../context';
 import { displayName } from '../state';
 import { execShell } from '../utils/exec';
-import { ensureWorkspaceFile, focusOrOpenWindow } from './shared';
+import { openTreeWindow } from './shared';
 import { notify } from '../notify';
 
 export async function switchTree(ctx: ForestContext, branchArg?: string): Promise<void> {
@@ -31,6 +31,5 @@ export async function switchTree(ctx: ForestContext, branchArg?: string): Promis
     try { await execShell('direnv allow', { cwd: tree.path, timeout: 10_000 }); } catch { /* direnv not installed or .envrc invalid — non-fatal */ }
   }
 
-  const wsFile = ensureWorkspaceFile(tree);
-  await focusOrOpenWindow(vscode.Uri.file(wsFile));
+  await openTreeWindow(tree);
 }
