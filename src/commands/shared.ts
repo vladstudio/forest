@@ -293,7 +293,6 @@ export async function openTreeWindow(tree: TreeState, opts?: { forceNewWindow?: 
   if (!tree.path) throw new Error('Tree has no worktree path.');
   const devcontainerJson = path.join(tree.path, '.devcontainer', 'devcontainer.json');
   if (tree.useDevcontainer && fs.existsSync(devcontainerJson)) {
-    await devcontainer.ensureGitMount(tree.path);
     const cmds = await vscode.commands.getCommands(true);
     if (cmds.includes('remote-containers.openFolder')) {
       // Always new window: Dev Containers has no focus-existing-window equivalent of `open -a Code`.

@@ -29,7 +29,7 @@ function defaultFormState(init) {
     priority: 2,
     team: init.teams && init.teams[0] || '',
     carryChanges: init.uncommittedCount > 0,
-    useDevcontainer: !!init.hasDevcontainer,
+    useDevcontainer: false,
     submitting: false,
     error: null,
   };
