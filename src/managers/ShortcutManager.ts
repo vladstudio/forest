@@ -73,7 +73,7 @@ export class ShortcutManager implements vscode.Disposable {
   private openExternalTerminal(sc: ShortcutConfig & { type: 'terminal' }, app: string): void {
     // External terminal apps run on the host. Only reachable from non-container windows,
     // where workspaceFolders[0].fsPath is already a host path.
-    const cwd = this.currentTree?.path ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!cwd) return;
     const cmd = sc.command;
     const lowerApp = app.toLowerCase();
