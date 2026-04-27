@@ -8,6 +8,7 @@ import type { ForestContext } from '../context';
 import { TREE_OPERATION_HEARTBEAT_MS, displayName, type TreeState, type StateManager } from '../state';
 import * as git from '../cli/git';
 import * as linear from '../cli/linear';
+import * as devcontainer from '../cli/devcontainer';
 import { exec, execShell } from '../utils/exec';
 import { notify } from '../notify';
 
@@ -292,6 +293,7 @@ export async function openTreeWindow(tree: TreeState, opts?: { forceNewWindow?: 
   if (!tree.path) throw new Error('Tree has no worktree path.');
   const devcontainerJson = path.join(tree.path, '.devcontainer', 'devcontainer.json');
   if (tree.useDevcontainer && fs.existsSync(devcontainerJson)) {
+    await devcontainer.ensureGitMount(tree.path);
     const cmds = await vscode.commands.getCommands(true);
     if (cmds.includes('remote-containers.openFolder')) {
       // Always new window: Dev Containers has no focus-existing-window equivalent of `open -a Code`.

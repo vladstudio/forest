@@ -265,14 +265,22 @@ export async function activate(context: vscode.ExtensionContext) {
     }),
   );
 
-  // If this is a tree window, run onNewTree shortcuts
+  // If this is a tree window, run onNewTree shortcuts and show tree-specific UI.
+  // For dev-container trees, VS Code first activates locally, then reloads into the
+  // container — gate on env match so we don't show/run anything during the brief
+  // pre-attach local activation that gets thrown away.
   if (currentTree) {
-    statusBarManager.show();
-    if (currentTree.needsSetup) {
-      shortcutManager.openNewTreeShortcuts();
-      await stateManager.updateTree(repoPath, currentTree.branch, { needsSetup: undefined });
+    const wsScheme = vscode.workspace.workspaceFolders?.[0]?.uri.scheme;
+    const isRemoteWs = !!wsScheme && wsScheme !== 'file';
+    const expectingRemote = !!currentTree.useDevcontainer;
+    if (isRemoteWs === expectingRemote) {
+      statusBarManager.show();
+      if (currentTree.needsSetup) {
+        shortcutManager.openNewTreeShortcuts();
+        await stateManager.updateTree(repoPath, currentTree.branch, { needsSetup: undefined });
+      }
+      vscode.commands.executeCommand('forest.trees.focus');
     }
-    vscode.commands.executeCommand('forest.trees.focus');
   }
 
   // Helper: setInterval with a guard flag to prevent overlapping runs
@@ -333,6 +341,12 @@ export async function activate(context: vscode.ExtensionContext) {
     if (ctx.currentTree) {
       const updated = stateManager.getTree(newState, repoPath, ctx.currentTree.branch);
       if (updated) {
+        // Another window started deleting our tree — close now so a dev container
+        // window detaches gracefully before its container is killed.
+        if (updated.cleaning && !isLocal) {
+          vscode.commands.executeCommand('workbench.action.closeWindow');
+          return;
+        }
         ctx.currentTree = updated;
         statusBarManager.update(updated);
         shortcutManager.updateTree(updated);

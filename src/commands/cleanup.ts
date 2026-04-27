@@ -24,12 +24,18 @@ async function teardownTree(ctx: ForestContext, tree: TreeState, opts: TeardownO
   try {
     await ctx.stateManager.updateTree(tree.repoPath, tree.branch, { cleaning: true });
     const shouldClose = ctx.currentTree?.branch === tree.branch;
-    if (tree.path) {
-      // Tear down dev container before removing the worktree — its label points at this path.
-      await runStep(ctx, 'Remove dev container', async () => {
-        const { removed } = await devcontainer.cleanup(tree.path!);
+    if (tree.path && tree.useDevcontainer) {
+      // Give cross-window listeners ~300ms to react to cleaning:true and detach
+      // dev container windows before we kill the container (avoids "cannot reconnect").
+      await new Promise(r => setTimeout(r, 300));
+      try {
+        const { removed } = await devcontainer.cleanup(tree.path);
         if (removed > 0) ctx.outputChannel.appendLine(`[Forest] Removed ${removed} dev container(s).`);
-      });
+      } catch (e: any) {
+        ctx.outputChannel.appendLine(`[Forest] Remove dev container failed: ${e.message}`);
+      }
+    }
+    if (tree.path) {
       const removed = await runStep(ctx, 'Remove worktree', () => git.removeWorktree(tree.repoPath, tree.path!));
       if (!removed) {
         // Fail closed: keep the tree in state so the user can retry cleanup.

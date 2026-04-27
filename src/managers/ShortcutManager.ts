@@ -56,8 +56,9 @@ export class ShortcutManager implements vscode.Disposable {
       }
     }
     // Pass the workspace folder URI so VS Code spawns the terminal on the correct side
-    // (host or inside the dev container) — passing a host path string would fall back to host.
-    const cwd: vscode.Uri | string | undefined = wsFolder?.uri ?? this.currentTree?.path;
+    // (host or inside the dev container). Never fall back to currentTree.path — that's a
+    // host path which fails inside a container.
+    const cwd: vscode.Uri | undefined = wsFolder?.uri;
     const terminal = vscode.window.createTerminal({
       name: sc.name,
       cwd,
@@ -70,6 +71,8 @@ export class ShortcutManager implements vscode.Disposable {
   }
 
   private openExternalTerminal(sc: ShortcutConfig & { type: 'terminal' }, app: string): void {
+    // External terminal apps run on the host. Only reachable from non-container windows,
+    // where workspaceFolders[0].fsPath is already a host path.
     const cwd = this.currentTree?.path ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!cwd) return;
     const cmd = sc.command;

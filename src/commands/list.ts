@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import type { ForestContext } from '../context';
+import { getHostWorkspacePath } from '../context';
 import { displayName } from '../state';
 import { notify } from '../notify';
 
@@ -8,7 +9,7 @@ export async function list(ctx: ForestContext): Promise<void> {
   const trees = ctx.stateManager.getTreesForRepo(state, ctx.repoPath).filter(t => t.path);
   if (!trees.length) { notify.info('No trees yet.'); return; }
 
-  const curPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const curPath = getHostWorkspacePath();
   const items = trees.map(t => ({
     label: displayName(t),
     description: t.path === curPath ? `current • ${t.branch}` : t.branch,

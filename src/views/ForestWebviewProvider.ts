@@ -4,6 +4,7 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import type { ForestConfig } from '../config';
 import type { ForestContext } from '../context';
+import { getHostWorkspacePath } from '../context';
 import { displayName, type StateManager, type TreeState } from '../state';
 import * as git from '../cli/git';
 import * as gh from '../cli/gh';
@@ -225,7 +226,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
     const repoPath = this.repoPath;
     const state = await this.stateManager.load();
     const trees = this.stateManager.getTreesForRepo(state, repoPath);
-    const curPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const curPath = getHostWorkspacePath();
 
     const liveKeys = new Set(trees.map(t => `${t.repoPath}:${t.branch}`));
     for (const k of this.dataCache.keys()) {
