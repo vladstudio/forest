@@ -2,7 +2,6 @@ import * as cp from 'child_process';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { type ForestConfig, type ShortcutConfig, allShortcuts } from '../config';
-import type { TreeState } from '../state';
 import { shellEscape } from '../utils/slug';
 import { notify } from '../notify';
 
@@ -11,7 +10,7 @@ export class ShortcutManager implements vscode.Disposable {
   private _onDidChange = new vscode.EventEmitter<void>();
   readonly onDidChange = this._onDidChange.event;
 
-  constructor(private config: ForestConfig, private currentTree: TreeState | undefined) {}
+  constructor(private config: ForestConfig) {}
 
   async open(sc: ShortcutConfig, viewColumn?: vscode.ViewColumn): Promise<void> {
     switch (sc.type) {
@@ -127,10 +126,6 @@ export class ShortcutManager implements vscode.Disposable {
       ? vscode.Uri.file(sc.path)
       : vscode.Uri.joinPath(wsFolder.uri, sc.path);
     await vscode.commands.executeCommand('vscode.open', target);
-  }
-
-  updateTree(tree: TreeState): void {
-    this.currentTree = tree;
   }
 
   dispose(): void {

@@ -180,7 +180,7 @@ export async function activate(context: vscode.ExtensionContext) {
   const currentTree = curPath ? Object.values(postPruneState.trees).find(t => t.path === curPath) : undefined;
   vscode.commands.executeCommand('setContext', 'forest.isTree', !!currentTree);
 
-  const shortcutManager = new ShortcutManager(config, currentTree);
+  const shortcutManager = new ShortcutManager(config);
   const statusBarManager = new StatusBarManager(currentTree);
   const forestProvider = new ForestWebviewProvider(stateManager, config, context.extensionUri);
   const shortcutsProvider = new ShortcutsTreeProvider(config);
@@ -349,7 +349,6 @@ export async function activate(context: vscode.ExtensionContext) {
         }
         ctx.currentTree = updated;
         statusBarManager.update(updated);
-        shortcutManager.updateTree(updated);
       } else {
         // Our tree was removed by another window — close this window
         vscode.commands.executeCommand('workbench.action.closeWindow');

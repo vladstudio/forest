@@ -127,6 +127,12 @@ When a PR is merged, you get a notification: *"ENG-1234 PR was merged. Clean up?
 
 If a `.envrc` file exists in the tree, Forest automatically runs `direnv allow` during tree creation.
 
+### Dev Containers
+
+If your repo has `.devcontainer/devcontainer.json`, the New Tree form shows a **Sandbox / Direct** toggle. Sandboxed trees open via the Dev Containers extension; Forest itself stays host-side, so all sidebar actions (Ship, Cleanup, Update, etc.) keep working from the container window. Cleanup removes the tree's containers and anonymous volumes (requires Docker).
+
+Git is intentionally not exposed inside the container — commit and push via the Forest sidebar or a host terminal, not from a container terminal.
+
 ### AI Integration
 
 Forest uses **Tetra** for AI-generated PR descriptions. To enable:
