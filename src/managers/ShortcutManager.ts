@@ -2,7 +2,6 @@ import * as cp from 'child_process';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { type ForestConfig, type ShortcutConfig, allShortcuts } from '../config';
-import type { TreeState } from '../state';
 import { shellEscape } from '../utils/slug';
 import { notify } from '../notify';
 
@@ -11,7 +10,7 @@ export class ShortcutManager implements vscode.Disposable {
   private _onDidChange = new vscode.EventEmitter<void>();
   readonly onDidChange = this._onDidChange.event;
 
-  constructor(private config: ForestConfig, private currentTree: TreeState | undefined) {}
+  constructor(private config: ForestConfig) {}
 
   async open(sc: ShortcutConfig, viewColumn?: vscode.ViewColumn): Promise<void> {
     switch (sc.type) {
@@ -37,9 +36,16 @@ export class ShortcutManager implements vscode.Disposable {
 
   private async openTerminal(sc: ShortcutConfig & { type: 'terminal' }, location?: vscode.ViewColumn, terminalApp?: string): Promise<void> {
     terminalApp ??= this.config.terminal[0];
+    const wsFolder = vscode.workspace.workspaceFolders?.[0];
+    const isRemoteWs = !!wsFolder && wsFolder.uri.scheme !== 'file';
+
     if (terminalApp !== 'integrated') {
-      this.openExternalTerminal(sc, terminalApp);
-      return;
+      if (isRemoteWs) {
+        notify.info(`External terminal "${terminalApp}" can't reach the dev container — using integrated.`);
+      } else {
+        this.openExternalTerminal(sc, terminalApp);
+        return;
+      }
     }
 
     const env: Record<string, string> = {};
@@ -48,9 +54,13 @@ export class ShortcutManager implements vscode.Disposable {
         env[k] = v;
       }
     }
+    // Pass the workspace folder URI so VS Code spawns the terminal on the correct side
+    // (host or inside the dev container). Never fall back to currentTree.path — that's a
+    // host path which fails inside a container.
+    const cwd: vscode.Uri | undefined = wsFolder?.uri;
     const terminal = vscode.window.createTerminal({
       name: sc.name,
-      cwd: this.currentTree?.path,
+      cwd,
       env,
       ...(location ? { location: { viewColumn: location } } : {}),
     });
@@ -60,7 +70,9 @@ export class ShortcutManager implements vscode.Disposable {
   }
 
   private openExternalTerminal(sc: ShortcutConfig & { type: 'terminal' }, app: string): void {
-    const cwd = this.currentTree?.path ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    // External terminal apps run on the host. Only reachable from non-container windows,
+    // where workspaceFolders[0].fsPath is already a host path.
+    const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!cwd) return;
     const cmd = sc.command;
     const lowerApp = app.toLowerCase();
@@ -106,14 +118,14 @@ export class ShortcutManager implements vscode.Disposable {
   }
 
   private async openFile(sc: ShortcutConfig & { type: 'file' }): Promise<void> {
-    const base = this.currentTree?.path ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (!base) return;
-    const filePath = path.isAbsolute(sc.path) ? sc.path : path.join(base, sc.path);
-    await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(filePath));
-  }
-
-  updateTree(tree: TreeState): void {
-    this.currentTree = tree;
+    const wsFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!wsFolder) return;
+    // Use the workspace folder URI as base so the path resolves on the right side
+    // (host vs dev container) and preserves URI scheme.
+    const target = path.isAbsolute(sc.path)
+      ? vscode.Uri.file(sc.path)
+      : vscode.Uri.joinPath(wsFolder.uri, sc.path);
+    await vscode.commands.executeCommand('vscode.open', target);
   }
 
   dispose(): void {

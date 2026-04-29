@@ -4,13 +4,14 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import type { ForestConfig } from '../config';
 import type { ForestContext } from '../context';
+import { getHostWorkspacePath } from '../context';
 import { displayName, type StateManager, type TreeState } from '../state';
 import * as git from '../cli/git';
 import * as gh from '../cli/gh';
 import * as linear from '../cli/linear';
 import * as ai from '../cli/ai';
 import { formatBranch } from '../utils/slug';
-import { copyConfigFiles, createTree, ensureTreeIdle, ensureWorkspaceFile, focusOrOpenWindow, getBlockingTreeOperation, updateLinear, withTreeOperation } from '../commands/shared';
+import { copyConfigFiles, createTree, ensureTreeIdle, focusOrOpenWindow, getBlockingTreeOperation, openTreeWindow, updateLinear, withTreeOperation } from '../commands/shared';
 import { executeDeletePlan, type DeletePlan } from '../commands/cleanup';
 import { shipCore } from '../commands/ship';
 import { notify } from '../notify';
@@ -108,6 +109,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
     const repoPath = this.repoPath;
     const localChanges = await git.localChanges(repoPath).catch(() => null);
     const uncommittedCount = localChanges ? localChanges.added + localChanges.removed + localChanges.modified : 0;
+    const hasDevcontainer = fs.existsSync(path.join(repoPath, '.devcontainer', 'devcontainer.json'));
     this.postMessage({
       type: 'showCreateForm',
       init: {
@@ -115,6 +117,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
         teams: this.config.linear.teams ?? [],
         uncommittedCount,
         branchFormat: this.config.branchFormat,
+        hasDevcontainer,
       },
     });
   }
@@ -223,7 +226,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
     const repoPath = this.repoPath;
     const state = await this.stateManager.load();
     const trees = this.stateManager.getTreesForRepo(state, repoPath);
-    const curPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const curPath = getHostWorkspacePath();
 
     const liveKeys = new Set(trees.map(t => `${t.repoPath}:${t.branch}`));
     for (const k of this.dataCache.keys()) {
@@ -519,7 +522,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
       }
 
       case 'switch':
-        if (tree?.path) focusOrOpenWindow(vscode.Uri.file(ensureWorkspaceFile(tree)));
+        if (tree?.path) openTreeWindow(tree);
         break;
 
       case 'workingDiff': {
@@ -682,6 +685,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
           title,
           existingBranch: msg.branchMode === 'existing',
           carryChanges,
+          useDevcontainer: !!msg.useDevcontainer,
         });
       } catch (e: any) {
         // Revert Linear issue status if we just created it

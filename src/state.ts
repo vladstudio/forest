@@ -17,6 +17,7 @@ export interface TreeState {
   busyOperation?: string;
   busyHeartbeatAt?: string;
   needsSetup?: boolean;
+  useDevcontainer?: boolean;
 }
 
 export const TREE_OPERATION_HEARTBEAT_MS = 15_000;
