@@ -203,6 +203,9 @@ export async function activate(context: vscode.ExtensionContext) {
   };
   forestProvider.setContext(ctx);
 
+  // Pre-warm tree data cache so the sidebar renders instantly on first open.
+  forestProvider.refresh();
+
   // Warm the automerge detection cache so the ship buttons render correctly without a network wait.
   if (config.github.enabled) {
     gh.repoHasAutomerge(repoPath).then(() => forestProvider.refresh()).catch(() => {});

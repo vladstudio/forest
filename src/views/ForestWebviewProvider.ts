@@ -184,10 +184,12 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
   }
 
   private async update(): Promise<void> {
-    if (!this.view?.visible || !this.ctx) return;
+    if (!this.ctx) return;
     try {
       const data = await this.buildData();
-      this.view.webview.postMessage({ type: 'update', data });
+      if (this.view?.visible) {
+        this.view.webview.postMessage({ type: 'update', data });
+      }
     } catch (e: any) {
       this.log(`Webview update failed: ${e.stack ?? e.message}`);
     }
