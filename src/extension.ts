@@ -222,7 +222,7 @@ export async function activate(context: vscode.ExtensionContext) {
     }));
 
   const lookupTree = (branch?: string) =>
-    branch ? stateManager.getTree(stateManager.loadSync(), repoPath, branch) : undefined;
+    branch ? stateManager.getTree(stateManager.getCached(), repoPath, branch) : undefined;
   const andRefresh = <T>(fn: () => Promise<T>) => async () => { await fn(); forestProvider.refreshTrees(); };
 
   reg('forest.create', () => ctx.forestProvider.showCreateForm());

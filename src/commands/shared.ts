@@ -15,7 +15,7 @@ import { notify } from '../notify';
 /** Resolve tree from arg or current context, showing an error if not found or missing path. */
 export function requireTree(ctx: ForestContext, arg: TreeState | string | undefined, action: string): (TreeState & { path: string }) | undefined {
   const tree = typeof arg === 'string'
-    ? ctx.stateManager.getTree(ctx.stateManager.loadSync(), ctx.repoPath, arg)
+    ? ctx.stateManager.getTree(ctx.stateManager.getCached(), ctx.repoPath, arg)
     : arg ?? ctx.currentTree;
   if (!tree) { notify.error(`No tree to ${action}. Run from a tree window or select from sidebar.`); return undefined; }
   if (!tree.path) { notify.error(`Cannot ${action}: tree has no worktree path.`); return undefined; }
@@ -211,8 +211,10 @@ export async function createTree(opts: {
       ...(useDevcontainer ? { useDevcontainer: true } : {}),
     };
 
-    // Save state early to prevent duplicates across windows.
-    await stateManager.addTree(repoPath, tree);
+    // Defer state persistence until after worktree creation succeeds.
+    // The in-memory createInProgress guard prevents duplicates within this
+    // process; the file lock in modify() prevents duplicates across windows.
+    let stateSaved = false;
 
     try {
       return await vscode.window.withProgress(
@@ -224,11 +226,20 @@ export async function createTree(opts: {
           } else {
             await git.createWorktree(repoPath, treePath, branch, config.baseBranch);
           }
+          // Worktree created successfully — now persist state.
+          await stateManager.addTree(repoPath, tree);
+          stateSaved = true;
+
           if (carryChanges) {
-            try { await git.stashApply(treePath, carryChanges); } catch {
+            try {
+              // Stash refs are local to the repo where they were created (main repo).
+              // Extract a patch there, then apply it in the new worktree.
+              const patch = await git.stashPatch(repoPath, carryChanges);
+              await git.applyPatch(treePath, patch);
+            } catch {
               throw new Error('Could not apply uncommitted changes (conflict). Run "git stash pop" in your main repo to recover.');
             }
-            await git.stashDrop(treePath, carryChanges).catch(() => {});
+            await git.stashDrop(repoPath, carryChanges).catch(() => {});
           }
 
           void git.pushBranch(treePath, branch).catch(() => notify.warn('Failed to push branch. You can push manually later.'));
@@ -241,7 +252,7 @@ export async function createTree(opts: {
         },
       );
     } catch (e: any) {
-      await stateManager.removeTree(repoPath, branch);
+      if (stateSaved) await stateManager.removeTree(repoPath, branch);
       await git.removeWorktree(repoPath, treePath).catch(() => {});
       if (!existingBranch) await git.deleteBranch(repoPath, branch).catch(() => {});
       throw e;

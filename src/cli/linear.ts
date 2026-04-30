@@ -92,7 +92,7 @@ export async function listMyIssues(states: string[], teams?: string[], opts?: { 
     if (teams?.length) filter.team = { key: { in: teams } };
     const data = await gql<{ issues: { nodes: { identifier: string; title: string; state: { name: string; type: string }; priority: number; url: string }[] } }>(
       `query($filter: IssueFilter!) {
-        issues(filter: $filter, orderBy: updatedAt, first: 50) {
+        issues(filter: $filter, orderBy: updatedAt, first: 100) {
           nodes { identifier title state { name type } priority url }
         }
       }`,

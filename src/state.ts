@@ -43,6 +43,8 @@ export class StateManager {
   private debounceTimer?: ReturnType<typeof setTimeout>;
   private writeLock = Promise.resolve();
   private lastWrittenContent = '';
+  /** In-memory cache to avoid synchronous disk reads on the extension host thread. */
+  private cachedState: ForestState | undefined;
 
   constructor() {
     this.statePath = path.join(os.homedir(), '.forest', 'state.json');
@@ -69,7 +71,9 @@ export class StateManager {
           if (content !== lastContent) {
             lastContent = content;
             if (content === this.lastWrittenContent) return; // self-write
-            this._onDidChange.fire({ state: JSON.parse(content), isLocal: false });
+            const state = JSON.parse(content) as ForestState;
+            this.cachedState = state;
+            this._onDidChange.fire({ state, isLocal: false });
           }
         } catch { }
       }, 50);
@@ -77,7 +81,11 @@ export class StateManager {
   }
 
   async load(): Promise<ForestState> {
-    try { return JSON.parse(await fs.promises.readFile(this.statePath, 'utf8')) as ForestState; } catch (e: any) {
+    try {
+      const state = JSON.parse(await fs.promises.readFile(this.statePath, 'utf8')) as ForestState;
+      this.cachedState = state;
+      return state;
+    } catch (e: any) {
       if (e.code === 'ENOENT') {
         const empty: ForestState = { version: 1, trees: {} };
         await this.save(empty);
@@ -90,17 +98,19 @@ export class StateManager {
     }
   }
 
+  /** Returns the last-known state without touching disk. Falls back to async load on first call. */
+  getCached(): ForestState {
+    return this.cachedState ?? { version: 1, trees: {} };
+  }
+
   loadSync(): ForestState {
-    try {
-      return JSON.parse(fs.readFileSync(this.statePath, 'utf8')) as ForestState;
-    } catch {
-      return { version: 1, trees: {} };
-    }
+    return this.getCached();
   }
 
   private async save(state: ForestState): Promise<void> {
     const data = JSON.stringify(state, null, 2);
     this.lastWrittenContent = data;
+    this.cachedState = state;
     const tmp = this.statePath + '.tmp';
     await fs.promises.writeFile(tmp, data, 'utf8');
     await fs.promises.rename(tmp, this.statePath);
@@ -110,17 +120,48 @@ export class StateManager {
     return `${repoPath}:${branch}`;
   }
 
-  /** Cross-process file lock using mkdir (atomic on all platforms). */
+  /** Cross-process file lock using mkdir (atomic on all platforms).
+   *  Writes PID + timestamp into the lock dir so stale detection can check
+   *  whether the holder process is still alive (robust on NFS / after kernel panic). */
   private async withFileLock<T>(fn: () => Promise<T>): Promise<T> {
     const lock = this.statePath + '.lock';
+    const lockFile = path.join(lock, 'owner');
     for (let i = 0;; i++) {
-      try { fs.mkdirSync(lock); } catch (e: any) {
+      try {
+        fs.mkdirSync(lock);
+        fs.writeFileSync(lockFile, `${process.pid}:${Date.now()}`, 'utf8');
+      } catch (e: any) {
         if (e.code !== 'EEXIST') throw e;
-        try { if (Date.now() - fs.statSync(lock).mtimeMs > 10_000) { fs.rmdirSync(lock); continue; } } catch {}
+        try {
+          const content = fs.readFileSync(lockFile, 'utf8');
+          const [pidStr, tsStr] = content.split(':');
+          const pid = parseInt(pidStr, 10);
+          const ts = parseInt(tsStr, 10);
+          // Stale if: holder process is dead OR lock is older than 10 seconds
+          const holderDead = Number.isFinite(pid) && !this.isProcessAlive(pid);
+          const lockStale = Number.isFinite(ts) && Date.now() - ts > 10_000;
+          if (holderDead || lockStale) {
+            try { fs.rmSync(lock, { recursive: true, force: true }); } catch { /* raced */ }
+            continue;
+          }
+        } catch {
+          // Corrupt or missing owner file — check mtime as fallback
+          try { if (Date.now() - fs.statSync(lock).mtimeMs > 10_000) { fs.rmSync(lock, { recursive: true, force: true }); continue; } } catch {}
+        }
         if (i >= 99) throw new Error('State file is locked');
         await new Promise(r => setTimeout(r, 50)); continue;
       }
-      try { return await fn(); } finally { try { fs.rmdirSync(lock); } catch {} }
+      try { return await fn(); } finally { try { fs.rmSync(lock, { recursive: true, force: true }); } catch {} }
+    }
+  }
+
+  private isProcessAlive(pid: number): boolean {
+    try {
+      // Sending signal 0 is a no-op that checks if the process exists
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
     }
   }
 
