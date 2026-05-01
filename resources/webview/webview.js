@@ -13,7 +13,7 @@ const pendingLabels = {
   pull: 'pulling…', push: 'pushing…', mergeFromMain: 'merging…',
   commit: 'committing…', discard: 'discarding…', ship: 'shipping…', shipMerge: 'shipping…',
   pickBranch: 'loading…', pickIssue: 'loading…', openTicket: 'opening…', copyTicketDescription: 'copying…',
-  workingDiff: 'loading…', branchDiff: 'loading…', mainDiff: 'loading…',
+  workingDiff: 'loading…', branchDiff: 'loading…',
 };
 
 function defaultFormState(init) {
@@ -337,7 +337,6 @@ function treeCard(t, d) {
     '<div class="row equal-fill">' +
     btn('workingDiff', (stats ? '<span class="stats">' + stats + '</span>' : '') + ic('diff'), allDis || !lc, { attrs: 'title="Diff working changes"' }) +
     btn('branchDiff', ic('diff') + '<span class="label">Branch</span>', allDis, { attrs: 'title="Diff branch changes"' }) +
-    btn('mainDiff', ic('diff') + '<span class="label">Main</span>', allDis, { attrs: 'title="Diff main against branch"' }) +
     btn('discard', ic('x'), allDis || !lc, { cls: 'danger', attrs: 'title="Discard changes"' }) +
     '</div>' +
     '<div class="field-label">Tree</div><div class="row">' + lastRow + '</div>' +

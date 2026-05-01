@@ -301,20 +301,6 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  private async openMainDiff(tree: TreeState): Promise<void> {
-    if (!tree.path) return;
-    const remoteBase = `origin/${this.config.baseBranch}`;
-    const changes = await git.diffFilesBetweenRefs(tree.path, remoteBase, 'HEAD');
-    await this.openRefDiff(tree, {
-      title: 'main diff',
-      leftRef: remoteBase,
-      rightRef: 'HEAD',
-      changes,
-      emptyMessage: `No differences between ${this.config.baseBranch} and this branch.`,
-      sourcePath: `${tree.path}/${remoteBase}..HEAD`,
-    });
-  }
-
   private async openRefDiff(
     tree: TreeState,
     opts: {
@@ -540,12 +526,6 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
       case 'branchDiff': {
         if (!tree || !tree.path) { bail(); return; }
         await this.runPending(async () => { await this.openBaseDiff(tree); });
-        break;
-      }
-
-      case 'mainDiff': {
-        if (!tree || !tree.path) { bail(); return; }
-        await this.runPending(async () => { await this.openMainDiff(tree); });
         break;
       }
 
