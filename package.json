@@ -198,6 +198,12 @@
         "icon": "$(play)"
       },
       {
+        "command": "forest.runShortcut",
+        "title": "Run Shortcut…",
+        "category": "Forest",
+        "icon": "$(play)"
+      },
+      {
         "command": "forest.openShortcutWith",
         "title": "Open With…",
         "category": "Forest",

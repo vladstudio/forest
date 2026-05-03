@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { loadConfig, getTreesDir } from './config';
+import { loadConfig, getTreesDir, allShortcuts } from './config';
 import { ShortcutItem, ShortcutsTreeProvider } from './views/ShortcutsTreeProvider';
 import { StateManager } from './state';
 import { ForestContext, getHostWorkspacePath, getRepoPath } from './context';
@@ -259,6 +259,21 @@ export async function activate(context: vscode.ExtensionContext) {
   const unwrap = (arg: any) => arg instanceof ShortcutItem ? arg.shortcut : arg;
   reg('forest.openShortcut', (arg: any) => shortcutManager.open(unwrap(arg)));
   reg('forest.openShortcutWith', (arg: any) => shortcutManager.openWith(unwrap(arg)));
+  reg('forest.runShortcut', async () => {
+    const shortcuts = allShortcuts(config.shortcuts);
+    if (!shortcuts.length) { notify.info('No shortcuts configured.'); return; }
+    const items = shortcuts.map(sc => ({
+      label: sc.name,
+      description: sc.type === 'terminal' ? (sc as any).command : sc.type === 'browser' ? (sc as any).url : (sc as any).path,
+      detail: sc.type === 'terminal' ? '$(terminal) Terminal' : sc.type === 'browser' ? '$(globe) Browser' : '$(file) File',
+      shortcut: sc,
+    }));
+    const picked = await vscode.window.showQuickPick(items, {
+      placeHolder: 'Run a shortcut…',
+      matchOnDescription: true,
+    });
+    if (picked) shortcutManager.open(picked.shortcut);
+  });
 
 
   // Refresh when window gains focus (cross-window coordination)
