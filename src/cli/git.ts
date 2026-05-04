@@ -7,12 +7,23 @@ const stashRef = (ref: number | string) => typeof ref === 'number' ? `stash@{${r
 
 export async function createWorktree(
   repoPath: string, worktreePath: string, branch: string, baseRef: string,
+  opts?: { from?: string },
 ): Promise<void> {
-  await Promise.all([
-    exec('git', ['fetch', 'origin', baseRef], { cwd: repoPath }),
-    exec('git', ['worktree', 'prune'], { cwd: repoPath }),
-  ]);
-  await exec('git', ['-c', 'checkout.workers=0', 'worktree', 'add', worktreePath, '-b', branch, `origin/${baseRef}`], { cwd: repoPath });
+  const from = opts?.from ?? `origin/${baseRef}`;
+  if (opts?.from) {
+    await exec('git', ['worktree', 'prune'], { cwd: repoPath });
+  } else {
+    await Promise.all([
+      exec('git', ['fetch', 'origin', baseRef], { cwd: repoPath }),
+      exec('git', ['worktree', 'prune'], { cwd: repoPath }),
+    ]);
+  }
+  await exec('git', ['-c', 'checkout.workers=0', 'worktree', 'add', worktreePath, '-b', branch, from], { cwd: repoPath });
+}
+
+export async function resolveRef(repoPath: string, ref: string): Promise<string> {
+  const { stdout } = await exec('git', ['rev-parse', ref], { cwd: repoPath });
+  return stdout.trim();
 }
 
 export async function removeWorktree(repoPath: string, worktreePath: string): Promise<void> {
@@ -76,7 +87,7 @@ export async function stashDrop(repoPath: string, ref: number | string): Promise
 
 /** Get a stash entry as a unified diff patch. Must run in the repo that owns the stash. */
 export async function stashPatch(repoPath: string, ref: number | string): Promise<string> {
-  const { stdout } = await exec('git', ['stash', 'show', '-p', stashRef(ref)], { cwd: repoPath, timeout: 30_000 });
+  const { stdout } = await exec('git', ['stash', 'show', '-p', '--include-untracked', stashRef(ref)], { cwd: repoPath, timeout: 30_000 });
   return stdout;
 }
 

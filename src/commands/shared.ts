@@ -224,7 +224,11 @@ export async function createTree(opts: {
           if (existingBranch) {
             await git.checkoutWorktree(repoPath, treePath, branch);
           } else {
-            await git.createWorktree(repoPath, treePath, branch, config.baseBranch);
+            // Carrying: base the new tree on the same commit the stash was made
+            // against, so the patch applies cleanly. Otherwise local HEAD vs
+            // origin/baseBranch drift produces 3-way conflicts.
+            const from = carryChanges ? await git.resolveRef(repoPath, `${carryChanges}^1`) : undefined;
+            await git.createWorktree(repoPath, treePath, branch, config.baseBranch, from ? { from } : undefined);
           }
           // Worktree created successfully — now persist state.
           await stateManager.addTree(repoPath, tree);
