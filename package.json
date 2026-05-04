@@ -58,6 +58,11 @@
           "id": "forest",
           "title": "Forest",
           "icon": "resources/forest.svg"
+        },
+        {
+          "id": "forestShortcuts",
+          "title": "Forest: Shortcuts",
+          "icon": "resources/shortcuts.svg"
         }
       ]
     },
@@ -78,7 +83,9 @@
           "name": "Forest",
           "type": "webview",
           "when": "forest.active && forest.ghAvailable"
-        },
+        }
+      ],
+      "forestShortcuts": [
         {
           "id": "forest.shortcuts",
           "name": "Shortcuts",
