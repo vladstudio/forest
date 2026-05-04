@@ -22,7 +22,7 @@ function defaultFormState(init) {
     branchName: '',
     existingBranch: null,
     branchManuallyEdited: false,
-    ticketMode: init.linearEnabled ? 'new' : 'none',
+    ticketMode: 'none',
     ticketId: null,
     ticketTitle: null,
     newTicketTitle: '',
@@ -180,7 +180,7 @@ const h = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&
 const dis = v => v ? ' disabled' : '';
 
 function sanitizeBranch(v) {
-  return v.replace(/[<>:"|?*\x00-\x1f\s~^\\]+/g, '-').replace(/\.{2,}/g, '-').replace(/\/\//g, '/').replace(/-+/g, '-').replace(/^[-./]+|[-./]+$/g, '');
+  return v.toLowerCase().replace(/[<>:"|?*\x00-\x1f\s~^\\]+/g, '-').replace(/\.{2,}/g, '-').replace(/\/\//g, '/').replace(/-+/g, '-').replace(/^[-./]+|[-./]+$/g, '');
 }
 
 function slugifyStr(t) {
@@ -549,8 +549,15 @@ function setupFormListeners() {
   var branchInput = document.getElementById('branchNameInput');
   if (branchInput) {
     branchInput.addEventListener('input', function (e) {
-      formState.branchName = e.target.value;
-      formState.branchManuallyEdited = e.target.value.length > 0;
+      var lower = e.target.value.toLowerCase();
+      if (lower !== e.target.value) {
+        var start = e.target.selectionStart;
+        var end = e.target.selectionEnd;
+        e.target.value = lower;
+        e.target.setSelectionRange(start, end);
+      }
+      formState.branchName = lower;
+      formState.branchManuallyEdited = lower.length > 0;
       updateFormHints();
     });
     if (formState.ticketMode !== 'new' || formState.newTicketTitle) branchInput.focus();
@@ -579,6 +586,21 @@ function setupFormListeners() {
     });
   }
   updateFormHints();
+
+  // Cmd+Enter (Mac) / Ctrl+Enter (Windows/Linux) to submit
+  function onKeyDown(e) {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      var btn = document.getElementById('submitBtn');
+      if (btn && !btn.disabled) btn.click();
+    }
+  }
+  document.addEventListener('keydown', onKeyDown);
+  // Cleanup when form is re-rendered
+  var observer = new MutationObserver(function () {
+    document.removeEventListener('keydown', onKeyDown);
+    observer.disconnect();
+  });
+  observer.observe(document.getElementById('root'), { childList: true });
 }
 
 function updateFormHints() {
