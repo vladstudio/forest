@@ -61,7 +61,7 @@ export async function pull(worktreePath: string, branch: string, opts?: { signal
 
 export async function pullMerge(worktreePath: string, baseRef: string, opts?: { signal?: AbortSignal }): Promise<void> {
   await exec('git', ['fetch', 'origin'], { cwd: worktreePath, signal: opts?.signal });
-  await exec('git', ['merge', `origin/${baseRef}`], { cwd: worktreePath, timeout: 60_000, signal: opts?.signal });
+  await exec('git', ['merge', '-s', 'ort', `origin/${baseRef}`], { cwd: worktreePath, timeout: 60_000, signal: opts?.signal });
 }
 
 export async function pullRebase(worktreePath: string, baseRef: string, opts?: { signal?: AbortSignal }): Promise<void> {
