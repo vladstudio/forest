@@ -236,12 +236,13 @@ export async function createTree(opts: {
 
           if (carryChanges) {
             try {
-              // Stash refs are local to the repo where they were created (main repo).
-              // Extract a patch there, then apply it in the new worktree.
-              const patch = await git.stashPatch(repoPath, carryChanges);
-              await git.applyPatch(treePath, patch);
-            } catch {
-              throw new Error('Could not apply uncommitted changes (conflict). Run "git stash pop" in your main repo to recover.');
+              // Worktree was created from the stash's parent (see `from` above),
+              // so the worktree's HEAD matches the stash's base — `git stash apply`
+              // restores tracked + index + untracked changes cleanly.
+              await git.stashApply(treePath, carryChanges);
+            } catch (e: any) {
+              const detail = (e?.stderr || e?.message || String(e)).trim().split('\n').slice(0, 4).join(' ');
+              throw new Error(`Could not apply uncommitted changes. Run "git stash pop" in your main repo to recover. (${detail})`);
             }
             await git.stashDrop(repoPath, carryChanges).catch(() => {});
           }

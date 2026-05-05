@@ -77,30 +77,12 @@ export async function stash(repoPath: string, message: string): Promise<string> 
   return ref;
 }
 
-export async function stashApply(repoPath: string, ref: number | string): Promise<void> {
-  await exec('git', ['stash', 'apply', stashRef(ref)], { cwd: repoPath });
+export async function stashApply(worktreePath: string, ref: number | string): Promise<void> {
+  await exec('git', ['stash', 'apply', stashRef(ref)], { cwd: worktreePath });
 }
 
 export async function stashDrop(repoPath: string, ref: number | string): Promise<void> {
   await exec('git', ['stash', 'drop', stashRef(ref)], { cwd: repoPath });
-}
-
-/** Get a stash entry as a unified diff patch. Must run in the repo that owns the stash. */
-export async function stashPatch(repoPath: string, ref: number | string): Promise<string> {
-  const { stdout } = await exec('git', ['stash', 'show', '-p', '--include-untracked', stashRef(ref)], { cwd: repoPath, timeout: 30_000 });
-  return stdout;
-}
-
-/** Apply a unified diff patch to a working tree (e.g. a worktree). */
-export async function applyPatch(worktreePath: string, patch: string): Promise<void> {
-  // Write patch to a temp file to avoid shell escaping issues with stdin
-  const tmp = path.join(os.tmpdir(), `forest-patch-${Date.now()}.diff`);
-  try {
-    fs.writeFileSync(tmp, patch, 'utf8');
-    await exec('git', ['apply', '--3way', tmp], { cwd: worktreePath, timeout: 30_000 });
-  } finally {
-    try { fs.unlinkSync(tmp); } catch { /* non-fatal */ }
-  }
 }
 
 export async function discardChanges(repoPath: string, opts?: { signal?: AbortSignal }): Promise<void> {
