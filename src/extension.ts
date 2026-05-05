@@ -230,7 +230,36 @@ export async function activate(context: vscode.ExtensionContext) {
 		return stateManager.load();
 	};
 
-	const postPruneState = await recoverOrphanWorktrees(await pruneOrphans());
+	/** Remove directories that are not in state and not valid git worktrees (e.g. Docker bind-mount junk). */
+	const cleanupOrphanDirectories = async (
+		state: import("./state").ForestState,
+	): Promise<import("./state").ForestState> => {
+		const treesDir = getTreesDir(repoPath);
+		if (!fs.existsSync(treesDir)) return state;
+		const knownPaths = new Set(
+			stateManager
+				.getTreesForRepo(state, repoPath)
+				.map((t) => t.path)
+				.filter(Boolean),
+		);
+		for (const entry of fs.readdirSync(treesDir)) {
+			if (entry.startsWith(".")) continue;
+			const dirPath = path.join(treesDir, entry);
+			if (!fs.statSync(dirPath).isDirectory()) continue;
+			if (knownPaths.has(dirPath)) continue;
+			// Skip valid git worktrees (recoverOrphanWorktrees handles those)
+			if (fs.existsSync(path.join(dirPath, ".git"))) continue;
+			outputChannel.appendLine(
+				`[Forest] Removing orphan directory: ${dirPath}`,
+			);
+			await fs.promises.rm(dirPath, { recursive: true, force: true });
+		}
+		return state;
+	};
+
+	const postPruneState = await cleanupOrphanDirectories(
+		await recoverOrphanWorktrees(await pruneOrphans()),
+	);
 
 	// Detect if current workspace is a tree (reuse state after pruning).
 	// getHostWorkspacePath maps remote (dev container) workspace URIs back to the host tree path.

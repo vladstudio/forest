@@ -331,8 +331,29 @@ button {
 .radio-option:hover { background: var(--forest-hover); }
 
 .radio-option input {
+  appearance: none;
+  -webkit-appearance: none;
   margin: 2px 0 0;
-  accent-color: var(--vscode-button-background);
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid var(--vscode-checkbox-border, var(--forest-border));
+  background: var(--vscode-checkbox-background, transparent);
+  cursor: pointer;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.radio-option input:checked {
+  border-color: var(--vscode-focusBorder, var(--vscode-button-background));
+}
+
+.radio-option input:checked::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--vscode-focusBorder, var(--vscode-button-background));
 }
 
 .radio-option input:focus,
@@ -343,6 +364,7 @@ button {
 }
 
 .radio-option.disabled { opacity: 0.6; cursor: default; }
+.radio-option.disabled input { cursor: default; }
 
 .radio-body { min-width: 0; flex: 1; }
 
