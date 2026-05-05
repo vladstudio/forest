@@ -62,7 +62,7 @@
         {
           "id": "forestShortcuts",
           "title": "Forest: Shortcuts",
-          "icon": "resources/shortcuts.svg"
+          "icon": "resources/forest-shortcuts.svg"
         }
       ]
     },
