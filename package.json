@@ -1,294 +1,296 @@
 {
-  "name": "vladstudio-forest",
-  "displayName": "Forest — Git Worktrees",
-  "description": "Manage parallel feature development with git worktrees",
-  "version": "0.1.26",
-  "publisher": "vladstudio",
-  "icon": "forest-color.png",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/vladstudio/forest"
-  },
-  "galleryBanner": {
-    "color": "#1e1e1e",
-    "theme": "dark"
-  },
-  "license": "MIT",
-  "engines": {
-    "vscode": "^1.109.0"
-  },
-  "categories": [
-    "SCM Providers"
-  ],
-  "keywords": [
-    "git",
-    "worktree",
-    "linear",
-    "workflow",
-    "monorepo"
-  ],
-  "main": "./dist/extension.js",
-  "extensionKind": ["ui"],
-  "activationEvents": [
-    "workspaceContains:.forest/config.json",
-    "onView:forest.setup"
-  ],
-  "scripts": {
-    "vscode:prepublish": "bun run package",
-    "compile": "bun run check-types && node esbuild.js",
-    "watch": "concurrently \"node esbuild.js --watch\" \"tsc --noEmit --watch --project tsconfig.json\"",
-    "package": "bun run check-types && node esbuild.js --production",
-    "check-types": "tsc --noEmit",
-    "lint": "eslint src"
-  },
-  "devDependencies": {
-    "@types/node": "^20.19.35",
-    "@types/vscode": "^1.109.0",
-    "@typescript-eslint/eslint-plugin": "^8.46.1",
-    "@typescript-eslint/parser": "^8.46.1",
-    "concurrently": "^9.2.1",
-    "esbuild": "^0.24.2",
-    "eslint": "^9.39.3",
-    "typescript": "^5.9.3"
-  },
-  "contributes": {
-    "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "forest",
-          "title": "Forest",
-          "icon": "resources/forest.svg"
-        },
-        {
-          "id": "forestShortcuts",
-          "title": "Forest: Shortcuts",
-          "icon": "resources/forest-shortcuts.svg"
-        }
-      ]
-    },
-    "views": {
-      "forest": [
-        {
-          "id": "forest.setup",
-          "name": "Setup",
-          "when": "!forest.active"
-        },
-        {
-          "id": "forest.ghMissing",
-          "name": "Setup",
-          "when": "forest.active && !forest.ghAvailable"
-        },
-        {
-          "id": "forest.trees",
-          "name": "Forest",
-          "type": "webview",
-          "when": "forest.active && forest.ghAvailable"
-        }
-      ],
-      "forestShortcuts": [
-        {
-          "id": "forest.shortcuts",
-          "name": "Shortcuts",
-          "when": "forest.active && forest.ghAvailable"
-        }
-      ]
-    },
-    "viewsWelcome": [
-      {
-        "view": "forest.setup",
-        "contents": "$(folder) Forest needs an open folder to operate.\n\n[Open Folder](command:vscode.openFolder)",
-        "when": "workspaceFolderCount == 0"
-      },
-      {
-        "view": "forest.setup",
-        "contents": "$(gear) Forest is not configured for this workspace.\n\nAsk your AI agent:\n\n`Set up Forest (https://github.com/vladstudio/forest) for this project. Create .forest/config.json with the required configuration.`\n\n[Copy to Clipboard](command:forest.copySetupPrompt)\n\n[Reload Window](command:workbench.action.reloadWindow)",
-        "when": "workspaceFolderCount != 0"
-      },
-      {
-        "view": "forest.ghMissing",
-        "contents": "$(warning) GitHub CLI (gh) is required.\n\nForest uses gh to create and manage pull requests.\n\n[Install GitHub CLI](https://cli.github.com)"
-      }
-    ],
-    "commands": [
-      {
-        "command": "forest.copySetupPrompt",
-        "title": "Copy Setup Prompt",
-        "category": "Forest"
-      },
-      {
-        "command": "forest.revealInFinder",
-        "title": "Reveal in Finder",
-        "category": "Forest"
-      },
-      {
-        "command": "forest.create",
-        "title": "New Tree…",
-        "category": "Forest",
-        "icon": "$(add)"
-      },
-      {
-        "command": "forest.start",
-        "title": "Start — Create Tree from Issue",
-        "category": "Forest",
-        "icon": "$(folder)"
-      },
-      {
-        "command": "forest.switch",
-        "title": "Switch Tree",
-        "category": "Forest",
-        "icon": "$(arrow-swap)"
-      },
-      {
-        "command": "forest.ship",
-        "title": "Ship — Push & Create PR",
-        "category": "Forest",
-        "icon": "$(rocket)"
-      },
-      {
-        "command": "forest.shipMerge",
-        "title": "Ship + Automerge — Push, Create PR & Enable Automerge",
-        "category": "Forest",
-        "icon": "$(rocket)"
-      },
-      {
-        "command": "forest.deleteTree",
-        "title": "Delete Tree...",
-        "category": "Forest",
-        "icon": "$(trash)"
-      },
-      {
-        "command": "forest.update",
-        "title": "Update — Merge from Main",
-        "category": "Forest",
-        "icon": "$(refresh)"
-      },
-      {
-        "command": "forest.pull",
-        "title": "Pull",
-        "category": "Forest",
-        "icon": "$(cloud-download)"
-      },
-      {
-        "command": "forest.push",
-        "title": "Push",
-        "category": "Forest",
-        "icon": "$(cloud-upload)"
-      },
-      {
-        "command": "forest.list",
-        "title": "List All Trees",
-        "category": "Forest",
-        "icon": "$(list-tree)"
-      },
-      {
-        "command": "forest.copyBranch",
-        "title": "Copy Branch Name",
-        "category": "Forest",
-        "icon": "$(copy)"
-      },
-      {
-        "command": "forest.openMain",
-        "title": "Open Main Repo",
-        "category": "Forest",
-        "icon": "$(home)"
-      },
-      {
-        "command": "forest.refresh",
-        "title": "Refresh",
-        "category": "Forest",
-        "icon": "$(refresh)"
-      },
-      {
-        "command": "forest.openShortcut",
-        "title": "Open Shortcut",
-        "category": "Forest",
-        "icon": "$(play)"
-      },
-      {
-        "command": "forest.runShortcut",
-        "title": "Run Shortcut…",
-        "category": "Forest",
-        "icon": "$(play)"
-      },
-      {
-        "command": "forest.openShortcutWith",
-        "title": "Open With…",
-        "category": "Forest",
-        "icon": "$(list-selection)"
-      },
-      {
-        "command": "forest.rebase",
-        "title": "Rebase onto Main",
-        "category": "Forest",
-        "icon": "$(git-merge)"
-      },
-      {
-        "command": "forest.openPR",
-        "title": "View Pull Request",
-        "category": "Forest",
-        "icon": "$(link-external)"
-      },
-      {
-        "command": "forest.openTicket",
-        "title": "View Linear Ticket",
-        "category": "Forest",
-        "icon": "$(link-external)"
-      },
-      {
-        "command": "forest.linkTicket",
-        "title": "Attach Linear Ticket…",
-        "category": "Forest",
-        "icon": "$(link)"
-      }
-    ],
-    "menus": {
-      "view/title": [
-        {
-          "command": "forest.refresh",
-          "when": "view == forest.trees",
-          "group": "navigation"
-        },
-        {
-          "command": "forest.create",
-          "when": "view == forest.trees",
-          "group": "navigation"
-        }
-      ],
-      "view/item/context": [
-        {
-          "command": "forest.openShortcutWith",
-          "when": "viewItem == shortcut-browser && forest.multipleBrowsers",
-          "group": "1_actions"
-        },
-        {
-          "command": "forest.openShortcutWith",
-          "when": "viewItem =~ /^shortcut-terminal/ && forest.multipleTerminals",
-          "group": "1_actions"
-        }
-      ],
-      "commandPalette": [
-        {
-          "command": "forest.openShortcut",
-          "when": "false"
-        },
-        {
-          "command": "forest.openShortcutWith",
-          "when": "false"
-        },
-        {
-          "command": "forest.start",
-          "when": "false"
-        },
-        {
-          "command": "forest.revealInFinder",
-          "when": "false"
-        },
-        {
-          "command": "forest.linkTicket",
-          "when": "false"
-        }
-      ]
-    },
-    "keybindings": []
-  }
+	"name": "vladstudio-forest",
+	"displayName": "Forest — Git Worktrees",
+	"description": "Manage parallel feature development with git worktrees",
+	"version": "0.1.26",
+	"publisher": "vladstudio",
+	"icon": "forest-color.png",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/vladstudio/forest"
+	},
+	"galleryBanner": {
+		"color": "#1e1e1e",
+		"theme": "dark"
+	},
+	"license": "MIT",
+	"engines": {
+		"vscode": "^1.109.0"
+	},
+	"categories": [
+		"SCM Providers"
+	],
+	"keywords": [
+		"git",
+		"worktree",
+		"linear",
+		"workflow",
+		"monorepo"
+	],
+	"main": "./dist/extension.js",
+	"extensionKind": [
+		"ui"
+	],
+	"activationEvents": [
+		"workspaceContains:.forest/config.json",
+		"onView:forest.setup"
+	],
+	"scripts": {
+		"vscode:prepublish": "bun run package",
+		"compile": "bun run check-types && node esbuild.js",
+		"watch": "concurrently \"node esbuild.js --watch\" \"tsc --noEmit --watch --project tsconfig.json\"",
+		"package": "bun run check-types && node esbuild.js --production",
+		"check-types": "tsc --noEmit",
+		"lint": "eslint src"
+	},
+	"devDependencies": {
+		"@types/node": "^20.19.35",
+		"@types/vscode": "^1.109.0",
+		"@typescript-eslint/eslint-plugin": "^8.46.1",
+		"@typescript-eslint/parser": "^8.46.1",
+		"concurrently": "^9.2.1",
+		"esbuild": "^0.24.2",
+		"eslint": "^9.39.3",
+		"typescript": "^5.9.3"
+	},
+	"contributes": {
+		"viewsContainers": {
+			"activitybar": [
+				{
+					"id": "forest",
+					"title": "Forest",
+					"icon": "resources/forest.svg"
+				},
+				{
+					"id": "forestShortcuts",
+					"title": "Forest: Shortcuts",
+					"icon": "resources/forest-shortcuts.svg"
+				}
+			]
+		},
+		"views": {
+			"forest": [
+				{
+					"id": "forest.setup",
+					"name": "Setup",
+					"when": "!forest.active"
+				},
+				{
+					"id": "forest.ghMissing",
+					"name": "Setup",
+					"when": "forest.active && !forest.ghAvailable"
+				},
+				{
+					"id": "forest.trees",
+					"name": "Forest",
+					"type": "webview",
+					"when": "forest.active && forest.ghAvailable"
+				}
+			],
+			"forestShortcuts": [
+				{
+					"id": "forest.shortcuts",
+					"name": "Shortcuts",
+					"when": "forest.active && forest.ghAvailable"
+				}
+			]
+		},
+		"viewsWelcome": [
+			{
+				"view": "forest.setup",
+				"contents": "$(folder) Forest needs an open folder to operate.\n\n[Open Folder](command:vscode.openFolder)",
+				"when": "workspaceFolderCount == 0"
+			},
+			{
+				"view": "forest.setup",
+				"contents": "$(gear) Forest is not configured for this workspace.\n\nAsk your AI agent:\n\n`Set up Forest (https://github.com/vladstudio/forest) for this project. Interview me and create .forest/config.json with the required configuration.`\n\n[Copy to Clipboard](command:forest.copySetupPrompt)\n\n[Reload Window](command:workbench.action.reloadWindow)",
+				"when": "workspaceFolderCount != 0"
+			},
+			{
+				"view": "forest.ghMissing",
+				"contents": "$(warning) GitHub CLI (gh) is required.\n\nForest uses gh to create and manage pull requests.\n\n[Install GitHub CLI](https://cli.github.com)"
+			}
+		],
+		"commands": [
+			{
+				"command": "forest.copySetupPrompt",
+				"title": "Copy Setup Prompt",
+				"category": "Forest"
+			},
+			{
+				"command": "forest.revealInFinder",
+				"title": "Reveal in Finder",
+				"category": "Forest"
+			},
+			{
+				"command": "forest.create",
+				"title": "New Tree…",
+				"category": "Forest",
+				"icon": "$(add)"
+			},
+			{
+				"command": "forest.start",
+				"title": "Start — Create Tree from Issue",
+				"category": "Forest",
+				"icon": "$(folder)"
+			},
+			{
+				"command": "forest.switch",
+				"title": "Switch Tree",
+				"category": "Forest",
+				"icon": "$(arrow-swap)"
+			},
+			{
+				"command": "forest.ship",
+				"title": "Ship — Push & Create PR",
+				"category": "Forest",
+				"icon": "$(rocket)"
+			},
+			{
+				"command": "forest.shipMerge",
+				"title": "Ship + Automerge — Push, Create PR & Enable Automerge",
+				"category": "Forest",
+				"icon": "$(rocket)"
+			},
+			{
+				"command": "forest.deleteTree",
+				"title": "Delete Tree...",
+				"category": "Forest",
+				"icon": "$(trash)"
+			},
+			{
+				"command": "forest.update",
+				"title": "Update — Merge from Main",
+				"category": "Forest",
+				"icon": "$(refresh)"
+			},
+			{
+				"command": "forest.pull",
+				"title": "Pull",
+				"category": "Forest",
+				"icon": "$(cloud-download)"
+			},
+			{
+				"command": "forest.push",
+				"title": "Push",
+				"category": "Forest",
+				"icon": "$(cloud-upload)"
+			},
+			{
+				"command": "forest.list",
+				"title": "List All Trees",
+				"category": "Forest",
+				"icon": "$(list-tree)"
+			},
+			{
+				"command": "forest.copyBranch",
+				"title": "Copy Branch Name",
+				"category": "Forest",
+				"icon": "$(copy)"
+			},
+			{
+				"command": "forest.openMain",
+				"title": "Open Main Repo",
+				"category": "Forest",
+				"icon": "$(home)"
+			},
+			{
+				"command": "forest.refresh",
+				"title": "Refresh",
+				"category": "Forest",
+				"icon": "$(refresh)"
+			},
+			{
+				"command": "forest.openShortcut",
+				"title": "Open Shortcut",
+				"category": "Forest",
+				"icon": "$(play)"
+			},
+			{
+				"command": "forest.runShortcut",
+				"title": "Run Shortcut…",
+				"category": "Forest",
+				"icon": "$(play)"
+			},
+			{
+				"command": "forest.openShortcutWith",
+				"title": "Open With…",
+				"category": "Forest",
+				"icon": "$(list-selection)"
+			},
+			{
+				"command": "forest.rebase",
+				"title": "Rebase onto Main",
+				"category": "Forest",
+				"icon": "$(git-merge)"
+			},
+			{
+				"command": "forest.openPR",
+				"title": "View Pull Request",
+				"category": "Forest",
+				"icon": "$(link-external)"
+			},
+			{
+				"command": "forest.openTicket",
+				"title": "View Linear Ticket",
+				"category": "Forest",
+				"icon": "$(link-external)"
+			},
+			{
+				"command": "forest.linkTicket",
+				"title": "Attach Linear Ticket…",
+				"category": "Forest",
+				"icon": "$(link)"
+			}
+		],
+		"menus": {
+			"view/title": [
+				{
+					"command": "forest.refresh",
+					"when": "view == forest.trees",
+					"group": "navigation"
+				},
+				{
+					"command": "forest.create",
+					"when": "view == forest.trees",
+					"group": "navigation"
+				}
+			],
+			"view/item/context": [
+				{
+					"command": "forest.openShortcutWith",
+					"when": "viewItem == shortcut-browser && forest.multipleBrowsers",
+					"group": "1_actions"
+				},
+				{
+					"command": "forest.openShortcutWith",
+					"when": "viewItem =~ /^shortcut-terminal/ && forest.multipleTerminals",
+					"group": "1_actions"
+				}
+			],
+			"commandPalette": [
+				{
+					"command": "forest.openShortcut",
+					"when": "false"
+				},
+				{
+					"command": "forest.openShortcutWith",
+					"when": "false"
+				},
+				{
+					"command": "forest.start",
+					"when": "false"
+				},
+				{
+					"command": "forest.revealInFinder",
+					"when": "false"
+				},
+				{
+					"command": "forest.linkTicket",
+					"when": "false"
+				}
+			]
+		},
+		"keybindings": []
+	}
 }
