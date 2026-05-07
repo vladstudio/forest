@@ -34,6 +34,7 @@ export interface ForestConfig {
   github: { enabled: boolean };
   ai?: AIConfig;
   branchFormat: string;
+  branchPrefix?: string;
   baseBranch: string;
   maxTrees: number;
   browser: string[];
