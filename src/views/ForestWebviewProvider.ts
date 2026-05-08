@@ -642,9 +642,8 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
         // New ticket created — use branchFormat with real ticketId
         branch = (ctx.config.branchPrefix ?? '') + formatBranch(ctx.config.branchFormat, ticketId, title);
       } else {
-        // msg.branchName is the user-typed suffix; webview shows prefix as a static label
-        const prefix = ctx.config.branchPrefix ?? '';
-        branch = msg.branchName.startsWith(prefix) ? msg.branchName : prefix + msg.branchName;
+        // msg.branchName is the typed suffix; webview shows the prefix as a static label
+        branch = (ctx.config.branchPrefix ?? '') + msg.branchName;
       }
 
       if (!branch) {
