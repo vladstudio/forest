@@ -479,7 +479,11 @@ function renderCreateForm() {
   }
   out += '</div>';
   if (fs.branchMode === 'new') {
-    out += '<input class="form-input" id="branchNameInput" placeholder="my-feature-branch" value="' + h(fs.branchName) + '"' + (dis ? ' disabled' : '') + '>';
+    var branchPrefix = formInit.branchPrefix || '';
+    out += '<div class="form-input-group">'
+      + (branchPrefix ? '<span class="form-input-prefix">' + h(branchPrefix) + '</span>' : '')
+      + '<input class="form-input" id="branchNameInput" placeholder="my-feature-branch" value="' + h(fs.branchName) + '"' + (dis ? ' disabled' : '') + '>'
+      + '</div>';
     out += '<div class="form-hint" id="branchHint" style="display:none"></div>';
     if (fs.ticketMode === 'new' && fs.newTicketTitle && !fs.branchManuallyEdited) {
       out += '<div class="form-hint">Ticket ID will be prepended after creation</div>';
@@ -607,8 +611,9 @@ function updateFormHints() {
   var hint = document.getElementById('branchHint');
   if (hint) {
     var sanitized = sanitizeBranch(formState.branchName);
+    var prefix = formInit.branchPrefix || '';
     if (sanitized && sanitized !== formState.branchName) {
-      hint.textContent = 'Branch: ' + sanitized;
+      hint.textContent = 'Branch: ' + prefix + sanitized;
       hint.style.display = '';
     } else {
       hint.style.display = 'none';

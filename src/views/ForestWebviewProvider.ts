@@ -117,6 +117,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
         teams: this.config.linear.teams ?? [],
         uncommittedCount,
         branchFormat: this.config.branchFormat,
+        branchPrefix: this.config.branchPrefix ?? '',
         hasDevcontainer,
       },
     });
@@ -639,9 +640,11 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
         branch = msg.existingBranch;
       } else if (ticketId && title && !msg.branchManuallyEdited) {
         // New ticket created — use branchFormat with real ticketId
-        branch = formatBranch(ctx.config.branchFormat, ticketId, title);
+        branch = (ctx.config.branchPrefix ?? '') + formatBranch(ctx.config.branchFormat, ticketId, title);
       } else {
-        branch = msg.branchName;
+        // msg.branchName is the user-typed suffix; webview shows prefix as a static label
+        const prefix = ctx.config.branchPrefix ?? '';
+        branch = msg.branchName.startsWith(prefix) ? msg.branchName : prefix + msg.branchName;
       }
 
       if (!branch) {

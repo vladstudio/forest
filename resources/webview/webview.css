@@ -265,6 +265,25 @@ button {
 
 .form-input::placeholder { color: var(--vscode-input-placeholderForeground); }
 
+.form-input-group {
+  display: flex;
+  align-items: stretch;
+  background: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 3px;
+}
+.form-input-group:focus-within { border-color: var(--vscode-focusBorder); }
+.form-input-group > .form-input-prefix {
+  display: flex;
+  align-items: center;
+  padding-left: 6px;
+  color: var(--vscode-descriptionForeground);
+  font-family: var(--vscode-font-family);
+  user-select: none;
+}
+.form-input-group > .form-input { border: none; background: transparent; flex: 1; }
+.form-input-group > .form-input-prefix + .form-input { padding-left: 0; }
+
 .form-select {
   background: var(--vscode-dropdown-background);
   color: var(--vscode-dropdown-foreground);
