@@ -19,6 +19,11 @@ export async function createWorktree(
     ]);
   }
   await exec('git', ['-c', 'checkout.workers=0', 'worktree', 'add', worktreePath, '-b', branch, from], { cwd: repoPath });
+  // worktree add inherits tracking from the start point (e.g. origin/main).
+  // Unset it so bare git-push won't accidentally target the base branch.
+  // The correct upstream is set later via git push -u.
+  await exec('git', ['config', '--unset', `branch.${branch}.merge`], { cwd: repoPath }).catch(() => {});
+  await exec('git', ['config', '--unset', `branch.${branch}.remote`], { cwd: repoPath }).catch(() => {});
 }
 
 export async function resolveRef(repoPath: string, ref: string): Promise<string> {
