@@ -29,6 +29,7 @@ Add `.forest/config.json` to your repo root (tip: ask Claude to generate one for
 {
   "version": 1,
   "copy": [".env", ".env.local"],
+  "symlink": ["node_modules"],
   "shortcuts": {
     "cli": [
       { "name": "install", "command": "bun install --frozen-lockfile", "onNewTree": true },
@@ -79,6 +80,7 @@ To set up Forest, ask Claude (or any AI) to read this README and generate `.fore
 | -------------- | -------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `version`      | yes      | —                     | Always `1`                                                                                                                                                                                                                                                                                                                           |
 | `copy`         | no       | `[]`                  | Files to copy from repo root into each tree                                                                                                                                                                                                                                                                                          |
+| `symlink`      | no       | `[]`                  | Directories to symlink from the main repo into each tree (e.g. `["node_modules"]`). Symlinks are relative, created after copy, and cleaned up before worktree removal.                                                                                                                                                             |
 | `shortcuts`    | no       | `{cli:[],web:[],files:[]}` | Terminals (`cli`), browsers (`web`), and files (`files`) to open per tree. Each array holds objects with `name` and type-specific fields.                                                                                                                                                                                     |
 | `linear`       | no       | disabled              | Linear integration. Auto-enabled when `teams` or `apiKey` is set. `teams` is an array of team **keys** (e.g. `["ENG"]` or `["ENG", "UX"]`). `statuses` controls issue list and lifecycle transitions including `onCancel` (**must use lowercase** state names: `triage`, `backlog`, `unstarted`, `started`, `completed`, `canceled`) |
 | `github`       | no       | `true`                | GitHub integration toggle. Set `false` to disable                                                                                                                                                                                                                                                                                    |
