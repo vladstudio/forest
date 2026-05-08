@@ -59,7 +59,7 @@ export async function start(ctx: ForestContext, arg: { ticketId: string; title: 
   const { ticketId, title } = arg;
 
   // Generate branch name from format
-  const defaultBranch = (config.branchPrefix ?? '') + formatBranch(config.branchFormat, ticketId, title);
+  const defaultBranch = formatBranch(config.branchFormat, ticketId, title);
 
   const choice = await vscode.window.showQuickPick([
     { label: `New branch: ${defaultBranch}`, id: 'new' },
@@ -145,8 +145,7 @@ async function createFromNewBranch(ctx: ForestContext): Promise<void> {
     }
   }
 
-  // Pre-fill branch name: prefix + ticket-derived format (or just prefix when no ticket)
-  const prefilled = (config.branchPrefix ?? '') + (ticketId && title ? formatBranch(config.branchFormat, ticketId, title) : '');
+  const prefilled = ticketId && title ? formatBranch(config.branchFormat, ticketId, title) : '';
   const branchName = await showBranchInput(prefilled ? { value: prefilled } : undefined);
   if (!branchName) {
     if (revertOnCancel && ticketId) await revertLinear(ctx, ticketId);
