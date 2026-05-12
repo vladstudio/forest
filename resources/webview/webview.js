@@ -330,7 +330,7 @@ function treeCard(t, d) {
     '<div class="field-label">Branch</div><div class="row"><span class="branch" data-cmd="revealInFinder" title="Reveal in Finder: ' + h(t.branch) + '">' + bl + '</span>' + btn('copyBranch', ic('copy'), allDis, { attrs: 'title="Copy branch name"' }) + '</div>' +
     '<div class="row equal-fill">' +
     btn('pull', ic('arrowDown') + '<span class="label">Pull</span>' + (t.remoteBehind > 0 ? ' ' + t.remoteBehind : ''), allDis, { attrs: 'title="Pull from remote"' }) +
-    btn('mergeFromMain', ic('gitMerge') + '<span class="label">Main</span>' + (t.behind > 0 ? ' ' + t.behind : ''), allDis || !t.behind, { attrs: 'title="Merge from main"' }) +
+    btn('mergeFromMain', ic('gitMerge') + '<span class="label">' + (t.wouldConflict ? 'Conflicts' : 'Main') + '</span>' + (!t.wouldConflict && t.behind > 0 ? ' ' + t.behind : ''), allDis || !t.behind || t.wouldConflict, { attrs: 'title="' + (t.wouldConflict ? 'Merge from main (conflicts)' : 'Merge from main') + '"' }) +
     (d.hasAI ? btn('commit', ic('gitCommit') + '<span class="label">Commit</span>', allDis) : '') +
     btn('push', ic('arrowUp') + '<span class="label">Push</span>' + (t.ahead > 0 ? ' ' + t.ahead : ''), allDis, { attrs: 'title="Push to remote"' }) +
     '</div>' +

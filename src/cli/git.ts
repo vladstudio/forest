@@ -149,6 +149,15 @@ async function revListCount(worktreePath: string, range: string): Promise<number
 
 export const commitsBehind = (wt: string, base: string) => revListCount(wt, `HEAD..origin/${base}`);
 
+export async function mergeWouldConflict(worktreePath: string, baseRef: string): Promise<boolean> {
+  try {
+    await exec('git', ['merge-tree', '--write-tree', '--no-messages', 'HEAD', `origin/${baseRef}`], { cwd: worktreePath, timeout: 30_000 });
+    return false;
+  } catch (e: any) {
+    return e?.code === 1;
+  }
+}
+
 export async function diffFromBase(worktreePath: string, baseRef: string, opts?: { signal?: AbortSignal }): Promise<string> {
   const { stdout } = await exec('git', ['diff', `origin/${baseRef}...HEAD`], { cwd: worktreePath, timeout: 30_000, signal: opts?.signal });
   return stdout;

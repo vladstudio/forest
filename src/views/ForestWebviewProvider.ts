@@ -28,6 +28,7 @@ interface TreeCardData {
   behind: number;
   ahead: number;
   remoteBehind: number;
+  wouldConflict: boolean;
   localChanges: { added: number; removed: number; modified: number } | null;
   isCurrent: boolean;
   cleaning: boolean;
@@ -59,7 +60,7 @@ function baseCard(t: TreeState, isCurrent: boolean): TreeCardData {
     key: `${t.repoPath}:${t.branch}`,
     branch: t.branch,
     ticketId: t.ticketId, ticketTitle: t.title,
-    behind: 0, ahead: 0, remoteBehind: 0, localChanges: null,
+    behind: 0, ahead: 0, remoteBehind: 0, wouldConflict: false, localChanges: null,
     isCurrent, cleaning: false, busyOperation: t.busyOperation,
   };
 }
@@ -217,11 +218,13 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
       git.localChanges(tree.path),
     ]);
 
+    const wouldConflict = behind > 0 ? await git.mergeWouldConflict(tree.path, this.config.baseBranch) : false;
+
     if (pr?.url && !tree.prUrl) {
       this.stateManager.updateTree(tree.repoPath, tree.branch, { prUrl: pr.url }).catch(() => { });
     }
 
-    return { ...base, prNumber: pr?.number, prState: pr?.state, behind, ahead, remoteBehind, localChanges };
+    return { ...base, prNumber: pr?.number, prState: pr?.state, behind, ahead, remoteBehind, wouldConflict, localChanges };
   }
 
   private async buildData(): Promise<WebviewData> {
