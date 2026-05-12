@@ -3,6 +3,8 @@ import * as path from 'path';
 import * as os from 'os';
 import { exec } from '../utils/exec';
 
+const NET_TIMEOUT = 300_000;
+
 const stashRef = (ref: number | string) => typeof ref === 'number' ? `stash@{${ref}}` : ref;
 
 export async function createWorktree(
@@ -14,7 +16,7 @@ export async function createWorktree(
     await exec('git', ['worktree', 'prune'], { cwd: repoPath });
   } else {
     await Promise.all([
-      exec('git', ['fetch', 'origin', baseRef], { cwd: repoPath }),
+      exec('git', ['fetch', 'origin', baseRef], { cwd: repoPath, timeout: NET_TIMEOUT }),
       exec('git', ['worktree', 'prune'], { cwd: repoPath }),
     ]);
   }
@@ -51,26 +53,26 @@ export async function removeWorktree(repoPath: string, worktreePath: string): Pr
 export async function deleteBranch(repoPath: string, branch: string, opts?: { skipRemote?: boolean }): Promise<void> {
   await exec('git', ['branch', '-D', branch], { cwd: repoPath });
   if (!opts?.skipRemote) {
-    await exec('git', ['push', 'origin', '--delete', branch], { cwd: repoPath }).catch(() => {});
+    await exec('git', ['push', 'origin', '--delete', branch], { cwd: repoPath, timeout: NET_TIMEOUT }).catch(() => {});
   }
 }
 
 export async function pushBranch(worktreePath: string, branch: string, opts?: { signal?: AbortSignal }): Promise<void> {
-  await exec('git', ['push', '-u', 'origin', branch], { cwd: worktreePath, signal: opts?.signal });
+  await exec('git', ['push', '-u', 'origin', branch], { cwd: worktreePath, timeout: NET_TIMEOUT, signal: opts?.signal });
 }
 
 export async function pull(worktreePath: string, branch: string, opts?: { signal?: AbortSignal }): Promise<void> {
-  await exec('git', ['fetch', 'origin', branch], { cwd: worktreePath, signal: opts?.signal });
+  await exec('git', ['fetch', 'origin', branch], { cwd: worktreePath, timeout: NET_TIMEOUT, signal: opts?.signal });
   await exec('git', ['merge', '--ff-only', `origin/${branch}`], { cwd: worktreePath, timeout: 60_000, signal: opts?.signal });
 }
 
 export async function pullMerge(worktreePath: string, baseRef: string, opts?: { signal?: AbortSignal }): Promise<void> {
-  await exec('git', ['fetch', 'origin'], { cwd: worktreePath, signal: opts?.signal });
+  await exec('git', ['fetch', 'origin'], { cwd: worktreePath, timeout: NET_TIMEOUT, signal: opts?.signal });
   await exec('git', ['merge', '-s', 'ort', `origin/${baseRef}`], { cwd: worktreePath, timeout: 60_000, signal: opts?.signal });
 }
 
 export async function pullRebase(worktreePath: string, baseRef: string, opts?: { signal?: AbortSignal }): Promise<void> {
-  await exec('git', ['fetch', 'origin'], { cwd: worktreePath, signal: opts?.signal });
+  await exec('git', ['fetch', 'origin'], { cwd: worktreePath, timeout: NET_TIMEOUT, signal: opts?.signal });
   await exec('git', ['rebase', `origin/${baseRef}`], { cwd: worktreePath, timeout: 60_000, signal: opts?.signal });
 }
 
@@ -209,7 +211,7 @@ export async function checkoutWorktree(
 ): Promise<void> {
   // Fetch, check current branch, and prune in parallel
   const [, { stdout }] = await Promise.all([
-    exec('git', ['fetch', 'origin', branch], { cwd: repoPath }).catch(() => {}),
+    exec('git', ['fetch', 'origin', branch], { cwd: repoPath, timeout: NET_TIMEOUT }).catch(() => {}),
     exec('git', ['symbolic-ref', '--short', 'HEAD'], { cwd: repoPath }).catch(() => ({ stdout: '' })),
     exec('git', ['worktree', 'prune'], { cwd: repoPath }),
   ]);
@@ -221,19 +223,19 @@ export async function checkoutWorktree(
 }
 
 export async function remoteBranchExists(repoPath: string, branch: string): Promise<boolean> {
-  const { stdout } = await exec('git', ['ls-remote', '--heads', 'origin', branch], { cwd: repoPath });
+  const { stdout } = await exec('git', ['ls-remote', '--heads', 'origin', branch], { cwd: repoPath, timeout: NET_TIMEOUT });
   return stdout.trim().length > 0;
 }
 
 export async function branchExists(repoPath: string, branch: string): Promise<boolean> {
-  await exec('git', ['fetch', 'origin', branch], { cwd: repoPath }).catch(() => {});
+  await exec('git', ['fetch', 'origin', branch], { cwd: repoPath, timeout: NET_TIMEOUT }).catch(() => {});
   const { stdout } = await exec('git', ['for-each-ref', '--format=%(refname:short)', `refs/heads/${branch}`, `refs/remotes/origin/${branch}`], { cwd: repoPath });
   return stdout.trim().length > 0;
 }
 
 /** List local branches suitable for worktree checkout, excluding base branch and those already in worktrees. */
 export async function listBranches(repoPath: string, baseBranch: string, opts?: { signal?: AbortSignal }): Promise<string[]> {
-  await exec('git', ['fetch', 'origin'], { cwd: repoPath, signal: opts?.signal });
+  await exec('git', ['fetch', 'origin'], { cwd: repoPath, timeout: NET_TIMEOUT, signal: opts?.signal });
 
   const [{ stdout: wtOut }, { stdout: localOut }, { stdout: remoteOut }] = await Promise.all([
     exec('git', ['worktree', 'list', '--porcelain'], { cwd: repoPath }),
