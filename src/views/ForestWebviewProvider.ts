@@ -4,47 +4,19 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import type { ForestConfig } from '../config';
 import type { ForestContext } from '../context';
-import { getHostWorkspacePath } from '../context';
 import { displayName, type StateManager, type TreeState } from '../state';
 import * as git from '../cli/git';
 import * as gh from '../cli/gh';
 import * as linear from '../cli/linear';
 import * as ai from '../cli/ai';
-import { formatBranch } from '../utils/slug';
+import { formatBranch, sanitizeBranch } from '../utils/slug';
 import { copyConfigFiles, createTree, ensureTreeIdle, focusOrOpenWindow, getBlockingTreeOperation, openTreeWindow, updateLinear, withTreeOperation } from '../commands/shared';
 import { executeDeletePlan, type DeletePlan } from '../commands/cleanup';
 import { shipCore } from '../commands/ship';
 import { notify } from '../notify';
 import { pickIssue } from '../commands/create';
 import { linkTicket } from '../commands/linkTicket';
-
-interface TreeCardData {
-  key: string;
-  branch: string;
-  ticketId?: string;
-  ticketTitle?: string;
-  prNumber?: number;
-  prState?: string;
-  behind: number;
-  ahead: number;
-  remoteBehind: number;
-  wouldConflict: boolean;
-  localChanges: { added: number; removed: number; modified: number } | null;
-  isCurrent: boolean;
-  cleaning: boolean;
-  busyOperation?: string;
-}
-
-interface WebviewData {
-  repoName: string;
-  baseBranch: string;
-  mainIsCurrent: boolean;
-  mainBehind: number;
-  hasAI: boolean;
-  hasAutomerge: boolean;
-  linearEnabled: boolean;
-  groups: Array<{ label: string; trees: TreeCardData[] }>;
-}
+import { parseTreeKey, TreeDataService, treeKey } from './treeData';
 
 function gitRefUri(filePath: string, ref: string): vscode.Uri {
   const fileUri = vscode.Uri.file(filePath);
@@ -54,29 +26,24 @@ function gitRefUri(filePath: string, ref: string): vscode.Uri {
   });
 }
 
-/** Maps a TreeState to the base fields shared by all card states. */
-function baseCard(t: TreeState, isCurrent: boolean): TreeCardData {
-  return {
-    key: `${t.repoPath}:${t.branch}`,
-    branch: t.branch,
-    ticketId: t.ticketId, ticketTitle: t.title,
-    behind: 0, ahead: 0, remoteBehind: 0, wouldConflict: false, localChanges: null,
-    isCurrent, cleaning: false, busyOperation: t.busyOperation,
-  };
-}
-
 export class ForestWebviewProvider implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView;
   private ctx?: ForestContext;
-  private dataCache = new Map<string, { data: Promise<TreeCardData>; time: number }>();
-  private readonly CACHE_TTL = 30_000;
   private pendingAbort: AbortController | null = null;
+  private readonly data: TreeDataService;
 
   constructor(
     private readonly stateManager: StateManager,
     private readonly config: ForestConfig,
     private readonly extensionUri: vscode.Uri,
-  ) { }
+  ) {
+    this.data = new TreeDataService(
+      stateManager,
+      config,
+      () => this.repoPath,
+      (msg) => this.log(msg),
+    );
+  }
 
   private log(msg: string): void {
     this.ctx?.outputChannel.appendLine(`[Forest] ${msg}`);
@@ -99,14 +66,14 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
   }
 
   refresh(): void {
-    this.dataCache.clear();
+    this.data.clear();
     this.update();
   }
 
   refreshTrees(): void { this.refresh(); }
 
-  async showCreateForm(): Promise<void> {
-    if (!this.view || !this.ctx) return;
+  async showCreateForm(): Promise<boolean> {
+    if (!this.view?.visible || !this.ctx) return false;
     const repoPath = this.repoPath;
     const localChanges = await git.localChanges(repoPath).catch(() => null);
     const uncommittedCount = localChanges ? localChanges.added + localChanges.removed + localChanges.modified : 0;
@@ -117,10 +84,10 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
         linearEnabled: this.config.linear.enabled && linear.isAvailable(),
         teams: this.config.linear.teams ?? [],
         uncommittedCount,
-        branchFormat: this.config.branchFormat,
         hasDevcontainer,
       },
     });
+    return true;
   }
 
   async showDeleteForm(branchArg?: string): Promise<boolean> {
@@ -146,7 +113,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
     this.postMessage({
       type: 'showDeleteForm',
       init: {
-        key: `${tree.repoPath}:${tree.branch}`,
+        key: treeKey(tree),
         name: displayName(tree),
         branch: tree.branch,
         ticketId: tree.ticketId ?? null,
@@ -187,108 +154,13 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
   private async update(): Promise<void> {
     if (!this.ctx) return;
     try {
-      const data = await this.buildData();
+      const data = await this.data.build();
       if (this.view?.visible) {
         this.view.webview.postMessage({ type: 'update', data });
       }
     } catch (e: any) {
       this.log(`Webview update failed: ${e.stack ?? e.message}`);
     }
-  }
-
-  private getTreeData(tree: TreeState): Promise<TreeCardData> {
-    const key = `${tree.repoPath}:${tree.branch}`;
-    const cached = this.dataCache.get(key);
-    if (cached && Date.now() - cached.time < this.CACHE_TTL) return cached.data;
-    const data = this.fetchTreeData(tree);
-    this.dataCache.set(key, { data, time: Date.now() });
-    data.catch(() => this.dataCache.delete(key));
-    return data;
-  }
-
-  private async fetchTreeData(tree: TreeState): Promise<TreeCardData> {
-    const base = baseCard(tree, false);
-    if (!tree.path || !fs.existsSync(tree.path)) return base;
-
-    const [behind, ahead, remoteBehind, pr, localChanges] = await Promise.all([
-      git.commitsBehind(tree.path, this.config.baseBranch),
-      git.commitsAhead(tree.path, tree.branch),
-      git.commitsBehindRemote(tree.path, tree.branch),
-      this.config.github.enabled ? gh.prStatus(tree.path) : Promise.resolve(null),
-      git.localChanges(tree.path),
-    ]);
-
-    const wouldConflict = behind > 0 ? await git.mergeWouldConflict(tree.path, this.config.baseBranch) : false;
-
-    if (pr?.url && !tree.prUrl) {
-      this.stateManager.updateTree(tree.repoPath, tree.branch, { prUrl: pr.url }).catch(() => { });
-    }
-
-    return { ...base, prNumber: pr?.number, prState: pr?.state, behind, ahead, remoteBehind, wouldConflict, localChanges };
-  }
-
-  private async buildData(): Promise<WebviewData> {
-    const repoPath = this.repoPath;
-    const state = await this.stateManager.load();
-    const trees = this.stateManager.getTreesForRepo(state, repoPath);
-    const curPath = getHostWorkspacePath();
-
-    const liveKeys = new Set(trees.map(t => `${t.repoPath}:${t.branch}`));
-    for (const k of this.dataCache.keys()) {
-      if (!liveKeys.has(k)) this.dataCache.delete(k);
-    }
-
-    trees.sort((a, b) => {
-      if (a.path === curPath) return -1;
-      if (b.path === curPath) return 1;
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    });
-
-    const mainIsCurrent = curPath === repoPath;
-    const [cardResults, mainBehind] = await Promise.all([
-      Promise.all(trees.map(t => t.cleaning ? Promise.resolve(null) : this.getTreeData(t).catch(() => null))),
-      mainIsCurrent ? git.commitsBehind(repoPath, this.config.baseBranch) : Promise.resolve(0),
-    ]);
-
-    const cleaning: TreeCardData[] = [];
-    const inProgress: TreeCardData[] = [];
-    const inReview: TreeCardData[] = [];
-    const done: TreeCardData[] = [];
-    const closed: TreeCardData[] = [];
-
-    trees.forEach((t, i) => {
-      const isCurrent = t.path === curPath;
-      if (t.cleaning) {
-        cleaning.push({ ...baseCard(t, isCurrent), cleaning: true });
-        return;
-      }
-      const cached = cardResults[i];
-      if (!cached) return;
-      const card: TreeCardData = { ...cached, isCurrent, busyOperation: t.busyOperation };
-      const s = card.prState;
-      if (s === 'MERGED') done.push(card);
-      else if (s === 'CLOSED') closed.push(card);
-      else if (card.prNumber) inReview.push(card);
-      else inProgress.push(card);
-    });
-
-    const groups: WebviewData['groups'] = [];
-    if (inProgress.length) groups.push({ label: 'In progress', trees: inProgress });
-    if (inReview.length) groups.push({ label: 'In review', trees: inReview });
-    if (done.length) groups.push({ label: 'Done', trees: done });
-    if (closed.length) groups.push({ label: 'Closed', trees: closed });
-    if (cleaning.length) groups.push({ label: 'Deleting', trees: cleaning });
-
-    return {
-      repoName: path.basename(repoPath),
-      baseBranch: this.config.baseBranch,
-      mainIsCurrent,
-      mainBehind,
-      hasAI: !!this.config.ai,
-      hasAutomerge: this.config.github.enabled && (gh.repoHasAutomergeCached(repoPath) ?? false),
-      linearEnabled: this.config.linear.enabled,
-      groups,
-    };
   }
 
   private async openBaseDiff(tree: TreeState): Promise<void> {
@@ -409,8 +281,8 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
     if (command === 'pickIssue') {
       if (!this.ctx) return;
       await this.runPending(async (signal) => {
-        const result = await pickIssue(this.ctx!, { signal });
-        this.postMessage({ type: 'issuePickResult', issue: result ?? null });
+        const issue = await pickIssue(this.ctx!, { signal });
+        this.postMessage({ type: 'issuePickResult', issue: issue ? { ...issue, branchName: formatBranch(this.config.branchFormat, issue.ticketId, issue.title) } : null });
       });
       return;
     }
@@ -426,9 +298,9 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
     }
 
     if (!key) return;
-    const colonIdx = key.indexOf(':');
-    const repoPath = key.slice(0, colonIdx);
-    const branch = key.slice(colonIdx + 1);
+    const parsed = parseTreeKey(key);
+    if (!parsed) return;
+    const { repoPath, branch } = parsed;
     const state = await this.stateManager.load();
     const tree = this.stateManager.getTree(state, repoPath, branch);
     const ctx = this.ctx;
@@ -461,7 +333,15 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
       case 'mergeFromMain':
         if (!tree?.path) { bail(); return; }
         await runTreeAction('merging', async (signal) => {
-          await git.pullMerge(tree.path!, this.config.baseBranch, { signal });
+          try {
+            await git.pullMerge(tree.path!, this.config.baseBranch, { signal });
+          } catch (e: any) {
+            const output = `${e.stdout ?? ''}\n${e.stderr ?? ''}`;
+            if (/CONFLICT|Automatic merge failed/i.test(output)) {
+              throw new Error('Merge stopped with conflicts. Resolve them in this worktree.');
+            }
+            throw e;
+          }
           copyConfigFiles(this.config, tree.repoPath, tree.path!);
         });
         break;
@@ -642,9 +522,9 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
         branch = msg.existingBranch;
       } else if (ticketId && title && !msg.branchManuallyEdited) {
         // New ticket created — use branchFormat with real ticketId
-        branch = formatBranch(ctx.config.branchFormat, ticketId, title);
+        branch = sanitizeBranch(formatBranch(ctx.config.branchFormat, ticketId, title));
       } else {
-        branch = msg.branchName;
+        branch = sanitizeBranch(String(msg.branchName ?? ''));
       }
 
       if (!branch) {
@@ -671,12 +551,13 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
           existingBranch: msg.branchMode === 'existing',
           carryChanges,
           useDevcontainer: !!msg.useDevcontainer,
+          outputChannel: ctx.outputChannel,
         });
       } catch (e: any) {
         // Revert Linear issue status if we just created it
         if (newlyCreatedTicket) {
           const revertStatus = ctx.config.linear.statuses.issueList[ctx.config.linear.statuses.issueList.length - 1];
-          await updateLinear(ctx, ticketId!, revertStatus).catch(() => { });
+          await updateLinear(ctx, ticketId!, revertStatus).catch((e) => this.log(`Linear revert failed: ${e.message}`));
         }
         throw e;
       }
@@ -695,10 +576,9 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
     if (!this.ctx || !msg.key) return;
     const ctx = this.ctx;
     const key = String(msg.key);
-    const colonIdx = key.indexOf(':');
-    if (colonIdx < 0) return;
-    const repoPath = key.slice(0, colonIdx);
-    const branch = key.slice(colonIdx + 1);
+    const parsed = parseTreeKey(key);
+    if (!parsed) return;
+    const { repoPath, branch } = parsed;
     const state = await this.stateManager.load();
     const tree = this.stateManager.getTree(state, repoPath, branch);
 
@@ -749,26 +629,18 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
     const jsUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'webview.js'),
     );
-    const cspSource = webview.cspSource;
-    return `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
-<link rel="stylesheet" href="${cssUri}">
-</head>
-<body>
-<div id="root"><div style="display:flex;flex-direction:column;align-items:center;padding:32px;color:var(--vscode-descriptionForeground)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="opacity:0.5;margin-bottom:8px"><path d="M7.25 23V15C7.25 14.5858 7.58579 14.25 8 14.25C8.41421 14.25 8.75 14.5858 8.75 15V23C8.75 23.4142 8.41421 23.75 8 23.75C7.58579 23.75 7.25 23.4142 7.25 23Z" fill="currentColor"/><path d="M18.25 23V21C18.25 20.5858 18.5858 20.25 19 20.25C19.4142 20.25 19.75 20.5858 19.75 21V23C19.75 23.4142 19.4142 23.75 19 23.75C18.5858 23.75 18.25 23.4142 18.25 23Z" fill="currentColor"/><path d="M13.25 13.5C13.25 10.5651 11.8468 7.7172 10.3789 5.55371C9.65147 4.48158 8.92305 3.59966 8.37695 2.98633C8.23812 2.8304 8.11174 2.69163 8 2.57227C7.88826 2.69163 7.76188 2.8304 7.62305 2.98633C7.07695 3.59966 6.34853 4.48158 5.62109 5.55371C4.15318 7.7172 2.75 10.5651 2.75 13.5C2.75 16.3995 5.1005 18.75 8 18.75C10.8995 18.75 13.25 16.3995 13.25 13.5ZM14.75 13.5C14.75 17.2279 11.7279 20.25 8 20.25C4.27208 20.25 1.25 17.2279 1.25 13.5C1.25 10.1212 2.84682 6.96902 4.37891 4.71094C5.15138 3.57242 5.92308 2.63842 6.50195 1.98828C6.79174 1.66283 7.03472 1.40768 7.20605 1.23242C7.29172 1.1448 7.3599 1.07678 7.40723 1.03028C7.43077 1.00714 7.44898 0.989043 7.46191 0.976565C7.46841 0.970302 7.47385 0.965439 7.47754 0.961916L7.4834 0.956057H7.48438C7.77367 0.681884 8.22633 0.681884 8.51562 0.956057L8 1.5L8.5166 0.956057L8.52246 0.961916C8.52615 0.965439 8.53159 0.970302 8.53809 0.976565C8.55102 0.989043 8.56923 1.00714 8.59277 1.03028C8.6401 1.07678 8.70828 1.1448 8.79395 1.23242C8.96528 1.40768 9.20826 1.66283 9.49805 1.98828C10.0769 2.63842 10.8486 3.57242 11.6211 4.71094C13.1532 6.96902 14.75 10.1212 14.75 13.5Z" fill="currentColor"/><path d="M21.25 18C21.25 16.6435 20.5968 15.2954 19.8789 14.2373C19.5659 13.776 19.2518 13.3873 19 13.0977C18.7482 13.3873 18.4341 13.776 18.1211 14.2373C17.4032 15.2954 16.75 16.6435 16.75 18C16.75 19.2427 17.7573 20.25 19 20.25C20.2427 20.25 21.25 19.2427 21.25 18ZM22.75 18C22.75 20.0711 21.0711 21.75 19 21.75C16.9289 21.75 15.25 20.0711 15.25 18C15.25 16.1998 16.0969 14.5482 16.8789 13.3955C17.2763 12.8098 17.6731 12.3294 17.9707 11.9951C18.1198 11.8277 18.2457 11.6958 18.335 11.6045C18.3795 11.5589 18.4151 11.523 18.4404 11.498C18.453 11.4857 18.4634 11.4758 18.4707 11.4687L18.4834 11.4561H18.4844C18.7737 11.1819 19.2263 11.1819 19.5156 11.4561L19 12L19.5166 11.4561L19.5293 11.4687C19.5366 11.4758 19.547 11.4857 19.5596 11.498C19.5849 11.523 19.6205 11.5589 19.665 11.6045C19.7543 11.6958 19.8802 11.8277 20.0293 11.9951C20.3269 12.3294 20.7237 12.8098 21.1211 13.3955C21.9031 14.5482 22.75 16.1998 22.75 18Z" fill="currentColor"/></svg><span style="font-size:11px">Loading…</span></div></div>
-<script nonce="${nonce}" src="${iconsUri}"></script>
-<script nonce="${nonce}" src="${jsUri}"></script>
-</body>
-</html>`;
+    return fs.readFileSync(vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'webview.html').fsPath, 'utf8')
+      .replaceAll('{{nonce}}', nonce)
+      .replace('{{cspSource}}', webview.cspSource)
+      .replace('{{cssUri}}', String(cssUri))
+      .replace('{{iconsUri}}', String(iconsUri))
+      .replace('{{jsUri}}', String(jsUri));
   }
 
   dispose(): void {
     this.pendingAbort?.abort();
     this.pendingAbort = null;
-    this.dataCache.clear();
+    this.data.clear();
     this.view = undefined;
   }
 }

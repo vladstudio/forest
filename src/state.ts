@@ -128,12 +128,12 @@ export class StateManager {
     const lockFile = path.join(lock, 'owner');
     for (let i = 0;; i++) {
       try {
-        fs.mkdirSync(lock);
-        fs.writeFileSync(lockFile, `${process.pid}:${Date.now()}`, 'utf8');
+        await fs.promises.mkdir(lock);
+        await fs.promises.writeFile(lockFile, `${process.pid}:${Date.now()}`, 'utf8');
       } catch (e: any) {
         if (e.code !== 'EEXIST') throw e;
         try {
-          const content = fs.readFileSync(lockFile, 'utf8');
+          const content = await fs.promises.readFile(lockFile, 'utf8');
           const [pidStr, tsStr] = content.split(':');
           const pid = parseInt(pidStr, 10);
           const ts = parseInt(tsStr, 10);
@@ -141,17 +141,22 @@ export class StateManager {
           const holderDead = Number.isFinite(pid) && !this.isProcessAlive(pid);
           const lockStale = Number.isFinite(ts) && Date.now() - ts > 10_000;
           if (holderDead || lockStale) {
-            try { fs.rmSync(lock, { recursive: true, force: true }); } catch { /* raced */ }
+            try { await fs.promises.rm(lock, { recursive: true, force: true }); } catch { /* raced */ }
             continue;
           }
         } catch {
           // Corrupt or missing owner file — check mtime as fallback
-          try { if (Date.now() - fs.statSync(lock).mtimeMs > 10_000) { fs.rmSync(lock, { recursive: true, force: true }); continue; } } catch {}
+          try {
+            if (Date.now() - (await fs.promises.stat(lock)).mtimeMs > 10_000) {
+              await fs.promises.rm(lock, { recursive: true, force: true });
+              continue;
+            }
+          } catch {}
         }
         if (i >= 99) throw new Error('State file is locked');
         await new Promise(r => setTimeout(r, 50)); continue;
       }
-      try { return await fn(); } finally { try { fs.rmSync(lock, { recursive: true, force: true }); } catch {} }
+      try { return await fn(); } finally { try { await fs.promises.rm(lock, { recursive: true, force: true }); } catch {} }
     }
   }
 

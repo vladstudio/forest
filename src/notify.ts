@@ -1,10 +1,11 @@
 import * as vscode from 'vscode';
 
-const auto = (title: string, ms: number) =>
-  void vscode.window.withProgress(
+const auto = (title: string, ms: number) => {
+  vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title },
     () => new Promise<void>(r => setTimeout(r, ms)),
   );
+};
 
 export const notify = {
   info: (msg: string) => auto(msg, 4000),

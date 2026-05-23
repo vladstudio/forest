@@ -3,7 +3,7 @@ import * as os from "os";
 import * as path from "path";
 import { getHostWorkspacePath, resolveMainRepo } from "./context";
 import { notify } from "./notify";
-import { repoHash } from "./utils/fs";
+import { repoHash, safeRelativePath } from "./utils/fs";
 
 interface ShortcutBase {
 	name: string;
@@ -31,13 +31,11 @@ const SHORTCUT_CATEGORIES = {
 	files: "file" as const,
 };
 
-export type ShortcutsConfig = {
-	[K in keyof typeof SHORTCUT_CATEGORIES]: ((typeof SHORTCUT_CATEGORIES)[K] extends "terminal"
-		? TerminalShortcut
-		: (typeof SHORTCUT_CATEGORIES)[K] extends "browser"
-			? BrowserShortcut
-			: FileShortcut)[];
-};
+export interface ShortcutsConfig {
+	cli: TerminalShortcut[];
+	web: BrowserShortcut[];
+	files: FileShortcut[];
+}
 
 /** Flattens all shortcut categories into a single array. */
 export function allShortcuts(s: ShortcutsConfig): ShortcutConfig[] {
@@ -155,12 +153,19 @@ export async function loadConfig(): Promise<ForestConfig | null> {
 	if (typeof merged.github === "boolean") {
 		merged.github = { enabled: merged.github };
 	}
+	try {
+		validateConfig(repoRoot, merged);
+	} catch (e: any) {
+		notify.error(`Forest config is invalid: ${e.message}`);
+		return null;
+	}
 
 	return merged as ForestConfig;
 }
 
 /** Returns ~/.forest/trees/<repoName>[-<hash>]. Uses old unhashed dir if it exists for backwards compat. */
 const treesDirCache = new Map<string, string>();
+export function clearConfigCache(): void { treesDirCache.clear(); }
 export function getTreesDir(repoPath: string): string {
 	let dir = treesDirCache.get(repoPath);
 	if (dir) return dir;
@@ -178,6 +183,7 @@ export function getTreesDir(repoPath: string): string {
 	return dir;
 }
 
+/** Object fields merge, shortcuts merge by name, and other arrays intentionally replace. */
 function mergeConfig(base: any, local: any): any {
 	const result = { ...base };
 	for (const key of Object.keys(local)) {
@@ -205,4 +211,16 @@ function mergeConfig(base: any, local: any): any {
 		}
 	}
 	return result;
+}
+
+function validateConfig(repoRoot: string, config: ForestConfig): void {
+	for (const key of ["copy", "symlink", "browser", "terminal"] as const) {
+		if (!Array.isArray(config[key])) throw new Error(`${key} must be an array`);
+	}
+	for (const value of [...config.copy, ...config.symlink]) {
+		safeRelativePath(repoRoot, value, "copy/symlink path");
+	}
+	for (const group of ["cli", "web", "files"] as const) {
+		if (!Array.isArray(config.shortcuts[group])) throw new Error(`shortcuts.${group} must be an array`);
+	}
 }

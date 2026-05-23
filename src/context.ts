@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
+import { execFileSync } from 'child_process';
 import type { ForestConfig } from './config';
 import type { StateManager, TreeState } from './state';
 import type { ShortcutManager } from './managers/ShortcutManager';
@@ -10,7 +11,7 @@ import type { StatusBarManager } from './managers/StatusBarManager';
 export interface IForestProvider {
   refresh(): void;
   refreshTrees(): void;
-  showCreateForm(): void;
+  showCreateForm(): Promise<boolean>;
   showDeleteForm(branch?: string): Promise<boolean>;
   dispose(): void;
 }
@@ -38,7 +39,8 @@ export function resolveMainRepo(wsPath: string): string {
         const commondir = fs.readFileSync(path.join(gitdir, 'commondir'), 'utf8').trim();
         return path.dirname(path.resolve(gitdir, commondir));
       } catch {
-        return path.resolve(gitdir, '..', '..', '..');
+        const common = execFileSync('git', ['-C', wsPath, 'rev-parse', '--git-common-dir'], { encoding: 'utf8' }).trim();
+        return path.dirname(path.resolve(wsPath, common));
       }
     }
   } catch { /* not a worktree — wsPath is the main repo */ }
@@ -56,9 +58,8 @@ export function getHostWorkspacePath(): string | undefined {
   try {
     const statePath = path.join(os.homedir(), '.forest', 'state.json');
     const state = JSON.parse(fs.readFileSync(statePath, 'utf8')) as { trees?: Record<string, TreeState> };
-    for (const tree of Object.values(state.trees ?? {})) {
-      if (tree.path && path.basename(tree.path) === basename) return tree.path;
-    }
+    const matches = Object.values(state.trees ?? {}).filter(tree => tree.path && path.basename(tree.path) === basename);
+    return matches.length === 1 ? matches[0].path : undefined;
   } catch { /* state unreadable — bail */ }
   return undefined;
 }

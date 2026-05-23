@@ -25,6 +25,7 @@ function defaultFormState(init) {
     ticketMode: 'none',
     ticketId: null,
     ticketTitle: null,
+    ticketBranchName: null,
     newTicketTitle: '',
     priority: 2,
     team: init.teams && init.teams[0] || '',
@@ -83,6 +84,7 @@ window.addEventListener('message', e => {
         formState.ticketMode = 'existing';
         formState.ticketId = msg.issue.ticketId;
         formState.ticketTitle = msg.issue.title;
+        formState.ticketBranchName = msg.issue.branchName;
         autoFillBranch();
       }
       renderCurrentMode();
@@ -126,11 +128,10 @@ document.getElementById('root').addEventListener('click', e => {
     formState.submitting = true;
     formState.error = null;
     renderCreateForm();
-    const sanitized = sanitizeBranch(formState.branchName);
     vscode.postMessage({
       command: 'createForm:submit',
       branchMode: formState.branchMode,
-      branchName: sanitized,
+      branchName: formState.branchName.trim(),
       existingBranch: formState.existingBranch,
       ticketMode: formState.ticketMode,
       ticketId: formState.ticketId,
@@ -179,22 +180,10 @@ document.getElementById('root').addEventListener('click', e => {
 const h = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const dis = v => v ? ' disabled' : '';
 
-function sanitizeBranch(v) {
-  return v.toLowerCase().replace(/[<>:"|?*\x00-\x1f\s~^\\]+/g, '-').replace(/\.{2,}/g, '-').replace(/\/\//g, '/').replace(/-+/g, '-').replace(/^[-./]+|[-./]+$/g, '');
-}
-
-function slugifyStr(t) {
-  return t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 50) || 'untitled';
-}
-
 function autoFillBranch() {
   if (formState.branchMode !== 'new' || formState.branchManuallyEdited) return;
   if (formState.ticketMode === 'existing' && formState.ticketId) {
-    var name = formInit.branchFormat;
-    name = name.replace('${ticketId}', formState.ticketId).replace('${slug}', slugifyStr(formState.ticketTitle || ''));
-    formState.branchName = sanitizeBranch(name);
-  } else if (formState.ticketMode === 'new' && formState.newTicketTitle) {
-    formState.branchName = slugifyStr(formState.newTicketTitle);
+    formState.branchName = formState.ticketBranchName || '';
   } else {
     formState.branchName = '';
   }
@@ -246,13 +235,13 @@ function renderList(d) {
 function withOptimisticCleaning(data) {
   if (!data || !optimisticCleaningKeys.size) return data;
 
-  var moved = [];
-  var groups = [];
-  for (var i = 0; i < data.groups.length; i++) {
-    var group = data.groups[i];
-    var trees = [];
-    for (var j = 0; j < group.trees.length; j++) {
-      var tree = group.trees[j];
+  let moved = [];
+  let groups = [];
+  for (let i = 0; i < data.groups.length; i++) {
+    let group = data.groups[i];
+    let trees = [];
+    for (let j = 0; j < group.trees.length; j++) {
+      let tree = group.trees[j];
       if (!tree.cleaning && optimisticCleaningKeys.has(tree.key)) {
         moved.push({ ...tree, cleaning: true });
       } else {
@@ -264,7 +253,7 @@ function withOptimisticCleaning(data) {
 
   if (!moved.length) return data;
 
-  var cleaningIdx = groups.findIndex(function (group) { return group.label === 'Deleting'; });
+  let cleaningIdx = groups.findIndex(function (group) { return group.label === 'Deleting'; });
   if (cleaningIdx >= 0) {
     groups[cleaningIdx] = {
       label: groups[cleaningIdx].label,
@@ -293,8 +282,8 @@ function mainCard(d) {
 }
 
 function btn(cmd, label, allDisabled, opts) {
-  var cls = 'btn' + (opts && opts.cls ? ' ' + opts.cls : '');
-  var extra = opts && opts.attrs ? ' ' + opts.attrs : '';
+  let cls = 'btn' + (opts && opts.cls ? ' ' + opts.cls : '');
+  let extra = opts && opts.attrs ? ' ' + opts.attrs : '';
   return '<button class="' + cls + '" data-cmd="' + h(cmd) + '"' + extra + dis(allDisabled) + '>' + label + '</button>';
 }
 
@@ -330,7 +319,7 @@ function treeCard(t, d) {
     '<div class="field-label">Branch</div><div class="row"><span class="branch" data-cmd="revealInFinder" title="Reveal in Finder: ' + h(t.branch) + '">' + bl + '</span>' + btn('copyBranch', ic('copy'), allDis, { attrs: 'title="Copy branch name"' }) + '</div>' +
     '<div class="row equal-fill">' +
     btn('pull', ic('arrowDown') + '<span class="label">Pull</span>' + (t.remoteBehind > 0 ? ' ' + t.remoteBehind : ''), allDis, { attrs: 'title="Pull from remote"' }) +
-    btn('mergeFromMain', ic('gitMerge') + '<span class="label">' + (t.wouldConflict ? 'Conflicts' : 'Main') + '</span>' + (!t.wouldConflict && t.behind > 0 ? ' ' + t.behind : ''), allDis || !t.behind || t.wouldConflict, { attrs: 'title="' + (t.wouldConflict ? 'Merge from main (conflicts)' : 'Merge from main') + '"' }) +
+    btn('mergeFromMain', ic('gitMerge') + '<span class="label">Main</span>' + (t.behind > 0 ? ' ' + t.behind : ''), allDis || !t.behind, { attrs: 'title="Merge from main"' }) +
     (d.hasAI ? btn('commit', ic('gitCommit') + '<span class="label">Commit</span>', allDis) : '') +
     btn('push', ic('arrowUp') + '<span class="label">Push</span>' + (t.ahead > 0 ? ' ' + t.ahead : ''), allDis, { attrs: 'title="Push to remote"' }) +
     '</div>' +
@@ -394,7 +383,7 @@ function renderDeleteForm() {
     out += '</div>';
   }
 
-  var canDelete = !dis && !pendingAction;
+  let canDelete = !dis && !pendingAction;
   out += '<div class="form-actions">';
   out += '<button class="btn primary fill" id="deleteSubmitBtn" data-cmd="deleteForm:submit"' + (canDelete ? '' : ' disabled') + '>' + (dis ? '<span class="spinner"></span> Deleting…' : 'Delete tree') + '</button>';
   out += '<button class="btn secondary" data-form="cancel"' + (canDelete ? '' : ' disabled') + '>Cancel</button>';
@@ -449,7 +438,7 @@ function renderCreateForm() {
       out += '</select>';
       if (init.teams.length > 1) {
         out += '<select class="form-select" id="teamSelect"' + (dis ? ' disabled' : '') + '>';
-        for (var i = 0; i < init.teams.length; i++) {
+        for (let i = 0; i < init.teams.length; i++) {
           out += '<option value="' + h(init.teams[i]) + '"' + (fs.team === init.teams[i] ? ' selected' : '') + '>' + h(init.teams[i]) + '</option>';
         }
         out += '</select>';
@@ -480,7 +469,6 @@ function renderCreateForm() {
   out += '</div>';
   if (fs.branchMode === 'new') {
     out += '<input class="form-input" id="branchNameInput" placeholder="my-feature-branch" value="' + h(fs.branchName) + '"' + (dis ? ' disabled' : '') + '>';
-    out += '<div class="form-hint" id="branchHint" style="display:none"></div>';
     if (fs.ticketMode === 'new' && fs.newTicketTitle && !fs.branchManuallyEdited) {
       out += '<div class="form-hint">Ticket ID will be prepended after creation</div>';
     }
@@ -510,10 +498,7 @@ function renderCreateForm() {
   }
 
   // Action buttons
-  var canSubmit = !dis && !pendingAction && (
-    (fs.branchMode === 'new' ? !!sanitizeBranch(fs.branchName) : !!fs.existingBranch) &&
-    (fs.ticketMode !== 'new' || !!fs.newTicketTitle.trim())
-  );
+  let canSubmit = !dis && !pendingAction && canCreate();
   out += '<div class="form-actions">';
   out += '<button class="btn primary fill" id="submitBtn" data-cmd="createForm:submit"' + (canSubmit ? '' : ' disabled') + '>' + (dis ? '<span class="spinner"></span> Creating…' : 'Create tree') + '</button>';
   out += '<button class="btn secondary" data-form="cancel"' + (dis ? ' disabled' : '') + '>Cancel</button>';
@@ -525,19 +510,19 @@ function renderCreateForm() {
 }
 
 function setupDeleteListeners() {
-  var branchRadios = document.querySelectorAll('input[name="delete-branches"]');
+  let branchRadios = document.querySelectorAll('input[name="delete-branches"]');
   branchRadios.forEach(function (input) {
     input.addEventListener('change', function (e) {
       deleteState.branches = e.target.value;
     });
   });
-  var linearRadios = document.querySelectorAll('input[name="delete-linear"]');
+  let linearRadios = document.querySelectorAll('input[name="delete-linear"]');
   linearRadios.forEach(function (input) {
     input.addEventListener('change', function (e) {
       deleteState.linear = e.target.value;
     });
   });
-  var prRadios = document.querySelectorAll('input[name="delete-pr"]');
+  let prRadios = document.querySelectorAll('input[name="delete-pr"]');
   prRadios.forEach(function (input) {
     input.addEventListener('change', function (e) {
       deleteState.pr = e.target.value;
@@ -546,13 +531,13 @@ function setupDeleteListeners() {
 }
 
 function setupFormListeners() {
-  var branchInput = document.getElementById('branchNameInput');
+  let branchInput = document.getElementById('branchNameInput');
   if (branchInput) {
     branchInput.addEventListener('input', function (e) {
-      var lower = e.target.value.toLowerCase();
+      let lower = e.target.value.toLowerCase();
       if (lower !== e.target.value) {
-        var start = e.target.selectionStart;
-        var end = e.target.selectionEnd;
+        let start = e.target.selectionStart;
+        let end = e.target.selectionEnd;
         e.target.value = lower;
         e.target.setSelectionRange(start, end);
       }
@@ -562,24 +547,24 @@ function setupFormListeners() {
     });
     if (formState.ticketMode !== 'new' || formState.newTicketTitle) branchInput.focus();
   }
-  var ticketInput = document.getElementById('ticketTitleInput');
+  let ticketInput = document.getElementById('ticketTitleInput');
   if (ticketInput) {
     ticketInput.addEventListener('input', function (e) {
       formState.newTicketTitle = e.target.value;
       autoFillBranch();
-      var bi = document.getElementById('branchNameInput');
+      let bi = document.getElementById('branchNameInput');
       if (bi) bi.value = formState.branchName;
       updateFormHints();
     });
     if (!formState.newTicketTitle) ticketInput.focus();
   }
-  var prioritySelect = document.getElementById('prioritySelect');
+  let prioritySelect = document.getElementById('prioritySelect');
   if (prioritySelect) {
     prioritySelect.addEventListener('change', function (e) {
       formState.priority = parseInt(e.target.value, 10);
     });
   }
-  var teamSelect = document.getElementById('teamSelect');
+  let teamSelect = document.getElementById('teamSelect');
   if (teamSelect) {
     teamSelect.addEventListener('change', function (e) {
       formState.team = e.target.value;
@@ -590,13 +575,13 @@ function setupFormListeners() {
   // Cmd+Enter (Mac) / Ctrl+Enter (Windows/Linux) to submit
   function onKeyDown(e) {
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-      var btn = document.getElementById('submitBtn');
+      let btn = document.getElementById('submitBtn');
       if (btn && !btn.disabled) btn.click();
     }
   }
   document.addEventListener('keydown', onKeyDown);
   // Cleanup when form is re-rendered
-  var observer = new MutationObserver(function () {
+  let observer = new MutationObserver(function () {
     document.removeEventListener('keydown', onKeyDown);
     observer.disconnect();
   });
@@ -604,24 +589,17 @@ function setupFormListeners() {
 }
 
 function updateFormHints() {
-  var hint = document.getElementById('branchHint');
-  if (hint) {
-    var sanitized = sanitizeBranch(formState.branchName);
-    if (sanitized && sanitized !== formState.branchName) {
-      hint.textContent = 'Branch: ' + sanitized;
-      hint.style.display = '';
-    } else {
-      hint.style.display = 'none';
-    }
-  }
-  var submitBtn = document.getElementById('submitBtn');
+  let submitBtn = document.getElementById('submitBtn');
   if (submitBtn) {
-    var canSubmit = !formState.submitting && !pendingAction && (
-      (formState.branchMode === 'new' ? !!sanitizeBranch(formState.branchName) : !!formState.existingBranch) &&
-      (formState.ticketMode !== 'new' || !!formState.newTicketTitle.trim())
-    );
-    submitBtn.disabled = !canSubmit;
+    submitBtn.disabled = formState.submitting || !!pendingAction || !canCreate();
   }
+}
+
+function canCreate() {
+  const hasBranch = formState.branchMode === 'existing'
+    ? !!formState.existingBranch
+    : !!formState.branchName.trim() || (formState.ticketMode === 'new' && !formState.branchManuallyEdited);
+  return hasBranch && (formState.ticketMode !== 'new' || !!formState.newTicketTitle.trim());
 }
 
 function handleFormAction(action) {
@@ -636,12 +614,14 @@ function handleFormAction(action) {
       formState.ticketMode = 'new';
       formState.ticketId = null;
       formState.ticketTitle = null;
+      formState.ticketBranchName = null;
       autoFillBranch();
       break;
     case 'ticketNone':
       formState.ticketMode = 'none';
       formState.ticketId = null;
       formState.ticketTitle = null;
+      formState.ticketBranchName = null;
       autoFillBranch();
       break;
     case 'carryYes':

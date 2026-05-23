@@ -1,5 +1,4 @@
 import * as fs from "fs";
-import * as path from "path";
 import * as vscode from "vscode";
 import * as devcontainer from "../cli/devcontainer";
 import * as gh from "../cli/gh";
@@ -8,7 +7,8 @@ import type { ForestContext } from "../context";
 import { notify } from "../notify";
 import type { TreeState } from "../state";
 import { displayName } from "../state";
-import { deleteWorkspaceFiles, ensureTreeIdle, requireTree, runStep, symlinkConfigDirs, updateLinear } from "./shared";
+import { safeRelativePath } from "../utils/fs";
+import { deleteWorkspaceFiles, ensureTreeIdle, requireTree, runStep, updateLinear } from "./shared";
 
 const teardownInProgress = new Set<string>();
 
@@ -46,7 +46,7 @@ async function teardownTree(ctx: ForestContext, tree: TreeState, opts: TeardownO
       // Remove symlinks before worktree removal so git doesn't follow them into the main repo
       try {
         for (const dir of ctx.config.symlink) {
-          const linkPath = path.join(tree.path, dir);
+          const linkPath = safeRelativePath(tree.path, dir, "symlink path");
           try {
             fs.unlinkSync(linkPath);
           } catch {
@@ -81,7 +81,7 @@ async function teardownTree(ctx: ForestContext, tree: TreeState, opts: TeardownO
     return true;
   } catch (e) {
     if (!removedFromState) {
-      await clearCleaning().catch(() => {});
+      await clearCleaning().catch((err) => ctx.outputChannel.appendLine(`[Forest] Clear cleaning flag failed: ${err.message}`));
     }
     throw e;
   } finally {

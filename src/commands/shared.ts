@@ -2,7 +2,6 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import * as vscode from "vscode";
-import * as devcontainer from "../cli/devcontainer";
 import * as git from "../cli/git";
 import * as linear from "../cli/linear";
 import { allShortcuts, type ForestConfig, getTreesDir } from "../config";
@@ -15,7 +14,7 @@ import {
 	type TreeState,
 } from "../state";
 import { exec, execShell } from "../utils/exec";
-import { repoHash, tryUnlinkSync } from "../utils/fs";
+import { repoHash, safeRelativePath, tryUnlinkSync } from "../utils/fs";
 
 /** Resolve tree from arg or current context, showing an error if not found or missing path. */
 export function requireTree(
@@ -85,18 +84,18 @@ export async function withTreeOperation<T>(
 	}
 
 	const heartbeat = setInterval(() => {
-		ctx.stateManager
-			.touchTreeOperation(tree.repoPath, tree.branch, busyOperation)
-			.catch(() => {});
+			ctx.stateManager
+				.touchTreeOperation(tree.repoPath, tree.branch, busyOperation)
+				.catch((e) => ctx.outputChannel.appendLine(`[Forest] Operation heartbeat failed: ${e.message}`));
 	}, TREE_OPERATION_HEARTBEAT_MS);
 
 	try {
 		return await fn();
 	} finally {
 		clearInterval(heartbeat);
-		await ctx.stateManager
-			.clearTreeOperation(tree.repoPath, tree.branch, busyOperation)
-			.catch(() => {});
+			await ctx.stateManager
+				.clearTreeOperation(tree.repoPath, tree.branch, busyOperation)
+				.catch((e) => ctx.outputChannel.appendLine(`[Forest] Clear operation failed: ${e.message}`));
 	}
 }
 
@@ -169,8 +168,8 @@ export function copyConfigFiles(
 	treePath: string,
 ): void {
 	for (const file of config.copy) {
-		const src = path.join(repoPath, file);
-		const dst = path.join(treePath, file);
+		const src = safeRelativePath(repoPath, file, "copy path");
+		const dst = safeRelativePath(treePath, file, "copy destination");
 		try {
 			fs.mkdirSync(path.dirname(dst), { recursive: true });
 			fs.cpSync(src, dst, { recursive: true });
@@ -187,16 +186,15 @@ export function symlinkConfigDirs(
 	treePath: string,
 ): void {
 	for (const dir of config.symlink) {
-		const src = path.resolve(repoPath, dir);
-		const dst = path.resolve(treePath, dir);
+		const src = safeRelativePath(repoPath, dir, "symlink path");
+		const dst = safeRelativePath(treePath, dir, "symlink destination");
 		// Only create if the source exists in the main repo
 		if (!fs.existsSync(src)) continue;
 		// Remove existing (dir, file, or stale symlink) in the tree
-		try {
-			fs.rmSync(dst, { recursive: true, force: true });
-		} catch {
-			/* may not exist */
+		if (fs.existsSync(dst) && !fs.lstatSync(dst).isSymbolicLink()) {
+			throw new Error(`Refusing to replace non-symlink: ${dst}`);
 		}
+		try { fs.rmSync(dst, { recursive: true, force: true }); } catch { /* may not exist */ }
 		// Ensure parent directory exists
 		fs.mkdirSync(path.dirname(dst), { recursive: true });
 		// Create relative symlink for portability
@@ -295,6 +293,7 @@ export async function createTree(opts: {
 	existingBranch?: boolean;
 	carryChanges?: string | false;
 	useDevcontainer?: boolean;
+	outputChannel?: vscode.OutputChannel;
 }): Promise<TreeState> {
 	const {
 		branch,
@@ -306,7 +305,9 @@ export async function createTree(opts: {
 		existingBranch,
 		carryChanges,
 		useDevcontainer,
+		outputChannel,
 	} = opts;
+	const log = (msg: string) => outputChannel?.appendLine(`[Forest] ${msg}`);
 	const createKey = `${repoPath}:${branch}`;
 	if (createInProgress.has(createKey))
 		throw new Error("Tree creation already in progress.");
@@ -391,16 +392,11 @@ export async function createTree(opts: {
 								`Could not apply uncommitted changes. Run "git stash pop" in your main repo to recover. (${detail})`,
 							);
 						}
-						await git.stashDrop(repoPath, carryChanges).catch(() => {});
+							await git.stashDrop(repoPath, carryChanges).catch((e) =>
+								log(`Drop carry stash failed: ${e.message}`),
+							);
 					}
 
-					void git
-						.pushBranch(treePath, branch)
-						.catch(() =>
-							notify.warn(
-								"Failed to push branch. You can push manually later.",
-							),
-						);
 					await postWorktreeSetup(config, repoPath, treePath, tree, progress);
 
 					progress.report({ message: "Opening window..." });
@@ -411,9 +407,13 @@ export async function createTree(opts: {
 			);
 		} catch (e: any) {
 			if (stateSaved) await stateManager.removeTree(repoPath, branch);
-			await git.removeWorktree(repoPath, treePath).catch(() => {});
+			await git.removeWorktree(repoPath, treePath).catch((err) =>
+				log(`Rollback remove worktree failed: ${err.message}`),
+			);
 			if (!existingBranch)
-				await git.deleteBranch(repoPath, branch).catch(() => {});
+				await git.deleteBranch(repoPath, branch).catch((err) =>
+					log(`Rollback delete branch failed: ${err.message}`),
+				);
 			throw e;
 		}
 	} finally {

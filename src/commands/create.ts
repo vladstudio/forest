@@ -93,7 +93,7 @@ export async function start(ctx: ForestContext, arg: { ticketId: string; title: 
   if (stashed === undefined) return;
 
   try {
-    await createTree({ branch, config, stateManager: ctx.stateManager, repoPath: ctx.repoPath, ticketId, title, existingBranch, carryChanges: stashed });
+    await createTree({ branch, config, stateManager: ctx.stateManager, repoPath: ctx.repoPath, ticketId, title, existingBranch, carryChanges: stashed, outputChannel: ctx.outputChannel });
     await updateLinear(ctx, ticketId, config.linear.statuses.onNew);
   } catch (e: any) {
     notify.error(e.message);
@@ -159,7 +159,7 @@ async function createFromNewBranch(ctx: ForestContext): Promise<void> {
   }
 
   try {
-    await createTree({ branch: branchName, config, stateManager: ctx.stateManager, repoPath: ctx.repoPath, ticketId, title, carryChanges: stashed });
+    await createTree({ branch: branchName, config, stateManager: ctx.stateManager, repoPath: ctx.repoPath, ticketId, title, carryChanges: stashed, outputChannel: ctx.outputChannel });
     if (ticketId) await updateLinear(ctx, ticketId, config.linear.statuses.onNew);
   } catch (e: any) {
     if (revertOnCancel && ticketId) await revertLinear(ctx, ticketId);
@@ -233,7 +233,7 @@ async function createFromExistingBranch(ctx: ForestContext): Promise<void> {
   }
 
   try {
-    await createTree({ branch, config, stateManager: ctx.stateManager, repoPath: ctx.repoPath, ticketId, title, existingBranch: true, carryChanges: stashed });
+    await createTree({ branch, config, stateManager: ctx.stateManager, repoPath: ctx.repoPath, ticketId, title, existingBranch: true, carryChanges: stashed, outputChannel: ctx.outputChannel });
     if (linkedLinear && ticketId) await updateLinear(ctx, ticketId, config.linear.statuses.onNew);
   } catch (e: any) {
     if (revertOnCancel && ticketId) await revertLinear(ctx, ticketId);

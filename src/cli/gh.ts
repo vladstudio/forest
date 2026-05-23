@@ -6,6 +6,13 @@ import { notify } from '../notify';
 
 let _available: boolean | null = null;
 let _authWarned = false;
+const automergeCache = new Map<string, boolean>();
+
+export function clearCache(): void {
+  _available = null;
+  _authWarned = false;
+  automergeCache.clear();
+}
 
 export async function isAvailable(): Promise<boolean> {
   if (_available === null) _available = await commandExists('gh');
@@ -33,7 +40,6 @@ export async function prIsMerged(repoPath: string, branch: string): Promise<bool
   } catch { return false; }
 }
 
-const automergeCache = new Map<string, boolean>();
 export async function repoHasAutomerge(cwd: string): Promise<boolean> {
   const cached = automergeCache.get(cwd);
   if (cached !== undefined) return cached;

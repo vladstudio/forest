@@ -53,6 +53,11 @@ type WorkflowState = { id: string; name: string; type: string; position: number 
 const STATE_CACHE_TTL = 5 * 60_000;
 const stateCache = new Map<string, { states: WorkflowState[]; time: number }>();
 
+export function clearCache(): void {
+  _authWarned = false;
+  stateCache.clear();
+}
+
 async function getWorkflowStates(teamKey: string): Promise<WorkflowState[]> {
   const cached = stateCache.get(teamKey);
   if (cached && Date.now() - cached.time < STATE_CACHE_TTL) return cached.states;
@@ -83,30 +88,21 @@ async function resolveStateId(teamKey: string, nameOrType: string): Promise<stri
 }
 
 export async function listMyIssues(states: string[], teams?: string[], opts?: { signal?: AbortSignal }): Promise<LinearIssue[]> {
-  try {
-    // states are type-level names like "triage", "backlog", etc.
-    const filter: Record<string, unknown> = {
-      assignee: { isMe: { eq: true } },
-      state: { type: { in: states } },
-    };
-    if (teams?.length) filter.team = { key: { in: teams } };
-    const data = await gql<{ issues: { nodes: { identifier: string; title: string; state: { name: string; type: string }; priority: number; url: string }[] } }>(
-      `query($filter: IssueFilter!) {
-        issues(filter: $filter, orderBy: updatedAt, first: 100) {
-          nodes { identifier title state { name type } priority url }
-        }
-      }`,
-      { filter },
-      opts?.signal,
-    );
-    return data.issues.nodes.map(n => ({
-      id: n.identifier,
-      title: n.title,
-      state: n.state.type,
-      priority: n.priority,
-      url: n.url,
-    }));
-  } catch { return []; }
+  const filter: Record<string, unknown> = {
+    assignee: { isMe: { eq: true } },
+    state: { type: { in: states } },
+  };
+  if (teams?.length) filter.team = { key: { in: teams } };
+  const data = await gql<{ issues: { nodes: { identifier: string; title: string; state: { type: string }; priority: number; url: string }[] } }>(
+    `query($filter: IssueFilter!) {
+      issues(filter: $filter, orderBy: updatedAt, first: 100) {
+        nodes { identifier title state { type } priority url }
+      }
+    }`,
+    { filter },
+    opts?.signal,
+  );
+  return data.issues.nodes.map(n => ({ id: n.identifier, title: n.title, state: n.state.type, priority: n.priority, url: n.url }));
 }
 
 export async function getIssue(issueId: string, opts?: { signal?: AbortSignal }): Promise<LinearIssue | null> {
@@ -177,31 +173,20 @@ export async function validateStatuses(
   statuses: { issueList: string[]; onNew: string; onShip: string; onCleanup: string; onCancel: string },
   teams: string[],
 ): Promise<string[]> {
-  try {
-    const problems: string[] = [];
-    const VALID_TYPES = ['triage', 'backlog', 'unstarted', 'started', 'completed', 'canceled'];
-    // Validate issueList — must be valid state types
-    for (const t of statuses.issueList) {
-      if (!VALID_TYPES.includes(t)) problems.push(`issueList: "${t}" is not a valid state type`);
-    }
-    const transitionFields = { onNew: statuses.onNew, onShip: statuses.onShip, onCleanup: statuses.onCleanup, onCancel: statuses.onCancel };
-    const teamResults = await Promise.all(teams.map(async (team) => {
-      const states = await getWorkflowStates(team);
-      if (!states.length) return [`Team "${team}" has no workflow states (wrong team key?)`];
-      const teamProblems: string[] = [];
-      for (const [field, value] of Object.entries(transitionFields)) {
-        const lower = value.toLowerCase();
-        const byName = states.find(s => s.name.toLowerCase() === lower);
-        const byType = states.find(s => s.type === lower);
-        if (!byName && !byType) {
-          const available = [...new Set(states.map(s => s.name))].join(', ');
-          teamProblems.push(`${field}: "${value}" not found for team ${team} (available: ${available})`);
-        }
-      }
-      return teamProblems;
-    }));
-    return [...problems, ...teamResults.flat()];
-  } catch { return []; }
+  const problems: string[] = [];
+  const validTypes = ['triage', 'backlog', 'unstarted', 'started', 'completed', 'canceled'];
+  for (const t of statuses.issueList) if (!validTypes.includes(t)) problems.push(`issueList: "${t}" is not a valid state type`);
+  const transitionFields = { onNew: statuses.onNew, onShip: statuses.onShip, onCleanup: statuses.onCleanup, onCancel: statuses.onCancel };
+  const teamResults = await Promise.all(teams.map(async (team) => {
+    const states = await getWorkflowStates(team);
+    if (!states.length) return [`Team "${team}" has no workflow states (wrong team key?)`];
+    return Object.entries(transitionFields).flatMap(([field, value]) => {
+      const lower = value.toLowerCase();
+      if (states.some(s => s.name.toLowerCase() === lower || s.type === lower)) return [];
+      return [`${field}: "${value}" not found for team ${team} (available: ${[...new Set(states.map(s => s.name))].join(', ')})`];
+    });
+  }));
+  return [...problems, ...teamResults.flat()];
 }
 
 export async function updateIssueState(issueId: string, state: string, team?: string): Promise<void> {
