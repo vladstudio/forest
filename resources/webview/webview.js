@@ -63,6 +63,13 @@ window.addEventListener('message', e => {
       loadingMessage = null;
       formInit = msg.init;
       formState = defaultFormState(msg.init);
+      if (msg.preselectedIssue) {
+        formState.ticketMode = 'existing';
+        formState.ticketId = msg.preselectedIssue.ticketId;
+        formState.ticketTitle = msg.preselectedIssue.title;
+        formState.ticketBranchName = msg.preselectedIssue.branchName;
+        autoFillBranch();
+      }
       renderCurrentMode();
       break;
     case 'showDeleteForm':

@@ -12,7 +12,13 @@ export interface IForestProvider {
   refresh(): void;
   refreshTrees(): void;
   showCreateForm(): Promise<boolean>;
+  showCreateFormWithIssue(issue: { id: string; title: string }): Promise<boolean>;
   showDeleteForm(branch?: string): Promise<boolean>;
+  dispose(): void;
+}
+
+export interface ITodosProvider {
+  refresh(): void;
   dispose(): void;
 }
 
@@ -23,6 +29,7 @@ export interface ForestContext {
   shortcutManager: ShortcutManager;
   statusBarManager: StatusBarManager;
   forestProvider: IForestProvider;
+  todosProvider?: ITodosProvider;
   outputChannel: vscode.OutputChannel;
   currentTree: TreeState | undefined;
 }

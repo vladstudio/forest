@@ -6,6 +6,7 @@ import {
 	ShortcutItem,
 	ShortcutsTreeProvider,
 } from "./views/ShortcutsTreeProvider";
+import { TodoItem, TodosTreeProvider } from "./views/TodosTreeProvider";
 import { StateManager, type ForestState } from "./state";
 import { ForestContext, getHostWorkspacePath, getRepoPath } from "./context";
 import { ShortcutManager } from "./managers/ShortcutManager";
@@ -64,10 +65,12 @@ export async function activate(context: vscode.ExtensionContext) {
 		);
 		return;
 	}
+	linear.configure(config.linear.apiKey);
+	const linearReady = config.linear.enabled && linear.isAvailable();
 	vscode.commands.executeCommand(
 		"setContext",
 		"forest.linearEnabled",
-		config.linear.enabled,
+		linearReady,
 	);
 	vscode.commands.executeCommand(
 		"setContext",
@@ -79,13 +82,11 @@ export async function activate(context: vscode.ExtensionContext) {
 		"forest.multipleTerminals",
 		config.terminal.length > 1,
 	);
-	linear.configure(config.linear.apiKey);
-
 	const repoPath = getRepoPath();
 	const outputChannel = vscode.window.createOutputChannel("Forest");
 
 	// Validate Linear config statuses against actual workflow states
-	if (config.linear.enabled && config.linear.teams?.length) {
+	if (linearReady && config.linear.teams?.length) {
 		linear
 			.validateStatuses(config.linear.statuses, config.linear.teams)
 			.then((problems) => {
@@ -164,6 +165,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		context.extensionUri,
 	);
 	const shortcutsProvider = new ShortcutsTreeProvider(config);
+	const todosProvider = linearReady ? new TodosTreeProvider(config, outputChannel) : undefined;
 	context.subscriptions.push(
 		vscode.window.registerWebviewViewProvider("forest.trees", forestProvider),
 		vscode.window.registerTreeDataProvider(
@@ -171,6 +173,11 @@ export async function activate(context: vscode.ExtensionContext) {
 			shortcutsProvider,
 		),
 	);
+	if (todosProvider) {
+		context.subscriptions.push(
+			vscode.window.registerTreeDataProvider("forest.todos", todosProvider),
+		);
+	}
 
 	// Update noTrees context
 	const updateNoTrees = async () => {
@@ -191,6 +198,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		shortcutManager,
 		statusBarManager,
 		forestProvider,
+		todosProvider,
 		outputChannel,
 		currentTree,
 	};
@@ -198,6 +206,9 @@ export async function activate(context: vscode.ExtensionContext) {
 
 	// Pre-warm tree data cache so the sidebar renders instantly on first open.
 	forestProvider.refresh();
+
+	// Pre-warm todos list
+	todosProvider?.refresh();
 
 	// Warm the automerge detection cache so the ship buttons render correctly without a network wait.
 	if (config.github.enabled) {
@@ -213,6 +224,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		vscode.window.onDidChangeWindowState((e) => {
 			if (e.focused) {
 				forestProvider.refresh();
+				todosProvider?.refresh();
 			}
 		}),
 	);
@@ -323,6 +335,12 @@ export async function activate(context: vscode.ExtensionContext) {
 	);
 	context.subscriptions.push({ dispose: () => clearInterval(healthId) });
 
+	// Auto-refresh todos every 3 minutes
+	if (todosProvider) {
+		const todosId = setInterval(() => todosProvider.refresh(), 3 * 60 * 1000);
+		context.subscriptions.push({ dispose: () => clearInterval(todosId) });
+	}
+
 	// Watch state for changes from other windows
 	let previousTrees = stateManager.getTreesForRepo(postPruneState, repoPath);
 	stateManager.onDidChange(({ state: newState, isLocal }) => {
@@ -372,6 +390,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		stateManager,
 		forestProvider,
 	);
+	if (todosProvider) context.subscriptions.push(todosProvider);
 }
 
 export function deactivate() {}
@@ -491,6 +510,7 @@ function registerCommands(
 	reg("forest.list", () => list(ctx));
 	reg("forest.openMain", () => focusOrOpenWindow(vscode.Uri.file(ctx.repoPath)));
 	reg("forest.refresh", () => ctx.forestProvider.refresh());
+	reg("forest.refreshTodos", () => ctx.todosProvider?.refresh());
 	reg("forest.copyBranch", () => ctx.currentTree && vscode.env.clipboard.writeText(ctx.currentTree.branch));
 	reg("forest.revealInFinder", () => {
 		if (ctx.currentTree?.path) vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(ctx.currentTree.path));
@@ -521,5 +541,22 @@ function registerCommands(
 			{ placeHolder: "Run a shortcut…", matchOnDescription: true },
 		);
 		if (picked) ctx.shortcutManager.open(picked.shortcut);
+	});
+
+	// Todos commands
+	reg("forest.todoCreateTree", async (arg: any) => {
+		const issue = arg instanceof TodoItem ? arg.issue : arg as linear.LinearIssue;
+		if (!issue) return;
+		const shown = await ctx.forestProvider.showCreateFormWithIssue(issue);
+		if (!shown) {
+			await start(ctx, { ticketId: issue.id, title: issue.title });
+			ctx.todosProvider?.refresh();
+		}
+	});
+	reg("forest.openTodoUrl", async (arg: any) => {
+		const issue = arg instanceof TodoItem ? arg.issue : arg as linear.LinearIssue;
+		if (issue?.url) {
+			vscode.env.openExternal(vscode.Uri.parse(issue.url));
+		}
 	});
 }

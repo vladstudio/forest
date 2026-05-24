@@ -88,6 +88,11 @@
 					"id": "forest.shortcuts",
 					"name": "Shortcuts",
 					"when": "forest.active && forest.ghAvailable"
+				},
+				{
+					"id": "forest.todos",
+					"name": "Todos",
+					"when": "forest.active && forest.ghAvailable && forest.linearEnabled"
 				}
 			]
 		},
@@ -197,6 +202,12 @@
 				"icon": "$(refresh)"
 			},
 			{
+				"command": "forest.refreshTodos",
+				"title": "Refresh Todos",
+				"category": "Forest",
+				"icon": "$(refresh)"
+			},
+			{
 				"command": "forest.openShortcut",
 				"title": "Open Shortcut",
 				"category": "Forest",
@@ -237,6 +248,18 @@
 				"title": "Attach Linear Ticket…",
 				"category": "Forest",
 				"icon": "$(link)"
+			},
+			{
+				"command": "forest.todoCreateTree",
+				"title": "Create Tree from Todo",
+				"category": "Forest",
+				"icon": "$(add)"
+			},
+			{
+				"command": "forest.openTodoUrl",
+				"title": "Open Linear Ticket",
+				"category": "Forest",
+				"icon": "$(link-external)"
 			}
 		],
 		"menus": {
@@ -250,6 +273,11 @@
 					"command": "forest.create",
 					"when": "view == forest.trees",
 					"group": "navigation"
+				},
+				{
+					"command": "forest.refreshTodos",
+					"when": "view == forest.todos",
+					"group": "navigation"
 				}
 			],
 			"view/item/context": [
@@ -262,6 +290,16 @@
 					"command": "forest.openShortcutWith",
 					"when": "viewItem =~ /^shortcut-terminal/ && forest.multipleTerminals",
 					"group": "1_actions"
+				},
+				{
+					"command": "forest.todoCreateTree",
+					"when": "viewItem == todo",
+					"group": "inline"
+				},
+				{
+					"command": "forest.openTodoUrl",
+					"when": "viewItem == todo",
+					"group": "inline"
 				}
 			],
 			"commandPalette": [
@@ -283,6 +321,18 @@
 				},
 				{
 					"command": "forest.linkTicket",
+					"when": "false"
+				},
+				{
+					"command": "forest.refreshTodos",
+					"when": "false"
+				},
+				{
+					"command": "forest.todoCreateTree",
+					"when": "false"
+				},
+				{
+					"command": "forest.openTodoUrl",
 					"when": "false"
 				}
 			]

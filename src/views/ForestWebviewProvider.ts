@@ -72,19 +72,37 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
 
   refreshTrees(): void { this.refresh(); }
 
-  async showCreateForm(): Promise<boolean> {
-    if (!this.view?.visible || !this.ctx) return false;
+  private async getCreateFormInit() {
+    if (!this.view?.visible || !this.ctx) return null;
     const repoPath = this.repoPath;
     const localChanges = await git.localChanges(repoPath).catch(() => null);
     const uncommittedCount = localChanges ? localChanges.added + localChanges.removed + localChanges.modified : 0;
     const hasDevcontainer = fs.existsSync(path.join(repoPath, '.devcontainer', 'devcontainer.json'));
+    return {
+      linearEnabled: this.config.linear.enabled && linear.isAvailable(),
+      teams: this.config.linear.teams ?? [],
+      uncommittedCount,
+      hasDevcontainer,
+    };
+  }
+
+  async showCreateForm(): Promise<boolean> {
+    const init = await this.getCreateFormInit();
+    if (!init) return false;
+    this.postMessage({ type: 'showCreateForm', init });
+    return true;
+  }
+
+  async showCreateFormWithIssue(issue: { id: string; title: string }): Promise<boolean> {
+    const init = await this.getCreateFormInit();
+    if (!init) return false;
     this.postMessage({
       type: 'showCreateForm',
-      init: {
-        linearEnabled: this.config.linear.enabled && linear.isAvailable(),
-        teams: this.config.linear.teams ?? [],
-        uncommittedCount,
-        hasDevcontainer,
+      init,
+      preselectedIssue: {
+        ticketId: issue.id,
+        title: issue.title,
+        branchName: formatBranch(this.config.branchFormat, issue.id, issue.title),
       },
     });
     return true;
@@ -565,6 +583,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
       if (ticketId) {
         await updateLinear(ctx, ticketId, ctx.config.linear.statuses.onNew);
       }
+      ctx.todosProvider?.refresh();
 
       this.postMessage({ type: 'createResult', success: true });
     } catch (e: any) {
