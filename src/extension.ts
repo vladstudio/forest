@@ -67,10 +67,16 @@ export async function activate(context: vscode.ExtensionContext) {
 	}
 	linear.configure(config.linear.apiKey);
 	const linearReady = config.linear.enabled && linear.isAvailable();
+	const showTodos = linearReady && !!config.linear.showTodos;
 	vscode.commands.executeCommand(
 		"setContext",
 		"forest.linearEnabled",
 		linearReady,
+	);
+	vscode.commands.executeCommand(
+		"setContext",
+		"forest.showTodos",
+		showTodos,
 	);
 	vscode.commands.executeCommand(
 		"setContext",
@@ -165,7 +171,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		context.extensionUri,
 	);
 	const shortcutsProvider = new ShortcutsTreeProvider(config);
-	const todosProvider = linearReady ? new TodosTreeProvider(config, outputChannel) : undefined;
+	const todosProvider = showTodos ? new TodosTreeProvider(config, outputChannel) : undefined;
 	context.subscriptions.push(
 		vscode.window.registerWebviewViewProvider("forest.trees", forestProvider),
 		vscode.window.registerTreeDataProvider(

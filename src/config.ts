@@ -53,6 +53,7 @@ export interface ForestConfig {
 		enabled: boolean;
 		apiKey?: string;
 		teams?: string[];
+		showTodos?: boolean;
 		statuses: {
 			issueList: string[];
 			onNew: string;

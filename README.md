@@ -237,7 +237,8 @@ Switch between trees from the sidebar. All processes keep running in background 
 "window.title": "${rootName}",                // readable tab labels per worktree
 "window.restoreWindows": "preserve",          // survives restarts
 "window.closeWhenEmpty": true,
-"git.openRepositoryInParentFolders": "always" // git works in worktree subdirs
+"git.openRepositoryInParentFolders": "always", // git works in worktree subdirs
+"terminal.integrated.gpuAcceleration": "canvas" // avoids a bug with heavy parallel terminal output
 ```
 
 To open terminals as editor tabs (instead of the bottom panel), add this keybinding (`Cmd+T`):

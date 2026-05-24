@@ -92,7 +92,7 @@
 				{
 					"id": "forest.todos",
 					"name": "Todos",
-					"when": "forest.active && forest.ghAvailable && forest.linearEnabled"
+					"when": "forest.showTodos"
 				}
 			]
 		},
