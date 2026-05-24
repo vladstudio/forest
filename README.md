@@ -1,25 +1,24 @@
-<p align="center">
-  <img src="forest.png" width="128" alt="Forest">
-</p>
-
 # Forest
+
+![Forest](forest.png)
 
 VSCode extension for parallel feature development using git worktrees. One Linear ticket = one branch = one worktree = one VSCode window.
 
 [Install from VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=vladstudio.vladstudio-forest)
 
+| Command         | Description                                                                                       |
 | --------------- | ------------------------------------------------------------------------------------------------- |
 | **New Tree**    | Unified wizard: pick new or existing branch, optionally link a Linear ticket                      |
 | **Ship**        | Push branch + create PR (with optional automerge) + move ticket to configured status              |
 | **Cleanup**     | Auto-triggered when PR is merged: remove worktree + branches + move ticket to configured status   |
 | **Delete Tree** | Interactive form: choose branch cleanup (keep / local only / all), Linear status, and PR handling |
-| **Update**      | Merge from main + re-copy env files                                                               |
+| **Update**      | Merge from the base branch + re-copy env files                                                    |
 | **List**        | Quick-pick list of all active trees                                                               |
 
 ## Prerequisites
 
 - `git` (required)
-- `gh` CLI (for PR creation and merge)
+- `gh` CLI (for PR creation and merge, unless you disable GitHub integration)
 
 ## Setup
 
@@ -72,25 +71,24 @@ To set up Forest, ask Claude (or any AI) to read this README and generate `.fore
 
 1. **Files to copy into trees?** → check which of `.env`, `.env.local`, `.envrc` exist
 2. **Shortcuts?** → what terminals to open (dev server, claude, shell), any browser URLs, any one-time setup commands (e.g. `bun install` with `onNewTree: true`)
-3. **Linear integration?** → yes/no, and team key(s) (e.g. `["ENG", "UX"]`). Get your API key from https://linear.app/settings/account/security
+3. **Linear integration?** → yes/no, and team key(s) (e.g. `["ENG", "UX"]`). Get your API key from [Linear account security](https://linear.app/settings/account/security)
 
 ### Config reference
 
-| Field          | Required | Default               | Description                                                                                                                                                                                                                                                                                                                          |
-| -------------- | -------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `version`      | yes      | —                     | Always `1`                                                                                                                                                                                                                                                                                                                           |
-| `copy`         | no       | `[]`                  | Files to copy from repo root into each tree                                                                                                                                                                                                                                                                                          |
-| `symlink`      | no       | `[]`                  | Directories to symlink from the main repo into each tree (e.g. `["node_modules"]`). Symlinks are relative, created after copy, and cleaned up before worktree removal.                                                                                                                                                             |
-| `shortcuts`    | no       | `{cli:[],web:[],files:[]}` | Terminals (`cli`), browsers (`web`), and files (`files`) to open per tree. Each array holds objects with `name` and type-specific fields.                                                                                                                                                                                     |
-| `linear`       | no       | disabled              | Linear integration. Auto-enabled when `teams` or `apiKey` is set. `teams` is an array of team **keys** (e.g. `["ENG"]` or `["ENG", "UX"]`). `statuses` controls issue list and lifecycle transitions including `onCancel` (**must use lowercase** state names: `triage`, `backlog`, `unstarted`, `started`, `completed`, `canceled`) |
-| `github`       | no       | `true`                | GitHub integration toggle. Set `false` to disable                                                                                                                                                                                                                                                                                    |
-| `branchFormat` | no       | `${ticketId}-${slug}` | Branch naming. Supports `${ticketId}`, `${slug}`                                                                                                                                                                                                                                                                                     |
-| `baseBranch`   | no       | `main`                | Base branch name (`origin/` prefix is added automatically)                                                                                                                                                                                                                                                                           |
-| `maxTrees`     | no       | `10`                  | Max concurrent worktrees                                                                                                                                                                                                                                                                                                             |
-| `ai`           | no       | `false`               | AI-generated PR descriptions using Tetra. Set `true` to enable. Requires Tetra to be running with AI commands configured (see below).                                                                                                                                                                                                 |
-| `logging`      | no       | `true`                | File-based logging to `~/.forest/forest.log`. Rotates at 5 MB                                                                                                                                                                                                                                                                        |
-| `browser`      | no       | `["integrated"]`      | Browser app list. First item is the default; right-click a shortcut to pick another. Values: `integrated` (VS Code integrated browser), `external` (system default), or an app name (e.g. `"Firefox"`)                                                                                                                               |
-| `terminal`     | no       | `["integrated"]`      | Terminal app list. First item is the default; right-click to pick another. Values: `integrated` (VS Code terminal), or an external app (`iTerm`, `Terminal`, `Ghostty`). External terminals receive the shortcut command automatically                                                                                               |
+| Field          | Required | Default                    | Description                                                                                                                                                                                                                                                                                                                                                                                     |
+| -------------- | -------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `version`      | yes      | —                          | Always `1`                                                                                                                                                                                                                                                                                                                                                                                      |
+| `copy`         | no       | `[]`                       | Files to copy from repo root into each tree                                                                                                                                                                                                                                                                                                                                                     |
+| `symlink`      | no       | `[]`                       | Directories to symlink from the main repo into each tree (e.g. `["node_modules"]`). Symlinks are relative, created after copy, and cleaned up before worktree removal.                                                                                                                                                                                                                          |
+| `shortcuts`    | no       | `{cli:[],web:[],files:[]}` | Terminals (`cli`), browsers (`web`), and files (`files`) to open per tree. Each array holds objects with `name` and type-specific fields.                                                                                                                                                                                                                                                       |
+| `linear`       | no       | disabled                   | Linear integration. Auto-enabled when `teams` or `apiKey` is set. `teams` is an array of team **keys** (e.g. `["ENG"]` or `["ENG", "UX"]`). `issueList` must use Linear's built-in lowercase state types (`triage`, `backlog`, `unstarted`, `started`, `completed`, `canceled`). `onNew`, `onShip`, `onCleanup`, and `onCancel` can be state names or types and are matched case-insensitively. |
+| `github`       | no       | `true`                     | GitHub integration toggle. Set `false` to disable                                                                                                                                                                                                                                                                                                                                               |
+| `branchFormat` | no       | `${ticketId}-${slug}`      | Branch naming. Supports `${ticketId}`, `${slug}`                                                                                                                                                                                                                                                                                                                                                |
+| `baseBranch`   | no       | `main`                     | Base branch name (`origin/` prefix is added automatically)                                                                                                                                                                                                                                                                                                                                      |
+| `maxTrees`     | no       | `10`                       | Max concurrent worktrees                                                                                                                                                                                                                                                                                                                                                                        |
+| `ai`           | no       | `false`                    | AI-generated commit messages and PR descriptions using Tetra. Set `true` to enable. Requires Tetra to be running with AI commands configured (see below).                                                                                                                                                                                                                                       |
+| `browser`      | no       | `["integrated"]`           | Browser app list. First item is the default; right-click a shortcut to pick another. Values: `integrated` (VS Code integrated browser), `external` (system default), or an app name (e.g. `"Firefox"`)                                                                                                                                                                                          |
+| `terminal`     | no       | `["integrated"]`           | Terminal app list. First item is the default; right-click to pick another. Values: `integrated` (VS Code terminal), or an external app (`iTerm`, `Terminal`, `Ghostty`). External terminals receive the shortcut command automatically                                                                                                                                                          |
 
 Shortcuts support `onNewTree: true` to auto-open when a tree is first created (e.g. for dependency installation). Terminals also accept `command` and `env`. Browser shortcuts accept a per-shortcut `browser` override (same values as the top-level `browser` setting). Shortcut values are treated literally: Forest does not expand `${...}` placeholders inside shortcut commands, URLs, env vars, or file paths.
 
@@ -100,34 +98,32 @@ Shortcuts support `onNewTree: true` to auto-open when a tree is first created (e
 
 ### Tree Grouping
 
-- **Cleaning up** — cleanup in progress (loading spinner)
-- **In Progress** — no PR created yet
-- **In Review** — PR is open
+- **Deleting** — cleanup in progress (loading spinner)
+- **In progress** — no PR created yet
+- **In review** — PR is open
 - **Done** — PR has been merged
 - **Closed** — PR has been closed
 
-### Tree Health Indicators
+### Tree Card Indicators
 
-```
-ENG-1234  Fix login bug   3↓ · 2h
-ENG-5678  Add dark mode   PR approved · 1d
-```
+On the active tree card, Forest surfaces:
 
-- **N↓** — commits behind base branch
-- **Age** — time since last commit
-- **PR status** — open, approved, changes requested
+- `Pull N` for commits behind the remote branch
+- `Main N` for commits behind the configured base branch
+- `+N / -N / ~N` for working tree changes
+- `PR#N` when a pull request exists
 
 ### Auto-Cleanup on Merged PRs
 
-When a PR is merged, you get a notification: *"ENG-1234 PR was merged. Clean up?"* → click Cleanup to remove the worktree automatically.
+When a PR is merged, Forest shows a cleanup notification. Choosing Cleanup removes the worktree, deletes the branch, updates the Linear ticket if enabled, and closes the tree window when appropriate.
 
-### Update (Rebase + Refresh)
+### Update / Rebase
 
-`Update` fetches and merges (or rebases) your tree on the base branch and re-copies config files. If the merge/rebase fails, it shows an error.
+`Update` merges your tree from the configured base branch and re-copies config files. `Rebase` does the same with `git rebase` instead of merge. If either operation fails, Forest shows an error and leaves conflicts for you to resolve manually.
 
 ### Direnv Support
 
-If a `.envrc` file exists in the tree, Forest automatically runs `direnv allow` during tree creation.
+If a `.envrc` file exists in the tree, Forest automatically runs `direnv allow` during tree creation and when switching into that tree.
 
 ### Dev Containers
 
@@ -137,7 +133,7 @@ Git is intentionally not exposed inside the container — commit and push via th
 
 ### AI Integration
 
-Forest uses **Tetra** for AI-generated PR descriptions. To enable:
+Forest uses **Tetra** for AI-generated commit messages and PR descriptions. To enable:
 
 1. Install [Tetra](https://apps.vlad.studio/tetra) (a macOS menu bar app)
 2. Add Tetra commands to `~/.config/tetra/commands/`:
@@ -168,6 +164,7 @@ OUTPUT ONLY THE PR DESCRIPTION.
 Claude Code asks for trust confirmation when opening a new workspace. Since each tree creates a new directory, you'd get this prompt for every tree. To avoid it, add `~/.forest/trees` to Claude's trusted directories:
 
 In `~/.claude/settings.json`:
+
 ```json
 {
   "trustedDirectories": ["/Users/you/.forest/trees"]
@@ -197,12 +194,12 @@ Status names in `issueList` use Linear's built-in types: `triage`, `backlog`, `u
 
 ## Usage
 
-All commands are available from the Forest sidebar (tree icon in activity bar) or the command palette (`Cmd+Shift+P` → "Forest: ...").
+Most user-facing actions are available from the Forest sidebar (tree icon in activity bar) or the command palette (`Cmd+Shift+P` → "Forest: ...").
 
 **Typical workflow:**
 
-1. **New Tree** from a Linear ticket (or **New Linear Issue + Tree** to create a new ticket)
-2. A new VSCode window opens with terminals running
+1. **New Tree** from a Linear ticket, or create a new Linear issue in the form
+2. A new VS Code window opens, then any configured `onNewTree` shortcuts run
 3. Code, test, iterate — each tree is fully isolated
 4. **Ship** when ready — pushes and creates a PR (with AI-generated description if enabled)
 5. **Cleanup** after merge — removes worktree, branch, and ticket
@@ -217,9 +214,10 @@ Switch between trees from the sidebar. All processes keep running in background 
 | `Forest: New Tree`           | Create tree (unified wizard)                            |
 | `Forest: Switch Tree`        | Open another tree's window                              |
 | `Forest: Ship`               | Push + create PR (offers automerge if repo supports it) |
+| `Forest: Ship + Automerge`   | Push + create PR + enable automerge when supported      |
 | `Forest: Delete Tree`        | Interactive deletion with branch/ticket/PR options      |
-| `Forest: Update`             | Merge from main + re-copy config files                  |
-| `Forest: Rebase`             | Rebase onto main                                        |
+| `Forest: Update`             | Merge from the base branch + re-copy config files       |
+| `Forest: Rebase`             | Rebase onto the base branch                             |
 | `Forest: Pull`               | Pull latest changes                                     |
 | `Forest: Push`               | Push to remote                                          |
 | `Forest: List`               | List all trees                                          |
@@ -271,7 +269,7 @@ git clone <repo> && cd forest
 bun install
 bun run package
 npx @vscode/vsce package
-code --install-extension forest-0.1.0.vsix
+code --install-extension vladstudio-forest-*.vsix
 ```
 
 ## Development
