@@ -325,10 +325,10 @@ function treeCard(t, d) {
     ticket +
     '<div class="field-label">Branch</div><div class="row"><span class="branch" data-cmd="revealInFinder" title="Reveal in Finder: ' + h(t.branch) + '">' + bl + '</span>' + btn('copyBranch', ic('copy'), allDis, { attrs: 'title="Copy branch name"' }) + '</div>' +
     '<div class="row equal-fill">' +
-    btn('pull', ic('arrowDown') + '<span class="label">Pull</span>' + (t.remoteBehind > 0 ? ' ' + t.remoteBehind : ''), allDis, { attrs: 'title="Pull from remote"' }) +
+    btn('pull', ic('arrowDown') + '<span class="label">Pull</span>' + (t.remoteBehind > 0 ? ' ' + t.remoteBehind : ''), allDis || !t.remoteBehind, { attrs: 'title="Pull from remote"' }) +
     btn('mergeFromMain', ic('gitMerge') + '<span class="label">Main</span>' + (t.behind > 0 ? ' ' + t.behind : ''), allDis || !t.behind, { attrs: 'title="Merge from main"' }) +
-    (d.hasAI ? btn('commit', ic('gitCommit') + '<span class="label">Commit</span>', allDis) : '') +
-    btn('push', ic('arrowUp') + '<span class="label">Push</span>' + (t.ahead > 0 ? ' ' + t.ahead : ''), allDis, { attrs: 'title="Push to remote"' }) +
+    (d.hasAI ? btn('commit', ic('gitCommit') + '<span class="label">Commit</span>', allDis || !lc || (lc.added === 0 && lc.removed === 0 && lc.modified === 0)) : '') +
+    btn('push', ic('arrowUp') + '<span class="label">Push</span>' + (t.ahead > 0 ? ' ' + t.ahead : ''), allDis || (t.ahead === 0 && t.hasTrackingRef), { attrs: 'title="Push to remote"' }) +
     '</div>' +
     '<div class="row equal-fill">' +
     btn('workingDiff', (stats ? '<span class="stats">' + stats + '</span>' : '') + ic('diff'), allDis || !lc, { attrs: 'title="Diff working changes"' }) +

@@ -16,6 +16,7 @@ export interface TreeCardData {
   behind: number;
   ahead: number;
   remoteBehind: number;
+  hasTrackingRef: boolean;
   localChanges: { added: number; removed: number; modified: number } | null;
   isCurrent: boolean;
   cleaning: boolean;
@@ -49,7 +50,7 @@ function baseCard(t: TreeState, isCurrent: boolean): TreeCardData {
     key: treeKey(t),
     branch: t.branch,
     ticketId: t.ticketId, ticketTitle: t.title,
-    behind: 0, ahead: 0, remoteBehind: 0, localChanges: null,
+    behind: 0, ahead: 0, remoteBehind: 0, hasTrackingRef: false, localChanges: null,
     isCurrent, cleaning: false, busyOperation: t.busyOperation,
   };
 }
@@ -132,16 +133,17 @@ export class TreeDataService {
   private async fetch(tree: TreeState): Promise<TreeCardData> {
     const base = baseCard(tree, false);
     if (!tree.path || !fs.existsSync(tree.path)) return base;
-    const [behind, ahead, remoteBehind, pr, localChanges] = await Promise.all([
+    const [behind, ahead, remoteBehind, pr, localChanges, hasTrackingRef] = await Promise.all([
       git.commitsBehind(tree.path, this.config.baseBranch),
       git.commitsAhead(tree.path, tree.branch),
       git.commitsBehindRemote(tree.path, tree.branch),
       this.config.github.enabled ? gh.prStatus(tree.path) : Promise.resolve(null),
       git.localChanges(tree.path),
+      git.trackingRefExists(tree.path, tree.branch),
     ]);
     if (pr?.url && !tree.prUrl) {
       this.stateManager.updateTree(tree.repoPath, tree.branch, { prUrl: pr.url }).catch((e) => this.log(`PR URL save failed: ${e.message}`));
     }
-    return { ...base, prNumber: pr?.number, prState: pr?.state, behind, ahead, remoteBehind, localChanges };
+    return { ...base, prNumber: pr?.number, prState: pr?.state, behind, ahead, remoteBehind, hasTrackingRef, localChanges };
   }
 }

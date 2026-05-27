@@ -12,6 +12,7 @@ vi.mock("../../src/cli/git", () => ({
 	commitsBehind: vi.fn(),
 	commitsBehindRemote: vi.fn(),
 	localChanges: vi.fn(),
+	trackingRefExists: vi.fn(),
 }));
 
 vi.mock("../../src/cli/gh", () => ({
@@ -47,6 +48,7 @@ describe("TreeDataService", () => {
 		vi.mocked(git.commitsAhead).mockResolvedValue(2);
 		vi.mocked(git.commitsBehindRemote).mockResolvedValue(0);
 		vi.mocked(git.localChanges).mockResolvedValue({ added: 1, removed: 0, modified: 0 });
+		vi.mocked(git.trackingRefExists).mockResolvedValue(true);
 		vi.mocked(gh.prStatus).mockImplementation(async (wt) => {
 			if (wt === paths.review) return { state: "OPEN", reviewDecision: null, number: 7, url: "https://pr/7" };
 			if (wt === paths.done) return { state: "MERGED", reviewDecision: null, number: 8, url: "https://pr/8" };
@@ -99,6 +101,7 @@ describe("TreeDataService", () => {
 		expect(git.commitsAhead).toHaveBeenCalledTimes(4);
 		expect(git.commitsBehindRemote).toHaveBeenCalledTimes(4);
 		expect(git.localChanges).toHaveBeenCalledTimes(4);
+		expect(git.trackingRefExists).toHaveBeenCalledTimes(4);
 		expect(gh.prStatus).toHaveBeenCalledTimes(4);
 	});
 });

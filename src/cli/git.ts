@@ -227,6 +227,15 @@ export async function remoteBranchExists(repoPath: string, branch: string): Prom
   return stdout.trim().length > 0;
 }
 
+export async function trackingRefExists(worktreePath: string, branch: string): Promise<boolean> {
+  try {
+    await exec('git', ['show-ref', '--verify', '--quiet', `refs/remotes/origin/${branch}`], { cwd: worktreePath, timeout: 10_000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function branchExists(repoPath: string, branch: string): Promise<boolean> {
   await exec('git', ['fetch', 'origin', branch], { cwd: repoPath, timeout: NET_TIMEOUT }).catch(() => {});
   const { stdout } = await exec('git', ['for-each-ref', '--format=%(refname:short)', `refs/heads/${branch}`, `refs/remotes/origin/${branch}`], { cwd: repoPath });
