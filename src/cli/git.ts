@@ -120,8 +120,18 @@ export async function localChanges(worktreePath: string): Promise<{ added: numbe
   } catch { return null; }
 }
 
-export const commitsAhead = (wt: string, branch: string) =>
-  revListCount(wt, `origin/${branch}..HEAD`);
+/** Counts commits on HEAD not on origin/<branch>. Also reports whether the
+ *  tracking ref exists — a 0 count from a missing ref is indistinguishable
+ *  from a 0 count from a fully-pushed branch, but callers need to tell them
+ *  apart (e.g. to allow publishing a branch that has nothing ahead). */
+export async function commitsAhead(wt: string, branch: string): Promise<{ count: number; hasTrackingRef: boolean }> {
+  try {
+    const { stdout } = await exec('git', ['rev-list', '--count', `refs/remotes/origin/${branch}..HEAD`], { cwd: wt, timeout: 10_000 });
+    return { count: parseInt(stdout) || 0, hasTrackingRef: true };
+  } catch {
+    return { count: 0, hasTrackingRef: false };
+  }
+}
 
 export const commitsBehindRemote = (wt: string, branch: string) =>
   revListCount(wt, `HEAD..origin/${branch}`);
@@ -225,15 +235,6 @@ export async function checkoutWorktree(
 export async function remoteBranchExists(repoPath: string, branch: string): Promise<boolean> {
   const { stdout } = await exec('git', ['ls-remote', '--heads', 'origin', branch], { cwd: repoPath, timeout: NET_TIMEOUT });
   return stdout.trim().length > 0;
-}
-
-export async function trackingRefExists(worktreePath: string, branch: string): Promise<boolean> {
-  try {
-    await exec('git', ['show-ref', '--verify', '--quiet', `refs/remotes/origin/${branch}`], { cwd: worktreePath, timeout: 10_000 });
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 export async function branchExists(repoPath: string, branch: string): Promise<boolean> {

@@ -304,6 +304,9 @@ function treeCard(t, d) {
   const isPending = pendingAction && pendingAction.key === t.key;
   const allDis = !!t.busyOperation || isPending;
   const lc = t.localChanges;
+  const noChanges = !lc || lc.added + lc.removed + lc.modified === 0;
+  // Allow push when nothing is ahead but the branch has never been published, so the user can create the tracking ref.
+  const nothingToPush = t.ahead === 0 && t.hasTrackingRef;
   const stats = lc ? [lc.added && '<span class="add">+' + lc.added + '</span>', lc.removed && '<span class="del">-' + lc.removed + '</span>', lc.modified && '<span class="mod">~' + lc.modified + '</span>'].filter(Boolean).join(' ') : '';
   const isDone = t.prState === 'MERGED' || t.prState === 'CLOSED';
   let ticket = '';
@@ -327,13 +330,13 @@ function treeCard(t, d) {
     '<div class="row equal-fill">' +
     btn('pull', ic('arrowDown') + '<span class="label">Pull</span>' + (t.remoteBehind > 0 ? ' ' + t.remoteBehind : ''), allDis || !t.remoteBehind, { attrs: 'title="Pull from remote"' }) +
     btn('mergeFromMain', ic('gitMerge') + '<span class="label">Main</span>' + (t.behind > 0 ? ' ' + t.behind : ''), allDis || !t.behind, { attrs: 'title="Merge from main"' }) +
-    (d.hasAI ? btn('commit', ic('gitCommit') + '<span class="label">Commit</span>', allDis || !lc || (lc.added === 0 && lc.removed === 0 && lc.modified === 0)) : '') +
-    btn('push', ic('arrowUp') + '<span class="label">Push</span>' + (t.ahead > 0 ? ' ' + t.ahead : ''), allDis || (t.ahead === 0 && t.hasTrackingRef), { attrs: 'title="Push to remote"' }) +
+    (d.hasAI ? btn('commit', ic('gitCommit') + '<span class="label">Commit</span>', allDis || noChanges) : '') +
+    btn('push', ic('arrowUp') + '<span class="label">Push</span>' + (t.ahead > 0 ? ' ' + t.ahead : ''), allDis || nothingToPush, { attrs: 'title="Push to remote"' }) +
     '</div>' +
     '<div class="row equal-fill">' +
-    btn('workingDiff', (stats ? '<span class="stats">' + stats + '</span>' : '') + ic('diff'), allDis || !lc, { attrs: 'title="Diff working changes"' }) +
+    btn('workingDiff', (stats ? '<span class="stats">' + stats + '</span>' : '') + ic('diff'), allDis || noChanges, { attrs: 'title="Diff working changes"' }) +
     btn('branchDiff', ic('diff') + '<span class="label">Branch</span>', allDis, { attrs: 'title="Diff branch changes"' }) +
-    btn('discard', ic('x'), allDis || !lc, { cls: 'danger', attrs: 'title="Discard changes"' }) +
+    btn('discard', ic('x'), allDis || noChanges, { cls: 'danger', attrs: 'title="Discard changes"' }) +
     '</div>' +
     '<div class="field-label">Tree</div><div class="row">' + lastRow + '</div>' +
     statusBar +

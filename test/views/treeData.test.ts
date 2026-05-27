@@ -12,7 +12,6 @@ vi.mock("../../src/cli/git", () => ({
 	commitsBehind: vi.fn(),
 	commitsBehindRemote: vi.fn(),
 	localChanges: vi.fn(),
-	trackingRefExists: vi.fn(),
 }));
 
 vi.mock("../../src/cli/gh", () => ({
@@ -45,10 +44,9 @@ describe("TreeDataService", () => {
 		vi.mocked(git.commitsBehind).mockImplementation(async (wt) =>
 			wt === paths.current ? 1 : 0,
 		);
-		vi.mocked(git.commitsAhead).mockResolvedValue(2);
+		vi.mocked(git.commitsAhead).mockResolvedValue({ count: 2, hasTrackingRef: true });
 		vi.mocked(git.commitsBehindRemote).mockResolvedValue(0);
 		vi.mocked(git.localChanges).mockResolvedValue({ added: 1, removed: 0, modified: 0 });
-		vi.mocked(git.trackingRefExists).mockResolvedValue(true);
 		vi.mocked(gh.prStatus).mockImplementation(async (wt) => {
 			if (wt === paths.review) return { state: "OPEN", reviewDecision: null, number: 7, url: "https://pr/7" };
 			if (wt === paths.done) return { state: "MERGED", reviewDecision: null, number: 8, url: "https://pr/8" };
@@ -101,7 +99,39 @@ describe("TreeDataService", () => {
 		expect(git.commitsAhead).toHaveBeenCalledTimes(4);
 		expect(git.commitsBehindRemote).toHaveBeenCalledTimes(4);
 		expect(git.localChanges).toHaveBeenCalledTimes(4);
-		expect(git.trackingRefExists).toHaveBeenCalledTimes(4);
 		expect(gh.prStatus).toHaveBeenCalledTimes(4);
+	});
+
+	it("surfaces hasTrackingRef from commitsAhead so the webview can allow first push", async () => {
+		const repoPath = fs.mkdtempSync(path.join(os.tmpdir(), "forest-repo-"));
+		const treePath = path.join(repoPath, "tree-new");
+		fs.mkdirSync(treePath, { recursive: true });
+		vi.mocked(getHostWorkspacePath).mockReturnValue(treePath);
+		vi.mocked(gh.repoHasAutomergeCached).mockReturnValue(false);
+		vi.mocked(git.commitsBehind).mockResolvedValue(0);
+		vi.mocked(git.commitsAhead).mockResolvedValue({ count: 0, hasTrackingRef: false });
+		vi.mocked(git.commitsBehindRemote).mockResolvedValue(0);
+		vi.mocked(git.localChanges).mockResolvedValue(null);
+		vi.mocked(gh.prStatus).mockResolvedValue(null);
+
+		const trees = [
+			{ branch: "new", repoPath, path: treePath, createdAt: "2024-01-01T00:00:00.000Z" },
+		];
+		const stateManager = {
+			load: vi.fn(async () => ({ version: 1, trees: {} })),
+			getTreesForRepo: vi.fn(() => trees),
+			updateTree: vi.fn(async () => undefined),
+		};
+		const service = new TreeDataService(
+			stateManager as any,
+			{ ai: false, baseBranch: "main", github: { enabled: true }, linear: { enabled: false } } as any,
+			() => repoPath,
+			() => {},
+		);
+
+		const data = await service.build();
+		const card = data.groups[0]?.trees[0];
+		expect(card?.ahead).toBe(0);
+		expect(card?.hasTrackingRef).toBe(false);
 	});
 });
