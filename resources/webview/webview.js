@@ -16,6 +16,23 @@ const pendingLabels = {
   workingDiff: 'loading…', branchDiff: 'loading…',
 };
 
+const gitCommands = new Set([
+  'pull', 'push', 'mergeFromMain', 'commit', 'discard', 'ship', 'shipMerge',
+  'pickBranch', 'createForm:submit', 'deleteForm:submit', 'delete',
+  'workingDiff', 'branchDiff',
+]);
+
+function hasGlobalGitOperation(data) {
+  if (pendingAction && gitCommands.has(pendingAction.cmd)) return true;
+  if (!data) return false;
+  for (const group of data.groups) {
+    for (const tree of group.trees) {
+      if (tree.busyOperation || tree.cleaning) return true;
+    }
+  }
+  return false;
+}
+
 function defaultFormState(init) {
   return {
     branchMode: 'new',
@@ -278,11 +295,11 @@ function mainCard(d) {
   const label = h(d.baseBranch) + ' · ' + h(d.repoName);
   if (d.mainIsCurrent) {
     const isPending = pendingAction && pendingAction.key === '__main__';
-    const allDis = isPending;
+    const gitDis = hasGlobalGitOperation(d);
     const statusBar = isPending ? '<div class="row status-bar"><span class="spinner"></span><span class="dim">' + h(pendingLabels[pendingAction.cmd] || 'loading…') + '</span>' + btn('cancelPending', ic('x'), false, { attrs: 'title="Cancel"' }) + '</div>' : '';
     return '<div class="' + cls + '" data-key="__main__"><div class="row"><span class="card-label">' + label + '</span>' +
-      '<button class="btn" data-cmd="revealInFinder" title="Reveal in Finder"' + dis(allDis) + '>' + ic('folderOpen') + '</button>' +
-      btn('pull', ic('arrowDown') + (d.mainBehind > 0 ? d.mainBehind : ''), allDis, { attrs: 'title="Pull"' }) +
+      '<button class="btn" data-cmd="revealInFinder" title="Reveal in Finder">' + ic('folderOpen') + '</button>' +
+      btn('pull', ic('arrowDown') + (d.mainBehind > 0 ? d.mainBehind : ''), gitDis, { attrs: 'title="Pull"' }) +
       '</div>' + statusBar + '</div>';
   }
   return '<div class="' + cls + '" data-key="__main__" data-cmd="switchToMain"><span class="card-label">' + label + '</span></div>';
@@ -299,10 +316,12 @@ function treeCard(t, d) {
   if (t.cleaning) return '<div class="card" data-key="' + h(t.key) + '"><div class="row"><span class="branch">' + bl + '</span><span class="dim">cleaning up…</span></div></div>';
   if (!t.isCurrent) {
     const done = t.prState === 'MERGED' || t.prState === 'CLOSED';
-    return '<div class="card" data-key="' + h(t.key) + '" data-cmd="switch"><div class="row"><span class="branch">' + bl + '</span>' + (done ? '<button class="btn danger" data-cmd="delete" data-done="1" title="Delete tree">' + ic('trash') + '</button>' : '') + '</div></div>';
+    const gitDis = hasGlobalGitOperation(d);
+    return '<div class="card" data-key="' + h(t.key) + '" data-cmd="switch"><div class="row"><span class="branch">' + bl + '</span>' + (done ? '<button class="btn danger" data-cmd="delete" data-done="1" title="Delete tree"' + dis(gitDis) + '>' + ic('trash') + '</button>' : '') + '</div></div>';
   }
   const isPending = pendingAction && pendingAction.key === t.key;
-  const allDis = !!t.busyOperation || isPending;
+  const localDis = !!t.busyOperation || isPending;
+  const gitDis = localDis || hasGlobalGitOperation(d);
   const lc = t.localChanges;
   const noChanges = !lc || lc.added + lc.removed + lc.modified === 0;
   // Allow push when nothing is ahead but the branch has never been published, so the user can create the tracking ref.
@@ -313,30 +332,30 @@ function treeCard(t, d) {
   if (d.linearEnabled) {
     const lbl = t.ticketId ? h(t.ticketId + (t.ticketTitle ? ': ' + t.ticketTitle : '')) : '';
     ticket = t.ticketId
-      ? '<div class="field-label">Linear</div><div class="row"><a class="ticket" data-cmd="openTicket" title="' + lbl + '"' + (allDis ? ' style="pointer-events:none;opacity:0.5"' : '') + '>' + lbl + '</a>' + btn('copyTicketDescription', ic('copy'), allDis, { attrs: 'title="Copy description"' }) + btn('detachTicket', 'Detach', allDis) + '</div>'
-      : '<div class="field-label">Linear</div><div class="row equal-fill">' + btn('linkTicket', 'Link Issue', allDis) + btn('newTicket', 'New Issue', allDis) + '</div>';
+      ? '<div class="field-label">Linear</div><div class="row"><a class="ticket" data-cmd="openTicket" title="' + lbl + '"' + (localDis ? ' style="pointer-events:none;opacity:0.5"' : '') + '>' + lbl + '</a>' + btn('copyTicketDescription', ic('copy'), localDis, { attrs: 'title="Copy description"' }) + btn('detachTicket', 'Detach', localDis) + '</div>'
+      : '<div class="field-label">Linear</div><div class="row equal-fill">' + btn('linkTicket', 'Link Issue', localDis) + btn('newTicket', 'New Issue', localDis) + '</div>';
   }
   const lastRow = (isDone || t.prNumber)
-    ? '<button class="btn fill" data-cmd="openPR"' + dis(allDis) + '>PR#' + (t.prNumber || '?') + '</button>' + btn('delete', ic('trash'), allDis, { cls: 'danger', attrs: 'data-done="' + (isDone ? '1' : '0') + '" title="Delete tree"' })
+    ? '<button class="btn fill" data-cmd="openPR"' + dis(localDis) + '>PR#' + (t.prNumber || '?') + '</button>' + btn('delete', ic('trash'), gitDis, { cls: 'danger', attrs: 'data-done="' + (isDone ? '1' : '0') + '" title="Delete tree"' })
     : (d.hasAutomerge
-      ? btn('ship', 'Push + PR', allDis, { cls: 'fill primary', attrs: 'title="Push and create PR"' }) + btn('shipMerge', '+ Automerge', allDis, { cls: 'fill primary', attrs: 'title="Push, create PR, enable auto-merge"' })
-      : btn('ship', 'Ship - Push and Create PR', allDis, { cls: 'fill primary' }))
-    + btn('delete', ic('trash'), allDis, { cls: 'danger', attrs: 'data-done="0" title="Delete tree"' });
+      ? btn('ship', 'Push + PR', gitDis, { cls: 'fill primary', attrs: 'title="Push and create PR"' }) + btn('shipMerge', '+ Automerge', gitDis, { cls: 'fill primary', attrs: 'title="Push, create PR, enable auto-merge"' })
+      : btn('ship', 'Ship - Push and Create PR', gitDis, { cls: 'fill primary' }))
+    + btn('delete', ic('trash'), gitDis, { cls: 'danger', attrs: 'data-done="0" title="Delete tree"' });
   const busyLabel = isPending ? (pendingLabels[pendingAction.cmd] || 'loading…') : (t.busyOperation ? t.busyOperation + '…' : '');
   const statusBar = busyLabel ? '<div class="row status-bar"><span class="spinner"></span><span class="dim">' + h(busyLabel) + '</span>' + (isPending ? btn('cancelPending', ic('x'), false, { attrs: 'title="Cancel"' }) : '') + '</div>' : '';
   return '<div class="card current" data-key="' + h(t.key) + '">' +
     ticket +
-    '<div class="field-label">Branch</div><div class="row"><span class="branch" data-cmd="revealInFinder" title="Reveal in Finder: ' + h(t.branch) + '">' + bl + '</span>' + btn('copyBranch', ic('copy'), allDis, { attrs: 'title="Copy branch name"' }) + '</div>' +
+    '<div class="field-label">Branch</div><div class="row"><span class="branch" data-cmd="revealInFinder" title="Reveal in Finder: ' + h(t.branch) + '">' + bl + '</span>' + btn('copyBranch', ic('copy'), localDis, { attrs: 'title="Copy branch name"' }) + '</div>' +
     '<div class="row equal-fill">' +
-    btn('pull', ic('arrowDown') + '<span class="label">Pull</span>' + (t.remoteBehind > 0 ? ' ' + t.remoteBehind : ''), allDis || !t.remoteBehind, { attrs: 'title="Pull from remote"' }) +
-    btn('mergeFromMain', ic('gitMerge') + '<span class="label">Main</span>' + (t.behind > 0 ? ' ' + t.behind : ''), allDis || !t.behind, { attrs: 'title="Merge from main"' }) +
-    (d.hasAI ? btn('commit', ic('gitCommit') + '<span class="label">Commit</span>', allDis || noChanges) : '') +
-    btn('push', ic('arrowUp') + '<span class="label">Push</span>' + (t.ahead > 0 ? ' ' + t.ahead : ''), allDis || nothingToPush, { attrs: 'title="Push to remote"' }) +
+    btn('pull', ic('arrowDown') + '<span class="label">Pull</span>' + (t.remoteBehind > 0 ? ' ' + t.remoteBehind : ''), gitDis || !t.remoteBehind, { attrs: 'title="Pull from remote"' }) +
+    btn('mergeFromMain', ic('gitMerge') + '<span class="label">Main</span>' + (t.behind > 0 ? ' ' + t.behind : ''), gitDis || !t.behind, { attrs: 'title="Merge from main"' }) +
+    (d.hasAI ? btn('commit', ic('gitCommit') + '<span class="label">Commit</span>', gitDis || noChanges) : '') +
+    btn('push', ic('arrowUp') + '<span class="label">Push</span>' + (t.ahead > 0 ? ' ' + t.ahead : ''), gitDis || nothingToPush, { attrs: 'title="Push to remote"' }) +
     '</div>' +
     '<div class="row equal-fill">' +
-    btn('workingDiff', (stats ? '<span class="stats">' + stats + '</span>' : '') + ic('diff'), allDis || noChanges, { attrs: 'title="Diff working changes"' }) +
-    btn('branchDiff', ic('diff') + '<span class="label">Branch</span>', allDis, { attrs: 'title="Diff branch changes"' }) +
-    btn('discard', ic('x'), allDis || noChanges, { cls: 'danger', attrs: 'title="Discard changes"' }) +
+    btn('workingDiff', (stats ? '<span class="stats">' + stats + '</span>' : '') + ic('diff'), gitDis || noChanges, { attrs: 'title="Diff working changes"' }) +
+    btn('branchDiff', ic('diff') + '<span class="label">Branch</span>', gitDis, { attrs: 'title="Diff branch changes"' }) +
+    btn('discard', ic('x'), gitDis || noChanges, { cls: 'danger', attrs: 'title="Discard changes"' }) +
     '</div>' +
     '<div class="field-label">Tree</div><div class="row">' + lastRow + '</div>' +
     statusBar +
@@ -393,10 +412,10 @@ function renderDeleteForm() {
     out += '</div>';
   }
 
-  let canDelete = !dis && !pendingAction;
+  let canDelete = !dis && !pendingAction && !hasGlobalGitOperation(latestData);
   out += '<div class="form-actions">';
   out += '<button class="btn primary fill" id="deleteSubmitBtn" data-cmd="deleteForm:submit"' + (canDelete ? '' : ' disabled') + '>' + (dis ? '<span class="spinner"></span> Deleting…' : 'Delete tree') + '</button>';
-  out += '<button class="btn secondary" data-form="cancel"' + (canDelete ? '' : ' disabled') + '>Cancel</button>';
+  out += '<button class="btn secondary" data-form="cancel"' + (dis ? ' disabled' : '') + '>Cancel</button>';
   out += '</div>';
 
   out += '</div>';
@@ -408,6 +427,7 @@ function renderCreateForm() {
   const fs = formState;
   const init = formInit;
   const dis = fs.submitting;
+  const gitDis = hasGlobalGitOperation(latestData);
   let out = '<div class="form">';
 
   if (fs.error) {
@@ -471,7 +491,7 @@ function renderCreateForm() {
   if (pendingAction && pendingAction.cmd === 'pickBranch') {
     out += '<button class="btn btn-pending" disabled>loading…</button><button class="btn" data-cmd="cancelPending" title="Cancel">' + ic('x') + '</button>';
   } else {
-    out += '<button class="btn" data-cmd="pickBranch"' + (dis || pendingAction ? ' disabled' : '') + '>Select Branch</button>';
+    out += '<button class="btn" data-cmd="pickBranch"' + (dis || pendingAction || gitDis ? ' disabled' : '') + '>Select Branch</button>';
   }
   if (fs.branchMode === 'existing') {
     out += '<button class="btn" data-form="branchNew"' + (dis ? ' disabled' : '') + '>Create New</button>';
@@ -508,7 +528,7 @@ function renderCreateForm() {
   }
 
   // Action buttons
-  let canSubmit = !dis && !pendingAction && canCreate();
+  let canSubmit = !dis && !pendingAction && !gitDis && canCreate();
   out += '<div class="form-actions">';
   out += '<button class="btn primary fill" id="submitBtn" data-cmd="createForm:submit"' + (canSubmit ? '' : ' disabled') + '>' + (dis ? '<span class="spinner"></span> Creating…' : 'Create tree') + '</button>';
   out += '<button class="btn secondary" data-form="cancel"' + (dis ? ' disabled' : '') + '>Cancel</button>';
@@ -601,7 +621,7 @@ function setupFormListeners() {
 function updateFormHints() {
   let submitBtn = document.getElementById('submitBtn');
   if (submitBtn) {
-    submitBtn.disabled = formState.submitting || !!pendingAction || !canCreate();
+    submitBtn.disabled = formState.submitting || !!pendingAction || hasGlobalGitOperation(latestData) || !canCreate();
   }
 }
 
