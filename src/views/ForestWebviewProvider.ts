@@ -9,7 +9,7 @@ import * as git from '../cli/git';
 import * as gh from '../cli/gh';
 import * as linear from '../cli/linear';
 import * as ai from '../cli/ai';
-import { formatBranch, sanitizeBranch } from '../utils/slug';
+import { formatBranch, formatBranchPrefix, sanitizeBranch } from '../utils/slug';
 import { copyConfigFiles, createTree, ensureTreeIdle, focusOrOpenWindow, getBlockingTreeOperation, openTreeWindow, updateLinear, withTreeOperation } from '../commands/shared';
 import { executeDeletePlan, type DeletePlan } from '../commands/cleanup';
 import { shipCore } from '../commands/ship';
@@ -83,6 +83,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
       teams: this.config.linear.teams ?? [],
       uncommittedCount,
       hasDevcontainer,
+      branchNamePrefix: formatBranchPrefix(this.config.branchNamePrefix),
     };
   }
 

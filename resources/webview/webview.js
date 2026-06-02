@@ -36,7 +36,7 @@ function hasGlobalGitOperation(data) {
 function defaultFormState(init) {
   return {
     branchMode: 'new',
-    branchName: '',
+    branchName: init.branchNamePrefix || '',
     existingBranch: null,
     branchManuallyEdited: false,
     ticketMode: 'none',
@@ -209,7 +209,7 @@ function autoFillBranch() {
   if (formState.ticketMode === 'existing' && formState.ticketId) {
     formState.branchName = formState.ticketBranchName || '';
   } else {
-    formState.branchName = '';
+    formState.branchName = formState.ticketMode === 'none' ? formInit.branchNamePrefix || '' : '';
   }
 }
 
