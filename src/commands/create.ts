@@ -3,7 +3,7 @@ import type { ForestContext } from '../context';
 import * as git from '../cli/git';
 import * as linear from '../cli/linear';
 import { createTree, filterUnlinkedIssues, updateLinear, pickTeam, promptUncommittedChanges } from './shared';
-import { sanitizeBranch, formatBranch } from '../utils/slug';
+import { sanitizeBranch, formatBranch, formatBranchPrefix } from '../utils/slug';
 import { notify } from '../notify';
 
 function showBranchInput(options?: { value?: string }): Promise<string | undefined> {
@@ -145,7 +145,7 @@ async function createFromNewBranch(ctx: ForestContext): Promise<void> {
     }
   }
 
-  const prefilled = ticketId && title ? formatBranch(config.branchFormat, ticketId, title) : '';
+  const prefilled = ticketId && title ? formatBranch(config.branchFormat, ticketId, title) : formatBranchPrefix(config.branchNamePrefix);
   const branchName = await showBranchInput(prefilled ? { value: prefilled } : undefined);
   if (!branchName) {
     if (revertOnCancel && ticketId) await revertLinear(ctx, ticketId);

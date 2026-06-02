@@ -65,6 +65,7 @@ export interface ForestConfig {
 	github: { enabled: boolean };
 	ai?: AIConfig;
 	branchFormat: string;
+	branchNamePrefix: string;
 	baseBranch: string;
 	maxTrees: number;
 	browser: string[];
@@ -87,6 +88,7 @@ const DEFAULTS: Partial<ForestConfig> = {
 	},
 	github: { enabled: true },
 	branchFormat: "${ticketId}-${slug}",
+	branchNamePrefix: "",
 	baseBranch: "main",
 	maxTrees: 10,
 	browser: ["integrated"],
