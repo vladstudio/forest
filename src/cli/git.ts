@@ -46,8 +46,14 @@ export async function removeWorktree(repoPath: string, worktreePath: string): Pr
     // Not registered — prune stale metadata
     await exec('git', ['worktree', 'prune'], { cwd: repoPath }).catch(() => {});
   }
-  // Always remove the directory — git worktree remove leaves gitignored files behind
-  await fs.promises.rm(worktreePath, { recursive: true, force: true });
+  // Always remove the directory — git worktree remove leaves gitignored files behind.
+  // Retry: dev servers/watchers can recreate files while removal is in progress.
+  await fs.promises.rm(worktreePath, {
+    recursive: true,
+    force: true,
+    maxRetries: 10,
+    retryDelay: 100,
+  });
 }
 
 export async function deleteBranch(repoPath: string, branch: string, opts?: { skipRemote?: boolean }): Promise<void> {
