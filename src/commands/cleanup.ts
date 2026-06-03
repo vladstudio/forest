@@ -56,11 +56,25 @@ async function teardownTree(ctx: ForestContext, tree: TreeState, opts: TeardownO
       } catch {
         /* non-fatal */
       }
-      const removed = await runStep(ctx, "Remove worktree", () => git.removeWorktree(tree.repoPath, tree.path!));
-      if (!removed) {
-        // Fail closed: keep the tree in state so the user can retry cleanup.
-        await clearCleaning();
-        return false;
+      let worktreeRemoved = false;
+      while (!worktreeRemoved) {
+        try {
+          await git.removeWorktree(tree.repoPath, tree.path!);
+          ctx.outputChannel.appendLine("[Forest] Remove worktree: done");
+          worktreeRemoved = true;
+        } catch (e: any) {
+          ctx.outputChannel.appendLine(`[Forest] Remove worktree: FAILED — ${e.message}`);
+          ctx.outputChannel.show(true);
+          const action = await vscode.window.showWarningMessage(
+            "Could not fully remove worktree directory. Stop any running services (Docker, Supabase) and retry.",
+            "Retry",
+          );
+          if (action !== "Retry") {
+            // Fail closed: keep the tree in state so the user can retry cleanup.
+            await clearCleaning();
+            return false;
+          }
+        }
       }
     }
     if (opts.deleteLocal) {
