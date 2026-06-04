@@ -298,7 +298,7 @@ function mainCard(d) {
     const gitDis = hasGlobalGitOperation(d);
     const statusBar = isPending ? '<div class="row status-bar"><span class="spinner"></span><span class="dim">' + h(pendingLabels[pendingAction.cmd] || 'loading…') + '</span>' + btn('cancelPending', ic('x'), false, { attrs: 'title="Cancel"' }) + '</div>' : '';
     return '<div class="' + cls + '" data-key="__main__"><div class="row"><span class="card-label">' + label + '</span>' +
-      '<button class="btn" data-cmd="revealInFinder" title="Reveal in Finder">' + ic('folderOpen') + '</button>' +
+      btn('revealInFinder', ic('folderOpen'), false, { attrs: 'title="Open folder in Finder"' }) +
       btn('pull', ic('arrowDown') + (d.mainBehind > 0 ? d.mainBehind : ''), gitDis, { attrs: 'title="Pull"' }) +
       '</div>' + statusBar + '</div>';
   }
@@ -333,7 +333,7 @@ function treeCard(t, d) {
     const lbl = t.ticketId ? h(t.ticketId + (t.ticketTitle ? ': ' + t.ticketTitle : '')) : '';
     ticket = t.ticketId
       ? '<div class="field-label">Linear</div><div class="row"><a class="ticket" data-cmd="openTicket" title="' + lbl + '"' + (localDis ? ' style="pointer-events:none;opacity:0.5"' : '') + '>' + lbl + '</a>' + btn('copyTicketDescription', ic('copy'), localDis, { attrs: 'title="Copy description"' }) + btn('detachTicket', 'Detach', localDis) + '</div>'
-      : '<div class="field-label">Linear</div><div class="row equal-fill">' + btn('linkTicket', 'Link Issue', localDis) + btn('newTicket', 'New Issue', localDis) + '</div>';
+      : '<div class="field-label">Linear</div><div class="row"><span class="dim">No issue</span><span style="flex:1"></span>' + btn('linkTicket', ic('link'), localDis, { attrs: 'title="Link issue" aria-label="Link issue"' }) + btn('newTicket', ic('plus'), localDis, { attrs: 'title="New issue" aria-label="New issue"' }) + '</div>';
   }
   const lastRow = (isDone || t.prNumber)
     ? '<button class="btn fill" data-cmd="openPR"' + dis(localDis) + '>PR#' + (t.prNumber || '?') + '</button>' + btn('delete', ic('trash'), gitDis, { cls: 'danger', attrs: 'data-done="' + (isDone ? '1' : '0') + '" title="Delete tree"' })
@@ -345,14 +345,14 @@ function treeCard(t, d) {
   const statusBar = busyLabel ? '<div class="row status-bar"><span class="spinner"></span><span class="dim">' + h(busyLabel) + '</span>' + (isPending ? btn('cancelPending', ic('x'), false, { attrs: 'title="Cancel"' }) : '') + '</div>' : '';
   return '<div class="card current" data-key="' + h(t.key) + '">' +
     ticket +
-    '<div class="field-label">Branch</div><div class="row"><span class="branch" data-cmd="revealInFinder" title="Reveal in Finder: ' + h(t.branch) + '">' + bl + '</span>' + btn('copyBranch', ic('copy'), localDis, { attrs: 'title="Copy branch name"' }) + '</div>' +
+    '<div class="field-label">Branch</div><div class="row"><span class="branch" title="' + h(t.branch) + '">' + bl + '</span>' + btn('revealInFinder', ic('folderOpen'), localDis, { attrs: 'title="Open folder in Finder"' }) + btn('copyBranch', ic('copy'), localDis, { attrs: 'title="Copy branch name"' }) + '</div>' +
     '<div class="row equal-fill">' +
     btn('pull', ic('arrowDown') + '<span class="label">Pull</span>' + (t.remoteBehind > 0 ? ' ' + t.remoteBehind : ''), gitDis || !t.remoteBehind, { attrs: 'title="Pull from remote"' }) +
     btn('mergeFromMain', ic('gitMerge') + '<span class="label">Main</span>' + (t.behind > 0 ? ' ' + t.behind : ''), gitDis || !t.behind, { attrs: 'title="Merge from main"' }) +
     (d.hasAI ? btn('commit', ic('gitCommit') + '<span class="label">Commit</span>', gitDis || noChanges) : '') +
     btn('push', ic('arrowUp') + '<span class="label">Push</span>' + (t.ahead > 0 ? ' ' + t.ahead : ''), gitDis || nothingToPush, { attrs: 'title="Push to remote"' }) +
     '</div>' +
-    '<div class="row equal-fill">' +
+    '<div class="field-label">Diff</div><div class="row equal-fill">' +
     btn('workingDiff', (stats ? '<span class="stats">' + stats + '</span>' : '') + ic('diff'), gitDis || noChanges, { attrs: 'title="Diff working changes"' }) +
     btn('branchDiff', ic('diff') + '<span class="label">Branch</span>', gitDis, { attrs: 'title="Diff branch changes"' }) +
     btn('discard', ic('x'), gitDis || noChanges, { cls: 'danger', attrs: 'title="Discard changes"' }) +
