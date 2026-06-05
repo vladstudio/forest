@@ -220,6 +220,12 @@
 				"icon": "$(play)"
 			},
 			{
+				"command": "forest.openShortcutExternal",
+				"title": "Open Externally",
+				"category": "Forest",
+				"icon": "$(link-external)"
+			},
+			{
 				"command": "forest.openShortcutWith",
 				"title": "Open With…",
 				"category": "Forest",
@@ -282,6 +288,11 @@
 			],
 			"view/item/context": [
 				{
+					"command": "forest.openShortcutExternal",
+					"when": "viewItem =~ /^shortcut-(terminal|browser)$/",
+					"group": "inline"
+				},
+				{
 					"command": "forest.openShortcutWith",
 					"when": "viewItem == shortcut-browser && forest.multipleBrowsers",
 					"group": "1_actions"
@@ -305,6 +316,10 @@
 			"commandPalette": [
 				{
 					"command": "forest.openShortcut",
+					"when": "false"
+				},
+				{
+					"command": "forest.openShortcutExternal",
 					"when": "false"
 				},
 				{

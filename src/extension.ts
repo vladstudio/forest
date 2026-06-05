@@ -533,6 +533,7 @@ function registerCommands(
 	});
 	const unwrap = (arg: any) => arg instanceof ShortcutItem ? arg.shortcut : arg;
 	reg("forest.openShortcut", (arg: any) => ctx.shortcutManager.open(unwrap(arg)));
+	reg("forest.openShortcutExternal", (arg: any) => ctx.shortcutManager.openExternal(unwrap(arg)));
 	reg("forest.openShortcutWith", (arg: any) => ctx.shortcutManager.openWith(unwrap(arg)));
 	reg("forest.runShortcut", async () => {
 		const shortcuts = allShortcuts(ctx.config.shortcuts);
@@ -540,8 +541,8 @@ function registerCommands(
 		const picked = await vscode.window.showQuickPick(
 			shortcuts.map((sc) => ({
 				label: sc.name,
-				description: sc.type === "terminal" ? sc.command : sc.type === "browser" ? sc.url : sc.path,
-				detail: sc.type === "terminal" ? "$(terminal) Terminal" : sc.type === "browser" ? "$(globe) Browser" : "$(file) File",
+				description: sc.type === "terminal" ? sc.command : sc.url,
+				detail: sc.type === "terminal" ? "$(terminal) Terminal" : "$(globe) Browser",
 				shortcut: sc,
 			})),
 			{ placeHolder: "Run a shortcut…", matchOnDescription: true },

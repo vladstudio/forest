@@ -19,27 +19,21 @@ interface BrowserShortcut extends ShortcutBase {
 	url: string;
 	browser?: "integrated" | "external" | string;
 }
-interface FileShortcut extends ShortcutBase {
-	type: "file";
-	path: string;
-}
-export type ShortcutConfig = TerminalShortcut | BrowserShortcut | FileShortcut;
+export type ShortcutConfig = TerminalShortcut | BrowserShortcut;
 
 const SHORTCUT_CATEGORIES = {
 	cli: "terminal" as const,
 	web: "browser" as const,
-	files: "file" as const,
 };
 
 export interface ShortcutsConfig {
 	cli: TerminalShortcut[];
 	web: BrowserShortcut[];
-	files: FileShortcut[];
 }
 
 /** Flattens all shortcut categories into a single array. */
 export function allShortcuts(s: ShortcutsConfig): ShortcutConfig[] {
-	return [...s.cli, ...s.web, ...s.files];
+	return [...s.cli, ...s.web];
 }
 
 export type AIConfig = boolean;
@@ -75,7 +69,7 @@ export interface ForestConfig {
 const DEFAULTS: Partial<ForestConfig> = {
 	copy: [],
 	symlink: [],
-	shortcuts: { cli: [], web: [], files: [] },
+	shortcuts: { cli: [], web: [] },
 	linear: {
 		enabled: false,
 		statuses: {
@@ -223,7 +217,7 @@ function validateConfig(repoRoot: string, config: ForestConfig): void {
 	for (const value of [...config.copy, ...config.symlink]) {
 		safeRelativePath(repoRoot, value, "copy/symlink path");
 	}
-	for (const group of ["cli", "web", "files"] as const) {
+	for (const group of ["cli", "web"] as const) {
 		if (!Array.isArray(config.shortcuts[group])) throw new Error(`shortcuts.${group} must be an array`);
 	}
 }

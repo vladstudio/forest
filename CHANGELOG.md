@@ -8,7 +8,7 @@ Initial release.
 - Linear integration: create trees from issues, auto-update ticket status
 - Ship: push + create PR (with optional automerge)
 - Cleanup: delete worktree + branch after PR merge
-- Configurable terminal and browser shortcuts with variable expansion
+- Configurable terminal and browser shortcuts
 - External terminal support (iTerm, Terminal.app, Ghostty)
 - Tree health indicators (commits behind, PR status, age)
 - Auto-cleanup notifications when PRs are merged

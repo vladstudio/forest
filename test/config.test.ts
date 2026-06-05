@@ -39,6 +39,7 @@ describe("loadConfig", () => {
 				github: true,
 				shortcuts: {
 					cli: [{ name: "dev", command: "bun dev" }],
+					files: [{ name: "notes", path: "docs/NOTES.md" }],
 				},
 			}),
 		);
@@ -77,6 +78,7 @@ describe("loadConfig", () => {
 			},
 			{ name: "shell", type: "terminal" },
 		]);
+		expect((config?.shortcuts as any).files).toBeUndefined();
 	});
 
 	it("returns null for invalid config paths", async () => {

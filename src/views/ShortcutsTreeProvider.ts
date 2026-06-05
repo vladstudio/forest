@@ -8,12 +8,9 @@ export class ShortcutItem extends vscode.TreeItem {
     if (shortcut.type === 'terminal') {
       this.contextValue = 'shortcut-terminal';
       this.iconPath = new vscode.ThemeIcon('terminal');
-    } else if (shortcut.type === 'browser') {
+    } else {
       this.contextValue = 'shortcut-browser';
       this.iconPath = new vscode.ThemeIcon('globe');
-    } else {
-      this.contextValue = 'shortcut-file';
-      this.iconPath = new vscode.ThemeIcon('file');
     }
 
     this.command = { command: 'forest.openShortcut', title: 'Open', arguments: [shortcut] };

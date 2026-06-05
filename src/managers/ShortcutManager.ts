@@ -1,6 +1,5 @@
 import * as cp from 'child_process';
 import * as vscode from 'vscode';
-import * as path from 'path';
 import { type ForestConfig, type ShortcutConfig, allShortcuts } from '../config';
 import { shellEscape } from '../utils/slug';
 import { notify } from '../notify';
@@ -16,12 +15,20 @@ export class ShortcutManager implements vscode.Disposable {
     switch (sc.type) {
       case 'terminal': return this.openTerminal(sc);
       case 'browser': return this.openBrowser(sc, viewColumn);
-      case 'file': return this.openFile(sc);
+    }
+  }
+
+  async openExternal(sc: ShortcutConfig): Promise<void> {
+    switch (sc.type) {
+      case 'terminal':
+        return this.openExternalTerminal(sc, 'Terminal');
+      case 'browser':
+        return this.openBrowser(sc, undefined, 'external');
     }
   }
 
   async openWith(sc: ShortcutConfig): Promise<void> {
-    const items = sc.type === 'terminal' ? this.config.terminal : sc.type === 'browser' ? this.config.browser : [];
+    const items = sc.type === 'terminal' ? this.config.terminal : this.config.browser;
     if (items.length === 0) return;
     const picked = items.length === 1 ? items[0] : await vscode.window.showQuickPick(items, { placeHolder: `Open "${sc.name}" with…` });
     if (!picked) return;
@@ -115,17 +122,6 @@ export class ShortcutManager implements vscode.Disposable {
       const cmd = process.platform === 'darwin' ? 'open' : browser;
       cp.spawn(cmd, args, { detached: true, stdio: 'ignore' }).on('error', () => {}).unref();
     }
-  }
-
-  private async openFile(sc: ShortcutConfig & { type: 'file' }): Promise<void> {
-    const wsFolder = vscode.workspace.workspaceFolders?.[0];
-    if (!wsFolder) return;
-    // Use the workspace folder URI as base so the path resolves on the right side
-    // (host vs dev container) and preserves URI scheme.
-    const target = path.isAbsolute(sc.path)
-      ? vscode.Uri.file(sc.path)
-      : vscode.Uri.joinPath(wsFolder.uri, sc.path);
-    await vscode.commands.executeCommand('vscode.open', target);
   }
 
   dispose(): void {
