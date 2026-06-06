@@ -214,6 +214,10 @@ function autoFillBranch() {
 }
 
 const ic = name => '<span class="icon">' + icons[name] + '</span>';
+const tip = text => {
+  const value = h(text);
+  return 'title="' + value + '" aria-label="' + value + '" data-tooltip="' + value + '"';
+};
 
 function renderLoading(message) {
   document.getElementById('root').innerHTML =
@@ -296,10 +300,10 @@ function mainCard(d) {
   if (d.mainIsCurrent) {
     const isPending = pendingAction && pendingAction.key === '__main__';
     const gitDis = hasGlobalGitOperation(d);
-    const statusBar = isPending ? '<div class="row status-bar"><span class="spinner"></span><span class="dim">' + h(pendingLabels[pendingAction.cmd] || 'loading…') + '</span>' + btn('cancelPending', ic('x'), false, { attrs: 'title="Cancel"' }) + '</div>' : '';
+    const statusBar = isPending ? '<div class="row status-bar"><span class="spinner"></span><span class="dim">' + h(pendingLabels[pendingAction.cmd] || 'loading…') + '</span>' + btn('cancelPending', ic('x'), false, { attrs: tip('Cancel') }) + '</div>' : '';
     return '<div class="' + cls + '" data-key="__main__"><div class="row"><span class="card-label">' + label + '</span>' +
-      btn('revealInFinder', ic('folderOpen'), false, { attrs: 'title="Open folder in Finder"' }) +
-      btn('pull', ic('arrowDown') + (d.mainBehind > 0 ? d.mainBehind : ''), gitDis, { attrs: 'title="Pull"' }) +
+      btn('revealInFinder', ic('folderOpen'), false, { attrs: tip('Open folder in Finder') }) +
+      btn('pull', ic('arrowDown') + (d.mainBehind > 0 ? d.mainBehind : ''), gitDis, { attrs: tip('Pull') }) +
       '</div>' + statusBar + '</div>';
   }
   return '<div class="' + cls + '" data-key="__main__" data-cmd="switchToMain"><span class="card-label">' + label + '</span></div>';
@@ -317,7 +321,7 @@ function treeCard(t, d) {
   if (!t.isCurrent) {
     const done = t.prState === 'MERGED' || t.prState === 'CLOSED';
     const gitDis = hasGlobalGitOperation(d);
-    return '<div class="card" data-key="' + h(t.key) + '" data-cmd="switch"><div class="row"><span class="branch">' + bl + '</span>' + (done ? '<button class="btn danger" data-cmd="delete" data-done="1" title="Delete tree"' + dis(gitDis) + '>' + ic('trash') + '</button>' : '') + '</div></div>';
+    return '<div class="card" data-key="' + h(t.key) + '" data-cmd="switch"><div class="row"><span class="branch">' + bl + '</span>' + (done ? '<button class="btn danger" data-cmd="delete" data-done="1" ' + tip('Delete tree') + dis(gitDis) + '>' + ic('trash') + '</button>' : '') + '</div></div>';
   }
   const isPending = pendingAction && pendingAction.key === t.key;
   const localDis = !!t.busyOperation || isPending;
@@ -332,20 +336,20 @@ function treeCard(t, d) {
   if (d.linearEnabled) {
     const lbl = t.ticketId ? h(t.ticketId + (t.ticketTitle ? ': ' + t.ticketTitle : '')) : '';
     ticket = t.ticketId
-      ? '<div class="field-label">Linear</div><div class="row"><a class="ticket" data-cmd="openTicket" title="' + lbl + '"' + (localDis ? ' style="pointer-events:none;opacity:0.5"' : '') + '>' + lbl + '</a>' + btn('copyTicketDescription', ic('copy'), localDis, { attrs: 'title="Copy description"' }) + btn('detachTicket', 'Detach', localDis) + '</div>'
-      : '<div class="field-label">Linear</div><div class="row"><span class="dim">No issue</span><span style="flex:1"></span>' + btn('linkTicket', ic('link'), localDis, { attrs: 'title="Link issue" aria-label="Link issue"' }) + btn('newTicket', ic('plus'), localDis, { attrs: 'title="New issue" aria-label="New issue"' }) + '</div>';
+      ? '<div class="field-label">Linear</div><div class="row"><span class="ticket" title="' + lbl + '">' + lbl + '</span>' + btn('openTicket', ic('globe'), localDis, { attrs: tip('Open in Linear') }) + btn('copyTicketDescription', ic('copy'), localDis, { attrs: tip('Copy description') }) + btn('detachTicket', ic('linkBreak'), localDis, { attrs: tip('Detach issue') }) + '</div>'
+      : '<div class="field-label">Linear</div><div class="row"><span class="dim">No issue</span><span style="flex:1"></span>' + btn('linkTicket', ic('link'), localDis, { attrs: tip('Link issue') }) + btn('newTicket', ic('plus'), localDis, { attrs: tip('New issue') }) + '</div>';
   }
   const lastRow = (isDone || t.prNumber)
-    ? '<button class="btn fill" data-cmd="openPR"' + dis(localDis) + '>PR#' + (t.prNumber || '?') + '</button>' + btn('delete', ic('trash'), gitDis, { cls: 'danger', attrs: 'data-done="' + (isDone ? '1' : '0') + '" title="Delete tree"' })
+    ? '<button class="btn fill" data-cmd="openPR"' + dis(localDis) + '>PR#' + (t.prNumber || '?') + '</button>' + btn('delete', ic('trash'), gitDis, { cls: 'danger', attrs: 'data-done="' + (isDone ? '1' : '0') + '" ' + tip('Delete tree') })
     : (d.hasAutomerge
       ? btn('ship', 'Push + PR', gitDis, { cls: 'fill primary', attrs: 'title="Push and create PR"' }) + btn('shipMerge', '+ Automerge', gitDis, { cls: 'fill primary', attrs: 'title="Push, create PR, enable auto-merge"' })
       : btn('ship', 'Ship - Push and Create PR', gitDis, { cls: 'fill primary' }))
-    + btn('delete', ic('trash'), gitDis, { cls: 'danger', attrs: 'data-done="0" title="Delete tree"' });
+    + btn('delete', ic('trash'), gitDis, { cls: 'danger', attrs: 'data-done="0" ' + tip('Delete tree') });
   const busyLabel = isPending ? (pendingLabels[pendingAction.cmd] || 'loading…') : (t.busyOperation ? t.busyOperation + '…' : '');
-  const statusBar = busyLabel ? '<div class="row status-bar"><span class="spinner"></span><span class="dim">' + h(busyLabel) + '</span>' + (isPending ? btn('cancelPending', ic('x'), false, { attrs: 'title="Cancel"' }) : '') + '</div>' : '';
+  const statusBar = busyLabel ? '<div class="row status-bar"><span class="spinner"></span><span class="dim">' + h(busyLabel) + '</span>' + (isPending ? btn('cancelPending', ic('x'), false, { attrs: tip('Cancel') }) : '') + '</div>' : '';
   return '<div class="card current" data-key="' + h(t.key) + '">' +
     ticket +
-    '<div class="field-label">Branch</div><div class="row"><span class="branch" title="' + h(t.branch) + '">' + bl + '</span>' + btn('revealInFinder', ic('folderOpen'), localDis, { attrs: 'title="Open folder in Finder"' }) + btn('copyBranch', ic('copy'), localDis, { attrs: 'title="Copy branch name"' }) + '</div>' +
+    '<div class="field-label">Branch</div><div class="row"><span class="branch" title="' + h(t.branch) + '">' + bl + '</span>' + btn('revealInFinder', ic('folderOpen'), localDis, { attrs: tip('Open folder in Finder') }) + btn('copyBranch', ic('copy'), localDis, { attrs: tip('Copy branch name') }) + '</div>' +
     '<div class="row equal-fill">' +
     btn('pull', ic('arrowDown') + '<span class="label">Pull</span>' + (t.remoteBehind > 0 ? ' ' + t.remoteBehind : ''), gitDis || !t.remoteBehind, { attrs: 'title="Pull from remote"' }) +
     btn('mergeFromMain', ic('gitMerge') + '<span class="label">Main</span>' + (t.behind > 0 ? ' ' + t.behind : ''), gitDis || !t.behind, { attrs: 'title="Merge from main"' }) +
@@ -353,9 +357,9 @@ function treeCard(t, d) {
     btn('push', ic('arrowUp') + '<span class="label">Push</span>' + (t.ahead > 0 ? ' ' + t.ahead : ''), gitDis || nothingToPush, { attrs: 'title="Push to remote"' }) +
     '</div>' +
     '<div class="field-label">Diff</div><div class="row equal-fill">' +
-    btn('workingDiff', (stats ? '<span class="stats">' + stats + '</span>' : '') + ic('diff'), gitDis || noChanges, { attrs: 'title="Diff working changes"' }) +
+    btn('workingDiff', (stats ? '<span class="stats">' + stats + '</span>' : '') + ic('diff'), gitDis || noChanges, { attrs: tip('Diff working changes') }) +
     btn('branchDiff', ic('diff') + '<span class="label">Branch</span>', gitDis, { attrs: 'title="Diff branch changes"' }) +
-    btn('discard', ic('x'), gitDis || noChanges, { cls: 'danger', attrs: 'title="Discard changes"' }) +
+    btn('discard', ic('x'), gitDis || noChanges, { cls: 'danger', attrs: tip('Discard changes') }) +
     '</div>' +
     '<div class="field-label">Tree</div><div class="row">' + lastRow + '</div>' +
     statusBar +
@@ -448,7 +452,7 @@ function renderCreateForm() {
     out += '</div>';
     out += '<div class="form-row">';
     if (pendingAction && pendingAction.cmd === 'pickIssue') {
-      out += '<button class="btn btn-pending" disabled>loading…</button><button class="btn" data-cmd="cancelPending" title="Cancel">' + ic('x') + '</button>';
+      out += '<button class="btn btn-pending" disabled>loading…</button><button class="btn" data-cmd="cancelPending" ' + tip('Cancel') + '>' + ic('x') + '</button>';
     } else {
       out += '<button class="btn" data-cmd="pickIssue"' + (dis || pendingAction ? ' disabled' : '') + '>Select Ticket</button>';
     }
@@ -489,7 +493,7 @@ function renderCreateForm() {
   out += '</div>';
   out += '<div class="form-row">';
   if (pendingAction && pendingAction.cmd === 'pickBranch') {
-    out += '<button class="btn btn-pending" disabled>loading…</button><button class="btn" data-cmd="cancelPending" title="Cancel">' + ic('x') + '</button>';
+    out += '<button class="btn btn-pending" disabled>loading…</button><button class="btn" data-cmd="cancelPending" ' + tip('Cancel') + '>' + ic('x') + '</button>';
   } else {
     out += '<button class="btn" data-cmd="pickBranch"' + (dis || pendingAction || gitDis ? ' disabled' : '') + '>Select Branch</button>';
   }

@@ -172,11 +172,14 @@ a[data-cmd]:hover {
 /* ── Tickets ── */
 
 .ticket {
-	cursor: pointer;
 	flex: 1;
 }
 
-.ticket:hover {
+a.ticket {
+	cursor: pointer;
+}
+
+a.ticket:hover {
 	text-decoration: underline;
 }
 
@@ -208,6 +211,33 @@ button {
 .btn:hover:not(:disabled) {
 	opacity: 1;
 	background: var(--vscode-toolbar-hoverBackground);
+}
+
+.btn[data-tooltip] {
+	position: relative;
+	overflow: visible;
+}
+
+.btn[data-tooltip]:hover::after,
+.btn[data-tooltip]:focus-visible::after {
+	content: attr(data-tooltip);
+	position: absolute;
+	right: 0;
+	bottom: calc(100% + 4px);
+	z-index: 10;
+	max-width: 220px;
+	padding: 3px 6px;
+	border: 1px solid var(--vscode-editorHoverWidget-border, var(--forest-border));
+	border-radius: 3px;
+	background: var(--vscode-editorHoverWidget-background);
+	color: var(--vscode-editorHoverWidget-foreground);
+	box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.36));
+	font-size: 12px;
+	font-weight: normal;
+	line-height: 16px;
+	text-transform: none;
+	white-space: nowrap;
+	pointer-events: none;
 }
 
 .btn:disabled {
