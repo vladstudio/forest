@@ -42,6 +42,7 @@ Add `.forest/config.json` to your repo root (tip: ask Claude to generate one for
   },
   "linear": {
     "teams": ["ENG"],
+    "showTodos": true,
     "statuses": {
       "issueList": ["triage", "backlog", "unstarted", "started"],
       "onNew": "started",
@@ -80,7 +81,7 @@ To set up Forest, ask Claude (or any AI) to read this README and generate `.fore
 | `copy`         | no       | `[]`                       | Files to copy from repo root into each tree                                                                                                                                                                                                                                                                                                                                                     |
 | `symlink`      | no       | `[]`                       | Directories to symlink from the main repo into each tree (e.g. `["node_modules"]`). Symlinks are relative, created after copy, and cleaned up before worktree removal.                                                                                                                                                                                                                          |
 | `shortcuts`    | no       | `{cli:[],web:[]}`          | Terminals (`cli`) and browsers (`web`) to open per tree. Each array holds objects with `name` and type-specific fields.                                                                                                                                                                                                                                                                         |
-| `linear`       | no       | disabled                   | Linear integration. Auto-enabled when `teams` or `apiKey` is set. `teams` is an array of team **keys** (e.g. `["ENG"]` or `["ENG", "UX"]`). `issueList` must use Linear's built-in lowercase state types (`triage`, `backlog`, `unstarted`, `started`, `completed`, `canceled`). `onNew`, `onShip`, `onCleanup`, and `onCancel` can be state names or types and are matched case-insensitively. |
+| `linear`       | no       | disabled                   | Linear integration. Auto-enabled when `teams` or `apiKey` is set. `teams` is an array of team **keys** (e.g. `["ENG"]` or `["ENG", "UX"]`). `issueList` must use Linear's built-in lowercase state types (`triage`, `backlog`, `unstarted`, `started`, `completed`, `canceled`). `onNew`, `onShip`, `onCleanup`, and `onCancel` can be state names or types and are matched case-insensitively. Set `showTodos: true` to surface a Todos sidebar listing your assigned issues in `issueList` states. |
 | `github`       | no       | `true`                     | GitHub integration toggle. Set `false` to disable                                                                                                                                                                                                                                                                                                                                               |
 | `branchFormat` | no       | `${ticketId}-${slug}`      | Branch naming for Linear-linked trees. Supports `${ticketId}`, `${slug}`                                                                                                                                                                                                                                                                                                                        |
 | `branchNamePrefix` | no   | `""`                     | Prefill for manual new branches. Supports `{YYMMDD}`, `{YY}`, `{MM}`, `{DD}`                                                                                                                                                                                                                                                                                                                    |
@@ -173,9 +174,15 @@ In `~/.claude/settings.json`:
 
 Replace `/Users/you` with your actual home directory.
 
+### Todos Sidebar
+
+Enable `linear.showTodos: true` to show a Todos panel listing Linear issues assigned to you in any of the configured `issueList` states. Click a todo (or use the inline `+` button) to start a new tree from that issue — Forest creates the branch, worktree, and window, and moves the ticket to `onNew`.
+
+Todos refresh automatically every 3 minutes, on window focus, and via the refresh button in the panel header.
+
 ### Configurable Linear Statuses
 
-Customize which Linear states to show in the issues sidebar and which states to set on new/ship/cleanup.
+Customize which Linear states to show in the Todos sidebar and which states to set on new/ship/cleanup.
 
 Status names in `issueList` use Linear's built-in types: `triage`, `backlog`, `unstarted`, `started`, `completed`, `canceled`. Status names in `onShip`, `onNew`, etc. can be custom workflow state names (e.g. `"in review"`) — Forest resolves them via the Linear API. Use team **keys** (e.g. `ENG`), not display names. Multiple teams are supported.
 
@@ -212,6 +219,8 @@ Switch between trees from the sidebar. All processes keep running in background 
 | Command                      | Description                                             |
 | ---------------------------- | ------------------------------------------------------- |
 | `Forest: New Tree`           | Create tree (unified wizard)                            |
+| `Forest: Start`              | Create tree from a Linear issue (used by Todos panel)   |
+| `Forest: Attach Linear Ticket…` | Link an existing branch to a Linear issue            |
 | `Forest: Switch Tree`        | Open another tree's window                              |
 | `Forest: Ship`               | Push + create PR (offers automerge if repo supports it) |
 | `Forest: Ship + Automerge`   | Push + create PR + enable automerge when supported      |
@@ -221,6 +230,7 @@ Switch between trees from the sidebar. All processes keep running in background 
 | `Forest: Pull`               | Pull latest changes                                     |
 | `Forest: Push`               | Push to remote                                          |
 | `Forest: List`               | List all trees                                          |
+| `Forest: Run Shortcut…`      | Quick-pick any configured terminal/browser shortcut     |
 | `Forest: Open Main`          | Open main repo window                                   |
 | `Forest: View Pull Request`  | Open PR in browser                                      |
 | `Forest: View Linear Ticket` | Open Linear ticket in browser                           |
