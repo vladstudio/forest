@@ -9,20 +9,42 @@ import { generatePRBody } from '../cli/ai';
 import { requireTree, updateLinear, withTreeOperation } from './shared';
 import { notify } from '../notify';
 
+export function prTitleForTree(tree: TreeState): string {
+  return tree.ticketId && tree.title ? `${tree.ticketId}: ${tree.title}` : displayName(tree);
+}
+
+export async function generatePRDraft(
+  ctx: ForestContext,
+  tree: TreeState & { path: string },
+  signal?: AbortSignal,
+): Promise<{ title: string; body: string }> {
+  const title = prTitleForTree(tree);
+  if (ctx.config.ai) {
+    try {
+      const diff = await git.diffFromBase(tree.path, ctx.config.baseBranch, { signal });
+      return { title, body: await generatePRBody(diff, title, { signal }) };
+    } catch (e: any) {
+      if (signal?.aborted) throw e;
+    }
+  }
+
+  const subjects = await git.commitSubjectsFromBase(tree.path, ctx.config.baseBranch, { signal });
+  return { title, body: subjects.length ? subjects.map(s => `- ${s}`).join('\n') : '' };
+}
+
 /** Core shipping logic: push + create PR + post-ship tasks. No UI wrappers. */
 export async function shipCore(
   ctx: ForestContext,
   tree: TreeState & { path: string },
   automerge: boolean,
   signal?: AbortSignal,
+  prBody?: string,
 ): Promise<string | null> {
   const config = ctx.config;
-  const name = displayName(tree);
   const ghEnabled = config.github.enabled && await gh.isAvailable();
 
   const pushPromise = git.pushBranch(tree.path, tree.branch, { signal });
   const prStatusPromise = ghEnabled && !tree.prUrl ? gh.prStatus(tree.path) : Promise.resolve(null);
-  const diffPromise = config.ai ? git.diffFromBase(tree.path, config.baseBranch, { signal }) : Promise.resolve(null);
 
   let url: string | null = null;
   if (ghEnabled) {
@@ -33,23 +55,19 @@ export async function shipCore(
       if (existing?.url) {
         url = existing.url;
       } else {
-        const prTitle = tree.ticketId && tree.title
-          ? `${tree.ticketId}: ${tree.title}`
-          : name;
-
-        let prBody: string | undefined;
-        if (config.ai) {
+        const title = prTitleForTree(tree);
+        let body = prBody;
+        if (body === undefined && config.ai) {
           try {
-            const diff = await diffPromise ?? '';
-            prBody = await generatePRBody(diff, prTitle, { signal });
+            const diff = await git.diffFromBase(tree.path, config.baseBranch, { signal });
+            body = await generatePRBody(diff, title, { signal });
           } catch (e: any) {
             if (signal?.aborted) throw e;
-            notify.warn(`AI description failed, using commits. ${e.message}`);
+            notify.warn(`AI description failed, using gh fill. ${e.message}`);
           }
         }
-
         await pushPromise;
-        url = await gh.createPR(tree.path, config.baseBranch, prTitle, prBody, { signal });
+        url = await gh.createPR(tree.path, config.baseBranch, title, body, { signal });
       }
     }
   }

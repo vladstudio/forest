@@ -170,6 +170,11 @@ export async function diffFromBase(worktreePath: string, baseRef: string, opts?:
   return stdout;
 }
 
+export async function commitSubjectsFromBase(worktreePath: string, baseRef: string, opts?: { signal?: AbortSignal }): Promise<string[]> {
+  const { stdout } = await exec('git', ['log', '--format=%s', `origin/${baseRef}..HEAD`], { cwd: worktreePath, timeout: 10_000, signal: opts?.signal });
+  return stdout.split('\n').map(s => s.trim()).filter(Boolean);
+}
+
 export interface DiffFileChange {
   status: string;
   path: string;

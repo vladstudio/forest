@@ -5,19 +5,21 @@ let formInit = null;
 let formState = null;
 let deleteInit = null;
 let deleteState = null;
+let prReviewInit = null;
+let prReviewState = null;
 let optimisticCleaningKeys = new Set();
 let pendingAction = null; // { cmd: string, key: string|null }
 let loadingMessage = null; // string | null
 
 const pendingLabels = {
   pull: 'pulling…', push: 'pushing…', mergeFromMain: 'merging…',
-  commit: 'committing…', discard: 'discarding…', ship: 'shipping…', shipMerge: 'shipping…',
+  commit: 'committing…', discard: 'discarding…', reviewPR: 'loading…', 'prReview:submit': 'shipping…',
   pickBranch: 'loading…', pickIssue: 'loading…', openTicket: 'opening…', copyTicketDescription: 'copying…',
   workingDiff: 'loading…', branchDiff: 'loading…',
 };
 
 const gitCommands = new Set([
-  'pull', 'push', 'mergeFromMain', 'commit', 'discard', 'ship', 'shipMerge',
+  'pull', 'push', 'mergeFromMain', 'commit', 'discard', 'reviewPR', 'prReview:submit',
   'pickBranch', 'createForm:submit', 'deleteForm:submit', 'delete',
   'workingDiff', 'branchDiff',
 ]);
@@ -64,6 +66,17 @@ function defaultDeleteState(init) {
   };
 }
 
+function defaultPrReviewState(init) {
+  return {
+    key: init.key,
+    body: '',
+    automerge: false,
+    loading: true,
+    submitting: false,
+    error: null,
+  };
+}
+
 window.addEventListener('message', e => {
   const msg = e.data;
   switch (msg.type) {
@@ -95,6 +108,27 @@ window.addEventListener('message', e => {
       deleteInit = msg.init;
       deleteState = defaultDeleteState(msg.init);
       renderCurrentMode();
+      break;
+    case 'showPrReview':
+      mode = 'prReview';
+      loadingMessage = null;
+      prReviewInit = msg.init;
+      prReviewState = defaultPrReviewState(msg.init);
+      renderCurrentMode();
+      break;
+    case 'prReviewReady':
+      if (prReviewState && msg.key === prReviewState.key) {
+        prReviewState.loading = false;
+        prReviewState.body = msg.draft.body || '';
+        renderCurrentMode();
+      }
+      break;
+    case 'prReviewDraftError':
+      if (prReviewState && msg.key === prReviewState.key) {
+        prReviewState.loading = false;
+        prReviewState.error = msg.error;
+        renderCurrentMode();
+      }
       break;
     case 'branchPickResult':
       if (formState && msg.branch) {
@@ -134,6 +168,17 @@ window.addEventListener('message', e => {
       }
       mode = 'list';
       renderCurrentMode();
+      break;
+    case 'prReviewResult':
+      if (prReviewState && msg.key === prReviewState.key) {
+        prReviewState.submitting = false;
+        if (msg.success) {
+          mode = 'list';
+        } else {
+          prReviewState.error = msg.error;
+        }
+        renderCurrentMode();
+      }
       break;
   }
 });
@@ -184,12 +229,26 @@ document.getElementById('root').addEventListener('click', e => {
     });
     return;
   }
+  if (btn.dataset.cmd === 'prReview:submit' && prReviewState) {
+    prReviewState.submitting = true;
+    prReviewState.error = null;
+    pendingAction = { cmd: 'prReview:submit', key: prReviewState.key };
+    renderPrReviewForm();
+    vscode.postMessage({
+      command: 'prReview:submit',
+      key: prReviewState.key,
+      body: prReviewState.body,
+      automerge: prReviewState.automerge,
+    });
+    return;
+  }
   if (btn.dataset.cmd === 'cancelPending') {
     vscode.postMessage({ command: 'cancelPending' });
     return;
   }
   const msg = { command: btn.dataset.cmd, key: btn.closest('[data-key]')?.dataset.key };
   if (btn.dataset.done !== undefined) msg.isDoneOrClosed = btn.dataset.done === '1';
+  if (btn.dataset.hasAutomerge !== undefined) msg.hasAutomerge = btn.dataset.hasAutomerge;
   if (btn.dataset.cmd === 'delete') {
     loadingMessage = 'Loading…';
     renderCurrentMode();
@@ -232,6 +291,8 @@ function renderCurrentMode() {
     renderCreateForm();
   } else if (mode === 'delete' && deleteState) {
     renderDeleteForm();
+  } else if (mode === 'prReview' && prReviewState) {
+    renderPrReviewForm();
   } else if (latestData) {
     renderList(latestData);
   }
@@ -341,9 +402,7 @@ function treeCard(t, d) {
   }
   const lastRow = (isDone || t.prNumber)
     ? '<button class="btn fill" data-cmd="openPR"' + dis(localDis) + '>PR#' + (t.prNumber || '?') + '</button>' + btn('delete', ic('trash'), gitDis, { cls: 'danger', attrs: 'data-done="' + (isDone ? '1' : '0') + '" ' + tip('Delete tree') })
-    : (d.hasAutomerge
-      ? btn('ship', 'Push + PR', gitDis, { cls: 'fill primary', attrs: 'title="Push and create PR"' }) + btn('shipMerge', '+ Automerge', gitDis, { cls: 'fill primary', attrs: 'title="Push, create PR, enable auto-merge"' })
-      : btn('ship', 'Ship - Push and Create PR', gitDis, { cls: 'fill primary' }))
+    : btn('reviewPR', 'Review PR', gitDis, { cls: 'fill primary', attrs: 'data-has-automerge="' + (d.hasAutomerge ? '1' : '0') + '" title="Review and create PR"' })
     + btn('delete', ic('trash'), gitDis, { cls: 'danger', attrs: 'data-done="0" ' + tip('Delete tree') });
   const busyLabel = isPending ? (pendingLabels[pendingAction.cmd] || 'loading…') : (t.busyOperation ? t.busyOperation + '…' : '');
   const statusBar = busyLabel ? '<div class="row status-bar"><span class="spinner"></span><span class="dim">' + h(busyLabel) + '</span>' + (isPending ? btn('cancelPending', ic('x'), false, { attrs: tip('Cancel') }) : '') + '</div>' : '';
@@ -364,6 +423,38 @@ function treeCard(t, d) {
     '<div class="field-label">Tree</div><div class="row">' + lastRow + '</div>' +
     statusBar +
     '</div>';
+}
+
+function renderPrReviewForm() {
+  const rs = prReviewState;
+  const init = prReviewInit;
+  const disabled = rs.loading || rs.submitting;
+  let out = '<div class="form">';
+
+  if (rs.error) {
+    out += '<div class="form-error">' + h(rs.error) + '</div>';
+  }
+
+  out += '<div class="form-section">';
+  out += '<div class="form-title">Review PR</div>';
+  out += '<textarea class="form-input form-textarea" id="prBodyInput" placeholder="' + (rs.loading ? 'loading…' : 'PR description') + '"' + (disabled ? ' disabled' : '') + '>' + h(rs.body) + '</textarea>';
+  out += '</div>';
+
+  if (init.hasAutomerge) {
+    out += '<div class="form-section">';
+    out += '<label class="check-row"><input type="checkbox" id="automergeInput"' + (rs.automerge ? ' checked' : '') + (disabled ? ' disabled' : '') + '> <span>Enable automerge</span></label>';
+    out += '</div>';
+  }
+
+  const canSubmit = !disabled && !pendingAction && !hasGlobalGitOperation(latestData);
+  out += '<div class="form-actions">';
+  out += '<button class="btn primary fill" id="prSubmitBtn" data-cmd="prReview:submit"' + (canSubmit ? '' : ' disabled') + '>' + (rs.submitting ? '<span class="spinner"></span> Creating…' : 'Create PR') + '</button>';
+  out += disabled ? '<button class="btn secondary" data-cmd="cancelPending">Cancel</button>' : '<button class="btn secondary" data-form="cancel">Cancel</button>';
+  out += '</div>';
+
+  out += '</div>';
+  document.getElementById('root').innerHTML = out;
+  setupPrReviewListeners();
 }
 
 function renderDeleteForm() {
@@ -543,6 +634,38 @@ function renderCreateForm() {
   setupFormListeners();
 }
 
+function setupPrReviewListeners() {
+  let bodyInput = document.getElementById('prBodyInput');
+  if (bodyInput) {
+    bodyInput.addEventListener('input', function (e) {
+      prReviewState.body = e.target.value;
+    });
+    if (!prReviewState.loading && !prReviewState.submitting) bodyInput.focus();
+  }
+  let automergeInput = document.getElementById('automergeInput');
+  if (automergeInput) {
+    automergeInput.addEventListener('change', function (e) {
+      prReviewState.automerge = e.target.checked;
+    });
+  }
+  setupSubmitShortcut('prSubmitBtn');
+}
+
+function setupSubmitShortcut(buttonId) {
+  function onKeyDown(e) {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      let btn = document.getElementById(buttonId);
+      if (btn && !btn.disabled) btn.click();
+    }
+  }
+  document.addEventListener('keydown', onKeyDown);
+  let observer = new MutationObserver(function () {
+    document.removeEventListener('keydown', onKeyDown);
+    observer.disconnect();
+  });
+  observer.observe(document.getElementById('root'), { childList: true });
+}
+
 function setupDeleteListeners() {
   let branchRadios = document.querySelectorAll('input[name="delete-branches"]');
   branchRadios.forEach(function (input) {
@@ -606,20 +729,7 @@ function setupFormListeners() {
   }
   updateFormHints();
 
-  // Cmd+Enter (Mac) / Ctrl+Enter (Windows/Linux) to submit
-  function onKeyDown(e) {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-      let btn = document.getElementById('submitBtn');
-      if (btn && !btn.disabled) btn.click();
-    }
-  }
-  document.addEventListener('keydown', onKeyDown);
-  // Cleanup when form is re-rendered
-  let observer = new MutationObserver(function () {
-    document.removeEventListener('keydown', onKeyDown);
-    observer.disconnect();
-  });
-  observer.observe(document.getElementById('root'), { childList: true });
+  setupSubmitShortcut('submitBtn');
 }
 
 function updateFormHints() {

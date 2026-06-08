@@ -12,7 +12,7 @@ import * as ai from '../cli/ai';
 import { formatBranch, formatBranchPrefix, sanitizeBranch } from '../utils/slug';
 import { copyConfigFiles, createTree, ensureTreeIdle, focusOrOpenWindow, getBlockingTreeOperation, openTreeWindow, updateLinear, withTreeOperation } from '../commands/shared';
 import { executeDeletePlan, type DeletePlan } from '../commands/cleanup';
-import { shipCore } from '../commands/ship';
+import { generatePRDraft, shipCore } from '../commands/ship';
 import { notify } from '../notify';
 import { pickIssue } from '../commands/create';
 import { linkTicket } from '../commands/linkTicket';
@@ -316,6 +316,11 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
+    if (command === 'prReview:submit') {
+      await this.handlePrReviewSubmit(msg);
+      return;
+    }
+
     if (!key) return;
     const parsed = parseTreeKey(key);
     if (!parsed) return;
@@ -466,28 +471,22 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
         break;
       }
 
-      case 'ship':
-      case 'shipMerge': {
+      case 'reviewPR': {
         if (!tree?.path || !ctx) { bail(); return; }
         if (await git.hasUncommittedChanges(tree.path)) {
           const choice = await vscode.window.showWarningMessage(
-            'You have uncommitted changes.', 'Ship Anyway', 'Cancel',
+            'You have uncommitted changes.', 'Ship anyway', 'Cancel',
           );
-          if (choice !== 'Ship Anyway') { bail(); return; }
+          if (choice !== 'Ship anyway') { bail(); return; }
         }
-        const automerge = command === 'shipMerge';
+        this.postMessage({ type: 'showPrReview', init: { key: treeKey(tree), hasAutomerge: msg.hasAutomerge === '1' } });
         await this.runPending(async (signal) => {
-          const prUrl = await withTreeOperation(
-            ctx,
-            tree as TreeState & { path: string },
-            'shipping',
-            () => shipCore(ctx, tree as TreeState & { path: string }, automerge, signal),
-          );
-          if (prUrl) {
-            notify.info(`Shipped! PR: ${prUrl}`);
-            vscode.env.openExternal(vscode.Uri.parse(prUrl));
-          } else if (prUrl !== undefined) {
-            notify.info('Shipped!');
+          try {
+            const draft = await generatePRDraft(ctx, tree as TreeState & { path: string }, signal);
+            this.postMessage({ type: 'prReviewReady', key: treeKey(tree), draft });
+          } catch (e: any) {
+            if (signal.aborted) return;
+            this.postMessage({ type: 'prReviewDraftError', key: treeKey(tree), error: e.message });
           }
         });
         break;
@@ -590,6 +589,50 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
     } catch (e: any) {
       this.postMessage({ type: 'createResult', success: false, error: e.message });
     }
+  }
+
+  private async handlePrReviewSubmit(msg: Record<string, any>): Promise<void> {
+    if (!this.ctx || !msg.key) return;
+    const ctx = this.ctx;
+    const key = String(msg.key);
+    const parsed = parseTreeKey(key);
+    if (!parsed) return;
+    const state = await this.stateManager.load();
+    const tree = this.stateManager.getTree(state, parsed.repoPath, parsed.branch);
+    if (!tree?.path) {
+      this.postMessage({ type: 'prReviewResult', key, success: false, error: 'Tree path is missing.' });
+      return;
+    }
+
+    if (await git.hasUncommittedChanges(tree.path)) {
+      const choice = await vscode.window.showWarningMessage(
+        'You have uncommitted changes.', 'Ship anyway', 'Cancel',
+      );
+      if (choice !== 'Ship anyway') {
+        this.postMessage({ type: 'prReviewResult', key, success: false });
+        return;
+      }
+    }
+
+    await this.runPending(async (signal) => {
+      try {
+        const prUrl = await withTreeOperation(
+          ctx,
+          tree as TreeState & { path: string },
+          'shipping',
+          () => shipCore(ctx, tree as TreeState & { path: string }, !!msg.automerge, signal, String(msg.body ?? '')),
+        );
+        this.postMessage({ type: 'prReviewResult', key, success: true });
+        if (prUrl) {
+          notify.info(`Shipped! PR: ${prUrl}`);
+          vscode.env.openExternal(vscode.Uri.parse(prUrl));
+        } else if (prUrl !== undefined) {
+          notify.info('Shipped!');
+        }
+      } catch (e: any) {
+        this.postMessage({ type: 'prReviewResult', key, success: false, error: signal.aborted ? undefined : e.message });
+      }
+    });
   }
 
   private async handleDeleteSubmit(msg: Record<string, any>): Promise<void> {

@@ -64,7 +64,7 @@ export async function enableAutomerge(worktreePath: string, opts?: { signal?: Ab
 export async function createPR(worktreePath: string, baseBranch: string, title: string, body?: string, opts?: { signal?: AbortSignal }): Promise<string | null> {
   const args = ['pr', 'create', '--base', baseBranch, '--title', title];
   let bodyFile: string | undefined;
-  if (body) {
+  if (body !== undefined) {
     bodyFile = join(tmpdir(), `forest-pr-body-${Date.now()}.md`);
     writeFileSync(bodyFile, body, 'utf8');
     args.push('--body-file', bodyFile);
