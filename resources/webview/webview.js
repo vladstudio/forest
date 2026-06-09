@@ -183,7 +183,27 @@ window.addEventListener('message', e => {
   }
 });
 
-document.getElementById('root').addEventListener('click', e => {
+const root = document.getElementById('root');
+const TOOLTIP_MAX_WIDTH = 220;
+const TOOLTIP_ESTIMATED_HEIGHT = 28;
+const TOOLTIP_GAP = 4;
+
+function updateTooltipPlacement(e) {
+  if (!(e.target instanceof Element)) return;
+  const btn = e.target.closest('.btn[data-tooltip]');
+  if (!btn) return;
+  if (e.type === 'mouseover' && e.relatedTarget instanceof Node && btn.contains(e.relatedTarget)) return;
+  const rect = btn.getBoundingClientRect();
+  const placement = rect.top < TOOLTIP_ESTIMATED_HEIGHT + TOOLTIP_GAP ? 'bottom' : '';
+  const align = rect.right < TOOLTIP_MAX_WIDTH ? 'left' : '';
+  if (btn.dataset.tooltipPlacement !== placement) btn.dataset.tooltipPlacement = placement;
+  if (btn.dataset.tooltipAlign !== align) btn.dataset.tooltipAlign = align;
+}
+
+root.addEventListener('mouseover', updateTooltipPlacement);
+root.addEventListener('focusin', updateTooltipPlacement);
+root.addEventListener('click', e => {
+  if (!(e.target instanceof Element)) return;
   const formBtn = e.target.closest('[data-form]');
   if (formBtn) {
     if (formBtn.disabled) return;
@@ -275,7 +295,7 @@ function autoFillBranch() {
 const ic = name => '<span class="icon">' + icons[name] + '</span>';
 const tip = text => {
   const value = h(text);
-  return 'title="' + value + '" aria-label="' + value + '" data-tooltip="' + value + '"';
+  return 'aria-label="' + value + '" data-tooltip="' + value + '"';
 };
 
 function renderLoading(message) {

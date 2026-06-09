@@ -240,6 +240,18 @@ button {
 	pointer-events: none;
 }
 
+.btn[data-tooltip][data-tooltip-placement="bottom"]:hover::after,
+.btn[data-tooltip][data-tooltip-placement="bottom"]:focus-visible::after {
+	bottom: auto;
+	top: calc(100% + 4px);
+}
+
+.btn[data-tooltip][data-tooltip-align="left"]:hover::after,
+.btn[data-tooltip][data-tooltip-align="left"]:focus-visible::after {
+	right: auto;
+	left: 0;
+}
+
 .btn:disabled {
 	opacity: 0.4;
 	cursor: default;
