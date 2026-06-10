@@ -16,6 +16,7 @@ import { create as createWizard, start } from "./commands/create";
 import { linkTicket } from "./commands/linkTicket";
 import { switchTree } from "./commands/switch";
 import { ship } from "./commands/ship";
+import * as ai from "./cli/ai";
 import { cleanupMerged, deleteTree } from "./commands/cleanup";
 import { update, rebase, pull, push } from "./commands/update";
 import { list } from "./commands/list";
@@ -111,6 +112,17 @@ export async function activate(context: vscode.ExtensionContext) {
 					});
 			})
 			.catch((e) => outputChannel.appendLine(`[Forest] Linear config validation failed: ${e.message}`));
+	}
+
+	// Warn once if AI is enabled but Tetra isn't reachable — marketplace
+	// users who set `ai: true` would otherwise see silent fallbacks.
+	if (config.ai) {
+		ai.isAvailable().then((ok) => {
+			if (ok) return;
+			vscode.window.showWarningMessage(
+				"Forest: AI is enabled but Tetra isn't reachable on localhost:24100. AI features will fall back to defaults.",
+			);
+		});
 	}
 
 	// Watch config files for external edits

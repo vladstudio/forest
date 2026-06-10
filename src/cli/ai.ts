@@ -32,3 +32,18 @@ async function callTetra(command: string, text: string, args?: Record<string, st
   const data = await res.json() as { result: string };
   return data.result?.trim() ?? '';
 }
+
+/** Lightweight reachability check for the Tetra server. Used at activation
+ *  to warn the user when `ai: true` is set but Tetra isn't running — without
+ *  this, marketplace users would see silent fallbacks with no indication. */
+export async function isAvailable(): Promise<boolean> {
+  try {
+    const res = await fetch(`http://localhost:${TETRA_PORT}/`, {
+      method: 'GET',
+      signal: AbortSignal.timeout(1_500),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}

@@ -9,6 +9,9 @@ const auto = (title: string, ms: number) => {
 
 export const notify = {
   info: (msg: string) => auto(msg, 4000),
-  warn: (msg: string) => auto(`$(warning) ${msg}`, 5000),
+  // showWarningMessage renders the $(warning) codicon in the message —
+  // withProgress titles don't render markdown/codicons, so we previously
+  // showed users the literal text "$(warning) …".
+  warn: (msg: string) => { vscode.window.showWarningMessage(msg); },
   error: (msg: string) => { vscode.window.showErrorMessage(msg); },
 };

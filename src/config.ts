@@ -36,8 +36,6 @@ export function allShortcuts(s: ShortcutsConfig): ShortcutConfig[] {
 	return [...s.cli, ...s.web];
 }
 
-export type AIConfig = boolean;
-
 export interface ForestConfig {
 	version: number;
 	copy: string[];
@@ -57,7 +55,7 @@ export interface ForestConfig {
 		};
 	};
 	github: { enabled: boolean };
-	ai?: AIConfig;
+	ai?: boolean;
 	branchFormat: string;
 	branchNamePrefix: string;
 	baseBranch: string;
