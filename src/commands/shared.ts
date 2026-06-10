@@ -162,6 +162,23 @@ export async function updateLinear(
 	);
 }
 
+/** Revert a freshly-created Linear issue back to the start of the issue
+ *  pipeline when its tree creation fails. The target is the last item of
+ *  `statuses.issueList` (assumed to be the earliest/backlog state). Errors
+ *  are swallowed and logged — a failed revert must not mask the original
+ *  create error that triggered it. */
+export async function revertLinear(
+	ctx: ForestContext,
+	ticketId: string,
+): Promise<void> {
+	const statuses = ctx.config.linear.statuses.issueList;
+	const status = statuses[statuses.length - 1];
+	if (!status) return;
+	await updateLinear(ctx, ticketId, status).catch((e) =>
+		ctx.outputChannel.appendLine(`[Forest] Linear revert failed: ${e.message}`),
+	);
+}
+
 export function copyConfigFiles(
 	config: ForestConfig,
 	repoPath: string,
@@ -245,7 +262,11 @@ function resolveTreePath(
 ): string {
 	const treesDir = getTreesDir(repoPath);
 	fs.mkdirSync(treesDir, { recursive: true });
-	return path.join(treesDir, ticketId ?? sanitizeBranchForPath(branch));
+	// Sanitize ticketId too: in practice it's a Linear ID (TEAM-123) or
+	// extracted via a strict regex, but the asymmetry with the branch
+	// fallback would let a malformed ID produce a path-traversal segment.
+	const leaf = ticketId ?? sanitizeBranchForPath(branch);
+	return path.join(treesDir, sanitizeBranchForPath(leaf));
 }
 
 function checkMaxTrees(

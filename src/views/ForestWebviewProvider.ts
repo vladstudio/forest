@@ -10,7 +10,7 @@ import * as gh from '../cli/gh';
 import * as linear from '../cli/linear';
 import * as ai from '../cli/ai';
 import { formatBranch, formatBranchPrefix, sanitizeBranch } from '../utils/slug';
-import { copyConfigFiles, createTree, ensureTreeIdle, focusOrOpenWindow, getBlockingTreeOperation, openTreeWindow, updateLinear, withTreeOperation } from '../commands/shared';
+import { copyConfigFiles, createTree, ensureTreeIdle, focusOrOpenWindow, getBlockingTreeOperation, openTreeWindow, revertLinear, updateLinear, withTreeOperation } from '../commands/shared';
 import { executeDeletePlan, type DeletePlan } from '../commands/cleanup';
 import { generatePRDraft, shipCore } from '../commands/ship';
 import { notify } from '../notify';
@@ -575,10 +575,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
         });
       } catch (e: any) {
         // Revert Linear issue status if we just created it
-        if (newlyCreatedTicket) {
-          const revertStatus = ctx.config.linear.statuses.issueList[ctx.config.linear.statuses.issueList.length - 1];
-          await updateLinear(ctx, ticketId!, revertStatus).catch((e) => this.log(`Linear revert failed: ${e.message}`));
-        }
+        if (newlyCreatedTicket && ticketId) await revertLinear(ctx, ticketId);
         throw e;
       }
 
@@ -660,11 +657,13 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
     }
 
     try {
-      const plan: DeletePlan = {
-        branches: msg.branches,
-        linear: msg.linear,
-        pr: msg.pr,
-      };
+      const plan = parseDeletePlan(msg);
+      if (!plan) {
+        const error = `Delete failed: invalid plan from webview.`;
+        notify.error(error);
+        this.postMessage({ type: 'deleteResult', key, success: false, error });
+        return;
+      }
       const success = await executeDeletePlan(ctx, tree as TreeState & { path: string }, plan);
       if (!success) {
         notify.error('Delete was interrupted. Check notifications for details.');
@@ -708,4 +707,18 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
     this.data.clear();
     this.view = undefined;
   }
+}
+
+/** Validate the deleteForm:submit message against the DeletePlan unions.
+ *  The webview is untyped, so a drift between webview.js and the provider
+ *  could send invalid values; this catches that before the plan reaches
+ *  executeDeletePlan. */
+function parseDeletePlan(msg: Record<string, unknown>): DeletePlan | null {
+  const branches = msg.branches;
+  const linear = msg.linear;
+  const pr = msg.pr;
+  if (branches !== "keep" && branches !== "local" && branches !== "all") return null;
+  if (linear !== "none" && linear !== "cancel" && linear !== "cleanup") return null;
+  if (pr !== "none" && pr !== "close") return null;
+  return { branches, linear, pr };
 }

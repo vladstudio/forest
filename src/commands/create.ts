@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import type { ForestContext } from '../context';
 import * as git from '../cli/git';
 import * as linear from '../cli/linear';
-import { createTree, filterUnlinkedIssues, updateLinear, pickTeam, promptUncommittedChanges } from './shared';
+import { createTree, filterUnlinkedIssues, revertLinear, updateLinear, pickTeam, promptUncommittedChanges } from './shared';
 import { sanitizeBranch, formatBranch, formatBranchPrefix } from '../utils/slug';
 import { notify } from '../notify';
 
@@ -34,11 +34,6 @@ function showBranchInput(options?: { value?: string }): Promise<string | undefin
     input.onDidHide(() => { input.dispose(); resolve(undefined); });
     input.show();
   });
-}
-
-async function revertLinear(ctx: ForestContext, ticketId: string): Promise<void> {
-  const statuses = ctx.config.linear.statuses.issueList;
-  await updateLinear(ctx, ticketId, statuses[statuses.length - 1]);
 }
 
 /** Try to extract a ticketId from a branch name using the configured branchFormat. */

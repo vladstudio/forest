@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
-import { clearConfigCache, loadConfig, getTreesDir, allShortcuts } from "./config";
+import { clearTreesDirCache, loadConfig, getTreesDir, allShortcuts } from "./config";
 import {
 	ShortcutItem,
 	ShortcutsTreeProvider,
@@ -32,7 +32,7 @@ const emptyProvider: vscode.TreeDataProvider<never> = {
 };
 
 export async function activate(context: vscode.ExtensionContext) {
-	clearConfigCache();
+	clearTreesDirCache();
 	gh.clearCache();
 	linear.clearCache();
 	const config = await loadConfig();
@@ -454,7 +454,12 @@ async function reconcileState(
 		const knownPaths = new Set(stateManager.getTreesForRepo(state, repoPath).map((t) => t.path).filter(Boolean));
 		for (const entry of fs.readdirSync(treesDir)) {
 			const dirPath = path.join(treesDir, entry);
-			if (entry.startsWith(".") || !fs.statSync(dirPath).isDirectory() || knownPaths.has(dirPath)) continue;
+			// statSync can throw ENOENT if the entry was deleted between
+			// readdir and stat (common during activation-time reconciliation
+			// when another window is also pruning). Skip such entries.
+			let isDir: boolean;
+			try { isDir = fs.statSync(dirPath).isDirectory(); } catch { continue; }
+			if (entry.startsWith(".") || !isDir || knownPaths.has(dirPath)) continue;
 			const gitFile = path.join(dirPath, ".git");
 			if (!fs.existsSync(gitFile)) continue;
 			try {
@@ -482,7 +487,10 @@ async function reconcileState(
 		const knownPaths = new Set(stateManager.getTreesForRepo(state, repoPath).map((t) => t.path).filter(Boolean));
 		for (const entry of fs.readdirSync(treesDir)) {
 			const dirPath = path.join(treesDir, entry);
-			if (entry.startsWith(".") || knownPaths.has(dirPath) || !fs.statSync(dirPath).isDirectory()) continue;
+			// Same ENOENT race as in recoverOrphanWorktrees.
+			let isDir: boolean;
+			try { isDir = fs.statSync(dirPath).isDirectory(); } catch { continue; }
+			if (entry.startsWith(".") || knownPaths.has(dirPath) || !isDir) continue;
 			if (!fs.existsSync(path.join(dirPath, ".git"))) outputChannel.appendLine(`[Forest] Ignoring unknown directory: ${dirPath}`);
 		}
 		return state;

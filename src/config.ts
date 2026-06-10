@@ -67,6 +67,7 @@ export interface ForestConfig {
 }
 
 const DEFAULTS: Partial<ForestConfig> = {
+	version: 1,
 	copy: [],
 	symlink: [],
 	shortcuts: { cli: [], web: [] },
@@ -162,7 +163,7 @@ export async function loadConfig(): Promise<ForestConfig | null> {
 
 /** Returns ~/.forest/trees/<repoName>[-<hash>]. Uses old unhashed dir if it exists for backwards compat. */
 const treesDirCache = new Map<string, string>();
-export function clearConfigCache(): void { treesDirCache.clear(); }
+export function clearTreesDirCache(): void { treesDirCache.clear(); }
 export function getTreesDir(repoPath: string): string {
 	let dir = treesDirCache.get(repoPath);
 	if (dir) return dir;
@@ -180,7 +181,10 @@ export function getTreesDir(repoPath: string): string {
 	return dir;
 }
 
-/** Object fields merge, shortcuts merge by name, and other arrays intentionally replace. */
+/** Object fields merge, shortcuts merge by name, and other arrays intentionally replace.
+ *  Note: `null` values in `local` are intentionally ignored — local.json can
+ *  override a config.json setting with a new value, but cannot unset it. To
+ *  drop a setting, set it to a safe empty value (e.g. `[]`, `""`, `0`). */
 function mergeConfig(base: any, local: any): any {
 	const result = { ...base };
 	for (const key of Object.keys(local)) {
@@ -211,6 +215,7 @@ function mergeConfig(base: any, local: any): any {
 }
 
 function validateConfig(repoRoot: string, config: ForestConfig): void {
+	if (typeof config.version !== "number") throw new Error("version must be a number");
 	for (const key of ["copy", "symlink", "browser", "terminal"] as const) {
 		if (!Array.isArray(config[key])) throw new Error(`${key} must be an array`);
 	}
