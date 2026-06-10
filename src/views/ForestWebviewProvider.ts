@@ -29,7 +29,11 @@ function gitRefUri(filePath: string, ref: string): vscode.Uri {
 export class ForestWebviewProvider implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView;
   private ctx?: ForestContext;
-  private pendingAbort: AbortController | null = null;
+  // Set (not single slot) so concurrent runPending calls — a webview action
+  // racing a non-button flow like pickBranch / createForm:submit, or a future
+  // command-palette wiring — don't overwrite each other's controllers. Cancel
+  // aborts everything currently in flight.
+  private readonly pendingAborts = new Set<AbortController>();
   private readonly data: TreeDataService;
 
   constructor(
@@ -69,8 +73,6 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
     this.data.clear();
     this.update();
   }
-
-  refreshTrees(): void { this.refresh(); }
 
   private async getCreateFormInit() {
     if (!this.view?.visible || !this.ctx) return null;
@@ -158,13 +160,13 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
   /** Run an async operation with inline pending state in the webview. */
   private async runPending(fn: (signal: AbortSignal) => Promise<void>): Promise<void> {
     const ac = new AbortController();
-    this.pendingAbort = ac;
+    this.pendingAborts.add(ac);
     try {
       await fn(ac.signal);
     } catch (e: any) {
       if (!ac.signal.aborted) notify.error(`Forest: ${e.message}`);
     } finally {
-      this.pendingAbort = null;
+      this.pendingAborts.delete(ac);
       this.postMessage({ type: 'pendingDone' });
       this.refresh();
     }
@@ -275,7 +277,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
     }
 
     if (command === 'cancelPending') {
-      this.pendingAbort?.abort();
+      for (const ac of this.pendingAborts) ac.abort();
       return;
     }
 
@@ -701,8 +703,8 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
   }
 
   dispose(): void {
-    this.pendingAbort?.abort();
-    this.pendingAbort = null;
+    for (const ac of this.pendingAborts) ac.abort();
+    this.pendingAborts.clear();
     this.data.clear();
     this.view = undefined;
   }

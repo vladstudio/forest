@@ -129,7 +129,16 @@ export class StateManager {
     for (let i = 0;; i++) {
       try {
         await fs.promises.mkdir(lock);
-        await fs.promises.writeFile(lockFile, `${process.pid}:${Date.now()}`, 'utf8');
+        try {
+          await fs.promises.writeFile(lockFile, `${process.pid}:${Date.now()}`, 'utf8');
+        } catch (writeErr) {
+          // mkdir succeeded but the owner file write failed (EACCES, ENOSPC,
+          // EROFS, …). Without this cleanup the lock dir is orphaned with no
+          // owner file, and the next 10s of waiters would all wedge on EEXIST
+          // until the mtime fallback fired.
+          await fs.promises.rm(lock, { recursive: true, force: true }).catch(() => {});
+          throw writeErr;
+        }
       } catch (e: any) {
         if (e.code !== 'EEXIST') throw e;
         try {
@@ -153,7 +162,11 @@ export class StateManager {
             }
           } catch {}
         }
-        if (i >= 99) throw new Error('State file is locked');
+        // Wait budget must exceed the 10s stale threshold, otherwise a
+        // healthy-but-slow holder causes waiters to give up before the
+        // stale logic could ever help. 250 × 50ms = 12.5s gives a 2.5s
+        // margin for the 10s mtime/holder-stale fallback to fire.
+        if (i >= 249) throw new Error('State file is locked');
         await new Promise(r => setTimeout(r, 50)); continue;
       }
       try { return await fn(); } finally { try { await fs.promises.rm(lock, { recursive: true, force: true }); } catch {} }

@@ -219,6 +219,18 @@ export async function executeDeletePlan(
   plan: DeletePlan,
 ): Promise<boolean> {
   if (!(await ensureTreeIdle(ctx, tree))) return false;
+  // Mirror the ship flow: warn on dirty worktrees, but let the user override.
+  // teardownTree is --force + rm -rf, so without this check we'd silently
+  // destroy uncommitted work whenever the user submits the delete form.
+  // cleanupMerged stays strict (auto path, no override possible).
+  if (await git.hasUncommittedChanges(tree.path)) {
+    const choice = await vscode.window.showWarningMessage(
+      `${displayName(tree)} has uncommitted changes. Delete anyway?`,
+      "Delete anyway",
+      "Cancel",
+    );
+    if (choice !== "Delete anyway") return false;
+  }
   const name = displayName(tree);
 
   return vscode.window.withProgress(

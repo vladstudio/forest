@@ -10,7 +10,6 @@ import type { StatusBarManager } from './managers/StatusBarManager';
 
 export interface IForestProvider {
   refresh(): void;
-  refreshTrees(): void;
   showCreateForm(): Promise<boolean>;
   showCreateFormWithIssue(issue: { id: string; title: string }): Promise<boolean>;
   showDeleteForm(branch?: string): Promise<boolean>;

@@ -309,12 +309,27 @@ export async function activate(context: vscode.ExtensionContext) {
 					]
 						.filter(Boolean)
 						.join(", ");
-					const action = await vscode.window.showInformationMessage(
-						`${name} PR was merged. Cleanup will ${detail}.`,
-						"Cleanup",
-						"Dismiss",
-					);
-					if (action === "Cleanup") await cleanupMerged(ctx, tree);
+					// Fire-and-forget: awaiting the message would wedge the
+					// guarded interval if the user ignores the notification
+					// (it slides into the notification center, promise never
+					// resolves, `running` stays true, poll never fires again).
+					// Awaiting the state update above is enough to dedupe —
+					// the next poll will skip this tree via mergeNotified.
+					void Promise.resolve(
+						vscode.window.showInformationMessage(
+							`${name} PR was merged. Cleanup will ${detail}.`,
+							"Cleanup",
+							"Dismiss",
+						),
+					)
+						.then((action) => {
+							if (action === "Cleanup") return cleanupMerged(ctx, tree);
+						})
+						.catch((e: Error) =>
+							outputChannel.appendLine(
+								`[Forest] merged-PR notice failed: ${e.message}`,
+							),
+						);
 				}
 			},
 			5 * 60 * 1000,
@@ -336,7 +351,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
 	// Auto-refresh tree health every 3 minutes (PR status, commits behind, age)
 	const healthId = setInterval(
-		() => forestProvider.refreshTrees(),
+		() => forestProvider.refresh(),
 		3 * 60 * 1000,
 	);
 	context.subscriptions.push({ dispose: () => clearInterval(healthId) });
@@ -498,7 +513,7 @@ function registerCommands(
 		branch ? ctx.stateManager.getTree(ctx.stateManager.getCached(), ctx.repoPath, branch) : undefined;
 	const refreshAfter = <T>(fn: () => Promise<T>) => async () => {
 		await fn();
-		ctx.forestProvider.refreshTrees();
+		ctx.forestProvider.refresh();
 	};
 
 	reg("forest.create", async () => {

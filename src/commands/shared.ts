@@ -345,6 +345,10 @@ export async function createTree(opts: {
 		// The in-memory createInProgress guard prevents duplicates within this
 		// process; the file lock in modify() prevents duplicates across windows.
 		let stateSaved = false;
+		// Drop the carry stash only after the whole creation succeeds. If we
+		// dropped earlier and a later step failed, the rollback would rm -rf the
+		// worktree and the user's uncommitted changes would be unrecoverable.
+		let stashApplied = false;
 
 		try {
 			return await vscode.window.withProgress(
@@ -382,6 +386,7 @@ export async function createTree(opts: {
 							// so the worktree's HEAD matches the stash's base — `git stash apply`
 							// restores tracked + index + untracked changes cleanly.
 							await git.stashApply(treePath, carryChanges);
+							stashApplied = true;
 						} catch (e: any) {
 							const detail = (e?.stderr || e?.message || String(e))
 								.trim()
@@ -392,15 +397,18 @@ export async function createTree(opts: {
 								`Could not apply uncommitted changes. Run "git stash pop" in your main repo to recover. (${detail})`,
 							);
 						}
-							await git.stashDrop(repoPath, carryChanges).catch((e) =>
-								log(`Drop carry stash failed: ${e.message}`),
-							);
 					}
 
 					await postWorktreeSetup(config, repoPath, treePath, tree, progress);
 
 					progress.report({ message: "Opening window..." });
 					await openTreeWindow(tree, { forceNewWindow: true });
+
+					if (stashApplied) {
+						await git.stashDrop(repoPath, carryChanges as string).catch((e) =>
+							log(`Drop carry stash failed: ${e.message}`),
+						);
+					}
 
 					return tree;
 				},

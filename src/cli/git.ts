@@ -163,8 +163,6 @@ async function revListCount(worktreePath: string, range: string): Promise<number
   } catch { return 0; }
 }
 
-export const commitsBehind = (wt: string, base: string) => revListCount(wt, `HEAD..origin/${base}`);
-
 export async function diffFromBase(worktreePath: string, baseRef: string, opts?: { signal?: AbortSignal }): Promise<string> {
   const { stdout } = await exec('git', ['diff', `origin/${baseRef}...HEAD`], { cwd: worktreePath, timeout: 30_000, signal: opts?.signal });
   return stdout;

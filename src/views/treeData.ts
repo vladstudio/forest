@@ -85,7 +85,7 @@ export class TreeDataService {
     const mainIsCurrent = curPath === repoPath;
     const [cards, mainBehind] = await Promise.all([
       Promise.all(trees.map(t => t.cleaning ? Promise.resolve(null) : this.get(t).catch(() => null))),
-      mainIsCurrent ? git.commitsBehind(repoPath, this.config.baseBranch) : Promise.resolve(0),
+      mainIsCurrent ? git.commitsBehindRemote(repoPath, this.config.baseBranch) : Promise.resolve(0),
     ]);
     const groups = new Map<string, TreeCardData[]>();
     const add = (label: string, card: TreeCardData) => groups.set(label, [...(groups.get(label) ?? []), card]);
@@ -134,7 +134,7 @@ export class TreeDataService {
     const base = baseCard(tree, false);
     if (!tree.path || !fs.existsSync(tree.path)) return base;
     const [behind, ahead, remoteBehind, pr, localChanges] = await Promise.all([
-      git.commitsBehind(tree.path, this.config.baseBranch),
+      git.commitsBehindRemote(tree.path, this.config.baseBranch),
       git.commitsAhead(tree.path, tree.branch),
       git.commitsBehindRemote(tree.path, tree.branch),
       this.config.github.enabled ? gh.prStatus(tree.path) : Promise.resolve(null),
