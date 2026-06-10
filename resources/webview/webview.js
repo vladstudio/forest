@@ -263,6 +263,12 @@ root.addEventListener('click', e => {
     return;
   }
   if (btn.dataset.cmd === 'cancelPending') {
+    if (mode === 'prReview') {
+      mode = 'list';
+      prReviewInit = null;
+      prReviewState = null;
+      renderCurrentMode();
+    }
     vscode.postMessage({ command: 'cancelPending' });
     return;
   }
@@ -413,6 +419,8 @@ function treeCard(t, d) {
   const nothingToPush = t.ahead === 0 && t.hasTrackingRef;
   const stats = lc ? [lc.added && '<span class="add">+' + lc.added + '</span>', lc.removed && '<span class="del">-' + lc.removed + '</span>', lc.modified && '<span class="mod">~' + lc.modified + '</span>'].filter(Boolean).join(' ') : '';
   const isDone = t.prState === 'MERGED' || t.prState === 'CLOSED';
+  const isReviewPending = pendingAction && pendingAction.cmd === 'reviewPR' && pendingAction.key === t.key;
+  const reviewPrLabel = isReviewPending && mode === 'list' ? 'Cancelling…' : 'Prepare PR';
   let ticket = '';
   if (d.linearEnabled) {
     const lbl = t.ticketId ? h(t.ticketId + (t.ticketTitle ? ': ' + t.ticketTitle : '')) : '';
@@ -422,9 +430,9 @@ function treeCard(t, d) {
   }
   const lastRow = (isDone || t.prNumber)
     ? '<button class="btn fill" data-cmd="openPR"' + dis(localDis) + '>PR#' + (t.prNumber || '?') + '</button>' + btn('delete', ic('trash'), gitDis, { cls: 'danger', attrs: 'data-done="' + (isDone ? '1' : '0') + '" ' + tip('Delete tree') })
-    : btn('reviewPR', 'Prepare PR', gitDis, { cls: 'fill primary', attrs: 'data-has-automerge="' + (d.hasAutomerge ? '1' : '0') + '" title="Prepare and create PR"' })
+    : btn('reviewPR', reviewPrLabel, gitDis, { cls: 'fill primary', attrs: 'data-has-automerge="' + (d.hasAutomerge ? '1' : '0') + '" title="Prepare and create PR"' })
     + btn('delete', ic('trash'), gitDis, { cls: 'danger', attrs: 'data-done="0" ' + tip('Delete tree') });
-  const busyLabel = isPending ? (pendingLabels[pendingAction.cmd] || 'loading…') : (t.busyOperation ? t.busyOperation + '…' : '');
+  const busyLabel = isPending ? (isReviewPending && mode === 'list' ? 'cancelling…' : (pendingLabels[pendingAction.cmd] || 'loading…')) : (t.busyOperation ? t.busyOperation + '…' : '');
   const statusBar = busyLabel ? '<div class="row status-bar"><span class="spinner"></span><span class="dim">' + h(busyLabel) + '</span>' + (isPending ? btn('cancelPending', ic('x'), false, { attrs: tip('Cancel') }) : '') + '</div>' : '';
   return '<div class="card current" data-key="' + h(t.key) + '">' +
     ticket +
