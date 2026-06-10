@@ -422,7 +422,7 @@ function treeCard(t, d) {
   }
   const lastRow = (isDone || t.prNumber)
     ? '<button class="btn fill" data-cmd="openPR"' + dis(localDis) + '>PR#' + (t.prNumber || '?') + '</button>' + btn('delete', ic('trash'), gitDis, { cls: 'danger', attrs: 'data-done="' + (isDone ? '1' : '0') + '" ' + tip('Delete tree') })
-    : btn('reviewPR', 'Review PR', gitDis, { cls: 'fill primary', attrs: 'data-has-automerge="' + (d.hasAutomerge ? '1' : '0') + '" title="Review and create PR"' })
+    : btn('reviewPR', 'Prepare PR', gitDis, { cls: 'fill primary', attrs: 'data-has-automerge="' + (d.hasAutomerge ? '1' : '0') + '" title="Prepare and create PR"' })
     + btn('delete', ic('trash'), gitDis, { cls: 'danger', attrs: 'data-done="0" ' + tip('Delete tree') });
   const busyLabel = isPending ? (pendingLabels[pendingAction.cmd] || 'loading…') : (t.busyOperation ? t.busyOperation + '…' : '');
   const statusBar = busyLabel ? '<div class="row status-bar"><span class="spinner"></span><span class="dim">' + h(busyLabel) + '</span>' + (isPending ? btn('cancelPending', ic('x'), false, { attrs: tip('Cancel') }) : '') + '</div>' : '';
@@ -456,7 +456,7 @@ function renderPrReviewForm() {
   }
 
   out += '<div class="form-section">';
-  out += '<div class="form-title">Review PR</div>';
+  out += '<div class="form-title">Prepare PR</div>';
   out += '<textarea class="form-input form-textarea" id="prBodyInput" placeholder="' + (rs.loading ? 'loading…' : 'PR description') + '"' + (disabled ? ' disabled' : '') + '>' + h(rs.body) + '</textarea>';
   out += '</div>';
 
