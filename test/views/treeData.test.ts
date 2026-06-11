@@ -12,6 +12,7 @@ vi.mock("../../src/cli/git", () => ({
 	commitsBehind: vi.fn(),
 	commitsBehindRemote: vi.fn(),
 	localChanges: vi.fn(),
+	remoteBranchExists: vi.fn(),
 }));
 
 vi.mock("../../src/cli/gh", () => ({
@@ -22,7 +23,7 @@ vi.mock("../../src/cli/gh", () => ({
 import { getHostWorkspacePath } from "../../src/context";
 import * as gh from "../../src/cli/gh";
 import * as git from "../../src/cli/git";
-import { TreeDataService } from "../../src/views/treeData";
+import { TreeDataService, treeKey } from "../../src/views/treeData";
 
 describe("TreeDataService", () => {
 	beforeEach(() => {
@@ -47,6 +48,7 @@ describe("TreeDataService", () => {
 		vi.mocked(git.commitsAhead).mockResolvedValue({ count: 2, hasTrackingRef: true });
 		vi.mocked(git.commitsBehindRemote).mockResolvedValue(0);
 		vi.mocked(git.localChanges).mockResolvedValue({ added: 1, removed: 0, modified: 0 });
+		vi.mocked(git.remoteBranchExists).mockResolvedValue(true);
 		vi.mocked(gh.prStatus).mockImplementation(async (wt) => {
 			if (wt === paths.review) return { state: "OPEN", reviewDecision: null, number: 7, url: "https://pr/7" };
 			if (wt === paths.done) return { state: "MERGED", reviewDecision: null, number: 8, url: "https://pr/8" };
@@ -95,11 +97,12 @@ describe("TreeDataService", () => {
 			prUrl: "https://pr/7",
 		});
 		expect(second.groups).toEqual(first.groups);
-		expect(git.commitsBehind).toHaveBeenCalledTimes(4);
+		expect(git.commitsBehind).not.toHaveBeenCalled();
 		expect(git.commitsAhead).toHaveBeenCalledTimes(4);
-		expect(git.commitsBehindRemote).toHaveBeenCalledTimes(4);
+		expect(git.commitsBehindRemote).toHaveBeenCalledTimes(8);
 		expect(git.localChanges).toHaveBeenCalledTimes(4);
 		expect(gh.prStatus).toHaveBeenCalledTimes(4);
+		expect(git.remoteBranchExists).toHaveBeenCalledTimes(4);
 	});
 
 	it("surfaces hasTrackingRef from commitsAhead so the webview can allow first push", async () => {
@@ -112,6 +115,7 @@ describe("TreeDataService", () => {
 		vi.mocked(git.commitsAhead).mockResolvedValue({ count: 0, hasTrackingRef: false });
 		vi.mocked(git.commitsBehindRemote).mockResolvedValue(0);
 		vi.mocked(git.localChanges).mockResolvedValue(null);
+		vi.mocked(git.remoteBranchExists).mockResolvedValue(false);
 		vi.mocked(gh.prStatus).mockResolvedValue(null);
 
 		const trees = [
@@ -133,5 +137,91 @@ describe("TreeDataService", () => {
 		const card = data.groups[0]?.trees[0];
 		expect(card?.ahead).toBe(0);
 		expect(card?.hasTrackingRef).toBe(false);
+	});
+
+	it("keeps last-known snapshot while a forced refresh is in flight", async () => {
+		const repoPath = fs.mkdtempSync(path.join(os.tmpdir(), "forest-repo-"));
+		const treePath = path.join(repoPath, "tree");
+		fs.mkdirSync(treePath, { recursive: true });
+		vi.mocked(getHostWorkspacePath).mockReturnValue(treePath);
+		vi.mocked(gh.repoHasAutomergeCached).mockReturnValue(false);
+		vi.mocked(git.commitsAhead).mockResolvedValue({ count: 1, hasTrackingRef: true });
+		vi.mocked(git.commitsBehindRemote).mockResolvedValue(0);
+		vi.mocked(git.localChanges).mockResolvedValue(null);
+		vi.mocked(git.remoteBranchExists).mockResolvedValue(true);
+		vi.mocked(gh.prStatus).mockResolvedValue({ state: "OPEN", reviewDecision: null, number: 1, url: "https://pr/1" });
+
+		const tree = { branch: "feature", repoPath, path: treePath, createdAt: "2024-01-01T00:00:00.000Z" };
+		const stateManager = {
+			load: vi.fn(async () => ({ version: 1, trees: {} })),
+			getTree: vi.fn(() => tree),
+			getTreesForRepo: vi.fn(() => [tree]),
+			updateTree: vi.fn(async () => undefined),
+		};
+		const service = new TreeDataService(
+			stateManager as any,
+			{ baseBranch: "main", github: { enabled: true }, linear: { enabled: false } } as any,
+			() => repoPath,
+			() => {},
+		);
+		await service.build();
+
+		let resolvePr!: (value: { state: string; reviewDecision: null; number: number; url: string }) => void;
+		vi.mocked(gh.prStatus).mockReturnValue(new Promise(resolve => { resolvePr = resolve; }));
+		const events: unknown[] = [];
+		service.onDidChangeSnapshots(event => events.push(event));
+
+		const refresh = service.refreshTree(repoPath, tree.branch, { force: true });
+		await Promise.resolve();
+		await Promise.resolve();
+		const duringRefresh = service.getSnapshot(treeKey(tree));
+		expect(duringRefresh?.prNumber).toBe(1);
+		expect(duringRefresh?.loading).toBe(true);
+		expect(duringRefresh?.stale).toBe(true);
+
+		resolvePr({ state: "MERGED", reviewDecision: null, number: 2, url: "https://pr/2" });
+		await refresh;
+		const afterRefresh = service.getSnapshot(treeKey(tree));
+		expect(afterRefresh?.prState).toBe("MERGED");
+		expect(afterRefresh?.prNumber).toBe(2);
+		expect(afterRefresh?.loading).toBe(false);
+		expect(afterRefresh?.stale).toBe(false);
+		expect(events.length).toBeGreaterThan(0);
+	});
+
+	it("preserves last-known snapshot and marks stale on refresh failure", async () => {
+		const repoPath = fs.mkdtempSync(path.join(os.tmpdir(), "forest-repo-"));
+		const treePath = path.join(repoPath, "tree");
+		fs.mkdirSync(treePath, { recursive: true });
+		vi.mocked(getHostWorkspacePath).mockReturnValue(treePath);
+		vi.mocked(gh.repoHasAutomergeCached).mockReturnValue(false);
+		vi.mocked(git.commitsAhead).mockResolvedValue({ count: 1, hasTrackingRef: true });
+		vi.mocked(git.commitsBehindRemote).mockResolvedValue(0);
+		vi.mocked(git.localChanges).mockResolvedValue(null);
+		vi.mocked(git.remoteBranchExists).mockResolvedValue(true);
+		vi.mocked(gh.prStatus).mockResolvedValue({ state: "OPEN", reviewDecision: null, number: 1, url: "https://pr/1" });
+
+		const tree = { branch: "feature", repoPath, path: treePath, createdAt: "2024-01-01T00:00:00.000Z" };
+		const stateManager = {
+			load: vi.fn(async () => ({ version: 1, trees: {} })),
+			getTree: vi.fn(() => tree),
+			getTreesForRepo: vi.fn(() => [tree]),
+			updateTree: vi.fn(async () => undefined),
+		};
+		const service = new TreeDataService(
+			stateManager as any,
+			{ baseBranch: "main", github: { enabled: true }, linear: { enabled: false } } as any,
+			() => repoPath,
+			() => {},
+		);
+		await service.build();
+
+		vi.mocked(git.commitsAhead).mockRejectedValue(new Error("git failed"));
+		await service.refreshTree(repoPath, tree.branch, { force: true });
+
+		const snapshot = service.getSnapshot(treeKey(tree));
+		expect(snapshot?.prNumber).toBe(1);
+		expect(snapshot?.stale).toBe(true);
+		expect(snapshot?.error).toBe("git failed");
 	});
 });

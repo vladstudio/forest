@@ -12,6 +12,7 @@ import { ForestContext, getHostWorkspacePath, getRepoPath } from "./context";
 import { ShortcutManager } from "./managers/ShortcutManager";
 import { StatusBarManager } from "./managers/StatusBarManager";
 import { ForestWebviewProvider } from "./views/ForestWebviewProvider";
+import { parseTreeKey, TreeDataService } from "./views/treeData";
 import { create as createWizard, start } from "./commands/create";
 import { linkTicket } from "./commands/linkTicket";
 import { switchTree } from "./commands/switch";
@@ -178,10 +179,18 @@ export async function activate(context: vscode.ExtensionContext) {
 
 	const shortcutManager = new ShortcutManager(config);
 	const statusBarManager = new StatusBarManager(currentTree);
+	const treeData = new TreeDataService(
+		stateManager,
+		config,
+		() => repoPath,
+		(msg) => outputChannel.appendLine(`[Forest] ${msg}`),
+	);
+	context.subscriptions.push(treeData);
 	const forestProvider = new ForestWebviewProvider(
 		stateManager,
 		config,
 		context.extensionUri,
+		treeData,
 	);
 	const shortcutsProvider = new ShortcutsTreeProvider(config);
 	const todosProvider = showTodos ? new TodosTreeProvider(config, outputChannel) : undefined;
@@ -222,6 +231,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		currentTree,
 	};
 	forestProvider.setContext(ctx);
+	treeData.startAutoRefresh();
 
 	// Pre-warm tree data cache so the sidebar renders instantly on first open.
 	forestProvider.refresh();
@@ -285,29 +295,33 @@ export async function activate(context: vscode.ExtensionContext) {
 		return { dispose: () => clearInterval(id) };
 	};
 
-	// Auto-cleanup polling: check merged PRs every 5 minutes
+	// Auto-cleanup notices use the same PR state snapshots as the sidebar.
 	// Only notify in the tree's own window or the main (non-tree) window.
+	const previousPrStates = new Map<string, string | undefined>();
+	const mergeNoticeInFlight = new Set<string>();
 	context.subscriptions.push(
-		guardedInterval(
-			async () => {
-				if (!(await gh.isAvailable())) return;
-				const s = await stateManager.load();
-				const trees = stateManager.getTreesForRepo(s, repoPath);
-				const candidates = trees.filter((tree) => {
-					if (!tree.prUrl || !tree.path || tree.mergeNotified) return false;
-					return ctx.currentTree?.branch === tree.branch || !ctx.currentTree;
-				});
-				if (!candidates.length) return;
-				const mergedResults = await Promise.allSettled(
-					candidates.map((tree) =>
-						gh
-							.prIsMerged(tree.repoPath, tree.branch)
-							.then((merged) => ({ tree, merged })),
-					),
-				);
-				for (const result of mergedResults) {
-					if (result.status !== "fulfilled" || !result.value.merged) continue;
-					const tree = result.value.tree;
+		treeData.onDidChangeSnapshots(({ repoPath: changedRepoPath, keys }) => {
+			void (async () => {
+				if (changedRepoPath !== repoPath) return;
+				for (const key of keys ?? []) {
+					const snapshot = treeData.getSnapshot(key);
+					const hasPrevious = previousPrStates.has(key);
+					const previous = previousPrStates.get(key);
+					previousPrStates.set(key, snapshot?.prState);
+					if (!hasPrevious || previous === "MERGED" || snapshot?.prState !== "MERGED") continue;
+					const parsed = parseTreeKey(key);
+					if (!parsed || mergeNoticeInFlight.has(key)) continue;
+					mergeNoticeInFlight.add(key);
+					const s = await stateManager.load();
+					const tree = stateManager.getTree(s, parsed.repoPath, parsed.branch);
+					if (!tree?.path || tree.mergeNotified) {
+						mergeNoticeInFlight.delete(key);
+						continue;
+					}
+					if (ctx.currentTree?.branch !== tree.branch && ctx.currentTree) {
+						mergeNoticeInFlight.delete(key);
+						continue;
+					}
 					const isOwnWindow = ctx.currentTree?.branch === tree.branch;
 					await stateManager.updateTree(tree.repoPath, tree.branch, {
 						mergeNotified: true,
@@ -322,12 +336,6 @@ export async function activate(context: vscode.ExtensionContext) {
 					]
 						.filter(Boolean)
 						.join(", ");
-					// Fire-and-forget: awaiting the message would wedge the
-					// guarded interval if the user ignores the notification
-					// (it slides into the notification center, promise never
-					// resolves, `running` stays true, poll never fires again).
-					// Awaiting the state update above is enough to dedupe —
-					// the next poll will skip this tree via mergeNotified.
 					void Promise.resolve(
 						vscode.window.showInformationMessage(
 							`${name} PR was merged. Cleanup will ${detail}.`,
@@ -342,11 +350,13 @@ export async function activate(context: vscode.ExtensionContext) {
 							outputChannel.appendLine(
 								`[Forest] merged-PR notice failed: ${e.message}`,
 							),
-						);
+						)
+						.finally(() => mergeNoticeInFlight.delete(key));
 				}
-			},
-			5 * 60 * 1000,
-		),
+			})().catch((e: Error) =>
+				outputChannel.appendLine(`[Forest] merged-PR snapshot handler failed: ${e.message}`),
+			);
+		}),
 	);
 
 	// Periodic orphan check: detect worktree folders deleted externally
@@ -361,13 +371,6 @@ export async function activate(context: vscode.ExtensionContext) {
 			if (after < before) forestProvider.refresh();
 		}, 60_000),
 	);
-
-	// Auto-refresh tree health every 3 minutes (PR status, commits behind, age)
-	const healthId = setInterval(
-		() => forestProvider.refresh(),
-		3 * 60 * 1000,
-	);
-	context.subscriptions.push({ dispose: () => clearInterval(healthId) });
 
 	// Auto-refresh todos every 3 minutes
 	if (todosProvider) {

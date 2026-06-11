@@ -7,7 +7,6 @@ import { resolveTetraConfig } from '../config';
 import type { ForestContext } from '../context';
 import { displayName, type StateManager, type TreeState } from '../state';
 import * as git from '../cli/git';
-import * as gh from '../cli/gh';
 import * as linear from '../cli/linear';
 import * as ai from '../cli/ai';
 import { formatBranch, formatBranchPrefix, sanitizeBranch } from '../utils/slug';
@@ -35,19 +34,15 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
   // command-palette wiring — don't overwrite each other's controllers. Cancel
   // aborts everything currently in flight.
   private readonly pendingAborts = new Set<AbortController>();
-  private readonly data: TreeDataService;
+  private updateTimer?: ReturnType<typeof setTimeout>;
 
   constructor(
     private readonly stateManager: StateManager,
     private readonly config: ForestConfig,
     private readonly extensionUri: vscode.Uri,
+    private readonly data: TreeDataService,
   ) {
-    this.data = new TreeDataService(
-      stateManager,
-      config,
-      () => this.repoPath,
-      (msg) => this.log(msg),
-    );
+    this.data.onDidChangeSnapshots(() => this.scheduleUpdate());
   }
 
   private log(msg: string): void {
@@ -71,8 +66,20 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
   }
 
   refresh(): void {
-    this.data.clear();
-    this.update();
+    if (!this.ctx) return;
+    void this.update();
+    void this.data.refreshRepo(this.repoPath, { force: true }).catch((e: unknown) => {
+      const message = e instanceof Error ? e.message : String(e);
+      this.log(`Tree data refresh failed: ${message}`);
+    });
+  }
+
+  private scheduleUpdate(): void {
+    if (this.updateTimer) clearTimeout(this.updateTimer);
+    this.updateTimer = setTimeout(() => {
+      this.updateTimer = undefined;
+      void this.update();
+    }, 50);
   }
 
   private async getCreateFormInit() {
@@ -127,11 +134,11 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
       return true;
     }
 
-    const [pr, hasRemote] = await Promise.all([
-      this.config.github.enabled ? gh.prStatus(tree.path).catch(() => null) : null,
-      git.remoteBranchExists(repoPath, tree.branch).catch(() => false),
-    ]);
-    const defaultLinearAction = pr?.state === 'MERGED' ? 'cleanup' : 'cancel';
+    const snapshot = this.data.getSnapshot(treeKey(tree));
+    const prState = snapshot?.prState ?? null;
+    const prNumber = snapshot?.prNumber ?? null;
+    const hasRemote = snapshot?.hasRemoteBranch ?? snapshot?.hasTrackingRef ?? false;
+    const defaultLinearAction = prState === 'MERGED' ? 'cleanup' : 'cancel';
     this.postMessage({
       type: 'showDeleteForm',
       init: {
@@ -141,12 +148,12 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
         ticketId: tree.ticketId ?? null,
         ticketTitle: tree.title ?? null,
         linearEnabled: this.config.linear.enabled && !!tree.ticketId,
-        prState: pr?.state ?? null,
-        prNumber: pr?.number ?? null,
+        prState,
+        prNumber,
         defaultBranches: hasRemote ? 'all' : 'local',
         remoteDeleted: !hasRemote,
         defaultLinearAction,
-        defaultPrAction: pr?.state === 'OPEN' ? 'close' : 'none',
+        defaultPrAction: prState === 'OPEN' ? 'close' : 'none',
         cancelStatusName: this.config.linear.statuses.onCancel,
         cleanupStatusName: this.config.linear.statuses.onCleanup,
       },
@@ -706,7 +713,7 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
   dispose(): void {
     for (const ac of this.pendingAborts) ac.abort();
     this.pendingAborts.clear();
-    this.data.clear();
+    if (this.updateTimer) clearTimeout(this.updateTimer);
     this.view = undefined;
   }
 }
