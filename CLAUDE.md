@@ -46,7 +46,7 @@ Command files are thin UI wrappers around orchestration in `commands/shared.ts` 
 
 ### CLI Wrappers (`src/cli/`)
 - `git.ts`, `linear.ts`, `gh.ts` — thin exec wrappers. Tool availability cached once per session; calls degrade gracefully when tools are missing / auth is expired. `gh.ts` also has `repoHasAutomerge()` (cached) + `enableAutomerge()` for the ship-automerge flow, `createPR()` (PR body via a temp `--body-file`, else `--fill`), and `closePR()`.
-- `ai.ts` — calls **Tetra** (local menu-bar app, `http://localhost:24100/transform`) for `generateCommitMessage()` (sidebar commit action) and `generatePRBody()` (ship). Enabled when `config.ai` is set; `ship` falls back to `gh pr create --fill` on failure.
+- `ai.ts` — calls **Tetra** (local menu-bar app, default `http://localhost:24100/transform`) for `generateCommitMessage()` (sidebar commit action) and `generatePRBody()` (ship). Opt-in via the `tetra` config block (presence enables AI; `port` and `commands.commit`/`commands.pr` are resolved against defaults in `config.ts`); `ship` falls back to `gh pr create --fill` on failure.
 - `devcontainer.ts` — Docker cleanup for sandboxed (dev container) trees: `cleanup()` stops/removes containers + anonymous volumes labeled `devcontainer.local_folder=<path>`.
 
 ### Logging & Notifications

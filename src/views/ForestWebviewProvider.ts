@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import type { ForestConfig } from '../config';
+import { resolveTetraConfig } from '../config';
 import type { ForestContext } from '../context';
 import { displayName, type StateManager, type TreeState } from '../state';
 import * as git from '../cli/git';
@@ -439,11 +440,12 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
       }
 
       case 'commit': {
-        if (!tree || !tree.path || !this.config.ai) { bail(); return; }
+        if (!tree || !tree.path || !this.config.tetra) { bail(); return; }
+        const tetra = resolveTetraConfig(this.config.tetra);
         await this.runPending(async (signal) => {
           const commitDiff = await git.workingDiff(tree.path!);
           if (!commitDiff.trim()) { notify.info('No working changes to commit.'); return; }
-          const message = await ai.generateCommitMessage(commitDiff, { signal });
+          const message = await ai.generateCommitMessage(tetra, commitDiff, { signal });
           const confirmed = await vscode.window.showInputBox({
             value: message,
             prompt: 'Commit message — all changes will be staged',

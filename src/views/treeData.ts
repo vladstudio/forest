@@ -107,7 +107,7 @@ export class TreeDataService {
       baseBranch: this.config.baseBranch,
       mainIsCurrent,
       mainBehind,
-      hasAI: !!this.config.ai,
+      hasAI: !!this.config.tetra,
       hasAutomerge: this.config.github.enabled && (gh.repoHasAutomergeCached(repoPath) ?? false),
       linearEnabled: this.config.linear.enabled,
       groups: ['In progress', 'In review', 'Done', 'Closed', 'Deleting'].flatMap(label => {

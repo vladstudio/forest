@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
-import { clearTreesDirCache, loadConfig, getTreesDir, allShortcuts } from "./config";
+import { clearTreesDirCache, loadConfig, getTreesDir, allShortcuts, resolveTetraConfig } from "./config";
 import {
 	ShortcutItem,
 	ShortcutsTreeProvider,
@@ -114,13 +114,14 @@ export async function activate(context: vscode.ExtensionContext) {
 			.catch((e) => outputChannel.appendLine(`[Forest] Linear config validation failed: ${e.message}`));
 	}
 
-	// Warn once if AI is enabled but Tetra isn't reachable — marketplace
-	// users who set `ai: true` would otherwise see silent fallbacks.
-	if (config.ai) {
-		ai.isAvailable().then((ok) => {
+	// Warn once if `tetra` is configured but Tetra isn't reachable — users
+	// who opt into AI would otherwise see silent fallbacks.
+	if (config.tetra) {
+		const tetra = resolveTetraConfig(config.tetra);
+		ai.isAvailable(tetra.port).then((ok) => {
 			if (ok) return;
 			vscode.window.showWarningMessage(
-				"Forest: AI is enabled but Tetra isn't reachable on localhost:24100. AI features will fall back to defaults.",
+				`Forest: Tetra isn't reachable on localhost:${tetra.port}. AI features will fall back to defaults.`,
 			);
 		});
 	}

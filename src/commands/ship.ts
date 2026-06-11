@@ -6,6 +6,7 @@ import * as git from '../cli/git';
 import * as gh from '../cli/gh';
 
 import { generatePRBody } from '../cli/ai';
+import { resolveTetraConfig } from '../config';
 import { requireTree, updateLinear, withTreeOperation } from './shared';
 import { notify } from '../notify';
 
@@ -19,10 +20,11 @@ export async function generatePRDraft(
   signal?: AbortSignal,
 ): Promise<{ title: string; body: string }> {
   const title = prTitleForTree(tree);
-  if (ctx.config.ai) {
+  if (ctx.config.tetra) {
+    const tetra = resolveTetraConfig(ctx.config.tetra);
     try {
       const diff = await git.diffFromBase(tree.path, ctx.config.baseBranch, { signal });
-      return { title, body: await generatePRBody(diff, title, { signal }) };
+      return { title, body: await generatePRBody(tetra, diff, title, { signal }) };
     } catch (e: any) {
       if (signal?.aborted) throw e;
     }
@@ -57,10 +59,11 @@ export async function shipCore(
       } else {
         const title = prTitleForTree(tree);
         let body = prBody;
-        if (body === undefined && config.ai) {
+        if (body === undefined && config.tetra) {
+          const tetra = resolveTetraConfig(config.tetra);
           try {
             const diff = await git.diffFromBase(tree.path, config.baseBranch, { signal });
-            body = await generatePRBody(diff, title, { signal });
+            body = await generatePRBody(tetra, diff, title, { signal });
           } catch (e: any) {
             if (signal?.aborted) throw e;
             notify.warn(`AI description failed, using gh fill. ${e.message}`);

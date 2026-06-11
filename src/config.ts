@@ -55,13 +55,46 @@ export interface ForestConfig {
 		};
 	};
 	github: { enabled: boolean };
-	ai?: boolean;
+	tetra?: RawTetraConfig;
 	branchFormat: string;
 	branchNamePrefix: string;
 	baseBranch: string;
 	maxTrees: number;
 	browser: string[];
 	terminal: string[];
+}
+
+/** Raw schema for the `tetra` config block (all fields optional). Presence of
+ *  the block itself signals "AI is enabled"; `resolveTetraConfig` fills in
+ *  defaults before passing to the AI client. */
+export interface RawTetraConfig {
+	port?: number;
+	commands?: {
+		commit?: string;
+		pr?: string;
+	};
+}
+
+/** Resolved (all-required) Tetra settings consumed by the AI client. */
+export interface TetraConfig {
+	port: number;
+	commands: { commit: string; pr: string };
+}
+
+export const DEFAULT_TETRA_PORT = 24100;
+export const DEFAULT_TETRA_COMMANDS = {
+	commit: "AI Generate commit message",
+	pr: "AI Generate PR description",
+} as const;
+
+export function resolveTetraConfig(t: RawTetraConfig | undefined): TetraConfig {
+	return {
+		port: t?.port ?? DEFAULT_TETRA_PORT,
+		commands: {
+			commit: t?.commands?.commit ?? DEFAULT_TETRA_COMMANDS.commit,
+			pr: t?.commands?.pr ?? DEFAULT_TETRA_COMMANDS.pr,
+		},
+	};
 }
 
 const DEFAULTS: Partial<ForestConfig> = {
