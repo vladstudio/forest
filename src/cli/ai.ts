@@ -35,14 +35,17 @@ async function callTetra(command: string, text: string, args?: Record<string, st
 
 /** Lightweight reachability check for the Tetra server. Used at activation
  *  to warn the user when `ai: true` is set but Tetra isn't running — without
- *  this, marketplace users would see silent fallbacks with no indication. */
+ *  this, marketplace users would see silent fallbacks with no indication.
+ *  Any HTTP response (even 404) means the server is up; fetch only throws on
+ *  connection errors. We don't check `res.ok` because Tetra returns 404 for
+ *  unknown routes including `GET /` — the real endpoint is `POST /transform`. */
 export async function isAvailable(): Promise<boolean> {
   try {
-    const res = await fetch(`http://localhost:${TETRA_PORT}/`, {
+    await fetch(`http://localhost:${TETRA_PORT}/`, {
       method: 'GET',
       signal: AbortSignal.timeout(1_500),
     });
-    return res.ok;
+    return true;
   } catch {
     return false;
   }
