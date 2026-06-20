@@ -14,6 +14,7 @@ vi.mock("../../src/cli/git", () => ({
 	stashDrop: vi.fn(),
 }));
 
+import { getTreesDir } from "../../src/config";
 import * as git from "../../src/cli/git";
 import { createTree } from "../../src/commands/shared";
 
@@ -40,6 +41,18 @@ function stateManager(trees: any[] = []) {
 			s.trees[`${repoPath}:${branch}`],
 		getTreesForRepo: (s: typeof state, repoPath: string) =>
 			Object.values(s.trees).filter((tree: any) => tree.repoPath === repoPath),
+		findTreeByTicket: (
+			s: typeof state,
+			repoPath: string,
+			ticketId: string,
+			opts?: { excludeBranch?: string },
+		) =>
+			Object.values(s.trees).find(
+				(tree: any) =>
+					tree.repoPath === repoPath &&
+					tree.ticketId === ticketId &&
+					(!opts?.excludeBranch || tree.branch !== opts.excludeBranch),
+		),
 		load: vi.fn(async () => state),
 		removeTree: vi.fn(async (repoPath: string, branch: string) => {
 			delete state.trees[`${repoPath}:${branch}`];
@@ -99,5 +112,81 @@ describe("createTree", () => {
 		).rejects.toThrow("boom");
 		expect(git.removeWorktree).not.toHaveBeenCalled();
 		expect(manager.removeTree).not.toHaveBeenCalled();
+	});
+
+	it("rejects when the tree path is already claimed by another tree", async () => {
+		const root = fs.mkdtempSync(path.join(os.tmpdir(), "forest-create-"));
+		const repoPath = path.join(root, "repo");
+		fs.mkdirSync(repoPath, { recursive: true });
+		// Pre-claim createTree's path for KAD-2 without a ticketId, so the ticket check doesn't short-circuit.
+		const claimedPath = path.join(getTreesDir(repoPath), "KAD-2");
+		const manager = stateManager([
+			{
+				branch: "old-branch",
+				createdAt: new Date().toISOString(),
+				path: claimedPath,
+				repoPath,
+			},
+		]);
+
+		await expect(
+			createTree({
+				branch: "new-branch",
+				ticketId: "KAD-2",
+				config,
+				repoPath,
+				stateManager: manager as any,
+			}),
+		).rejects.toThrow("Tree path is already in use");
+		expect(git.createWorktree).not.toHaveBeenCalled();
+	});
+
+	it("rejects when the tree path already exists on disk", async () => {
+		const root = fs.mkdtempSync(path.join(os.tmpdir(), "forest-create-"));
+		const repoPath = path.join(root, "repo");
+		fs.mkdirSync(repoPath, { recursive: true });
+		// Pre-create the git path to simulate a leftover from an aborted run.
+		const leftover = path.join(getTreesDir(repoPath), "KAD-9");
+		fs.mkdirSync(leftover, { recursive: true });
+		const manager = stateManager();
+
+		await expect(
+			createTree({
+				branch: "new-branch",
+				ticketId: "KAD-9",
+				config,
+				repoPath,
+				stateManager: manager as any,
+			}),
+		).rejects.toThrow("Tree path already exists");
+		expect(git.createWorktree).not.toHaveBeenCalled();
+	});
+
+	it("cleans up a partially-created worktree directory on failure", async () => {
+		const root = fs.mkdtempSync(path.join(os.tmpdir(), "forest-create-"));
+		const repoPath = path.join(root, "repo");
+		fs.mkdirSync(repoPath, { recursive: true });
+		const manager = stateManager();
+		// Simulate an interrupted create: git writes the worktree dir, then throws.
+		// Rollback must still clean it up.
+		vi.mocked(git.createWorktree).mockImplementation(
+			async (_repo: string, treePath: string) => {
+				fs.mkdirSync(treePath, { recursive: true });
+				throw new Error("interrupted");
+			},
+		);
+
+		await expect(
+			createTree({
+				branch: "partial-branch",
+				config,
+				repoPath,
+				stateManager: manager as any,
+			}),
+		).rejects.toThrow("interrupted");
+		expect(git.removeWorktree).toHaveBeenCalledWith(
+			repoPath,
+			expect.stringContaining("partial-branch"),
+		);
 	});
 });

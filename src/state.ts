@@ -35,6 +35,11 @@ export function displayName(tree: TreeState): string {
   return tree.branch;
 }
 
+/** Shared one-tree-per-ticket error for createTree/linkTicket/todoCreateTree. */
+export function duplicateTicketMessage(ticketId: string, tree: TreeState): string {
+  return `Tree for ticket "${ticketId}" already exists (${tree.branch}).`;
+}
+
 export class StateManager {
   private statePath: string;
   private _onDidChange = new vscode.EventEmitter<{ state: ForestState; isLocal: boolean }>();
@@ -286,6 +291,19 @@ export class StateManager {
 
   getTree(state: ForestState, repoPath: string, branch: string): TreeState | undefined {
     return state.trees[this.key(repoPath, branch)];
+  }
+
+  /** Find a tree by ticket, optionally skipping one branch. */
+  findTreeByTicket(
+    state: ForestState,
+    repoPath: string,
+    ticketId: string,
+    opts?: { excludeBranch?: string },
+  ): TreeState | undefined {
+    const exclude = opts?.excludeBranch;
+    return this.getTreesForRepo(state, repoPath).find(
+      t => t.ticketId === ticketId && (!exclude || t.branch !== exclude),
+    );
   }
 
   dispose(): void {

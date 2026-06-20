@@ -598,9 +598,9 @@ function registerCommands(
 		const issue = arg instanceof TodoItem ? arg.issue : arg as linear.LinearIssue;
 		if (!issue) return;
 		const state = await ctx.stateManager.load();
-		const existing = ctx.stateManager
-			.getTreesForRepo(state, ctx.repoPath)
-			.find((tree) => tree.ticketId === issue.id && tree.path);
+		const existing = ctx.stateManager.findTreeByTicket(state, ctx.repoPath, issue.id);
+		// Focus the existing tree instead of creating a duplicate. If the entry
+		// is corrupt (no path), openTreeWindow throws instead of hiding it.
 		if (existing) return openTreeWindow(existing);
 		const shown = await ctx.forestProvider.showCreateFormWithIssue(issue);
 		if (!shown) {

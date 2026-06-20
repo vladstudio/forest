@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import type { ForestContext } from '../context';
 import { notify } from '../notify';
+import { duplicateTicketMessage } from '../state';
 import { pickIssue, createIssue } from './create';
 import { updateLinear } from './shared';
 
@@ -31,11 +32,12 @@ export async function linkTicket(ctx: ForestContext, branch: string, mode?: 'sel
   }
 
   const state = await ctx.stateManager.load();
-  const existing = ctx.stateManager
-    .getTreesForRepo(state, ctx.repoPath)
-    .find((tree) => tree.ticketId === ticketId && tree.branch !== branch);
+  // Same ticket on same branch: no-op, not an error.
+  const existing = ctx.stateManager.findTreeByTicket(state, ctx.repoPath, ticketId!, {
+    excludeBranch: branch,
+  });
   if (existing) {
-    notify.error(`Tree for ticket "${ticketId}" already exists (${existing.branch}).`);
+    notify.error(duplicateTicketMessage(ticketId!, existing));
     return;
   }
 
