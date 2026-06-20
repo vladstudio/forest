@@ -347,6 +347,23 @@ export async function createTree(opts: {
 
 		checkMaxTrees(stateManager, state, repoPath, config.maxTrees);
 		const treePath = resolveTreePath(repoPath, branch, ticketId);
+		const repoTrees = stateManager.getTreesForRepo(state, repoPath);
+		const existingTicketTree =
+			ticketId && repoTrees.find((t) => t.ticketId === ticketId);
+		if (existingTicketTree) {
+			throw new Error(
+				`Tree for ticket "${ticketId}" already exists (${existingTicketTree.branch}).`,
+			);
+		}
+		const existingPathTree = repoTrees.find((t) => t.path === treePath);
+		if (existingPathTree) {
+			throw new Error(
+				`Tree path is already in use by "${existingPathTree.branch}".`,
+			);
+		}
+		if (fs.existsSync(treePath)) {
+			throw new Error(`Tree path already exists: ${treePath}`);
+		}
 
 		const hasNewTreeShortcuts = allShortcuts(config.shortcuts).some(
 			(s) => s.onNewTree,
@@ -366,6 +383,7 @@ export async function createTree(opts: {
 		// The in-memory createInProgress guard prevents duplicates within this
 		// process; the file lock in modify() prevents duplicates across windows.
 		let stateSaved = false;
+		let worktreeCreated = false;
 		// Drop the carry stash only after the whole creation succeeds. If we
 		// dropped earlier and a later step failed, the rollback would rm -rf the
 		// worktree and the user's uncommitted changes would be unrecoverable.
@@ -397,6 +415,7 @@ export async function createTree(opts: {
 							from ? { from } : undefined,
 						);
 					}
+					worktreeCreated = true;
 					// Worktree created successfully — now persist state.
 					await stateManager.addTree(repoPath, tree);
 					stateSaved = true;
@@ -436,9 +455,11 @@ export async function createTree(opts: {
 			);
 		} catch (e: any) {
 			if (stateSaved) await stateManager.removeTree(repoPath, branch);
-			await git.removeWorktree(repoPath, treePath).catch((err) =>
-				log(`Rollback remove worktree failed: ${err.message}`),
-			);
+			if (worktreeCreated) {
+				await git.removeWorktree(repoPath, treePath).catch((err) =>
+					log(`Rollback remove worktree failed: ${err.message}`),
+				);
+			}
 			if (!existingBranch)
 				await git.deleteBranch(repoPath, branch).catch((err) =>
 					log(`Rollback delete branch failed: ${err.message}`),

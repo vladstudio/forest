@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import type { ForestContext } from '../context';
+import { notify } from '../notify';
 import { pickIssue, createIssue } from './create';
 import { updateLinear } from './shared';
 
@@ -27,6 +28,15 @@ export async function linkTicket(ctx: ForestContext, branch: string, mode?: 'sel
     if (!result) return;
     ticketId = result.ticketId;
     title = result.title;
+  }
+
+  const state = await ctx.stateManager.load();
+  const existing = ctx.stateManager
+    .getTreesForRepo(state, ctx.repoPath)
+    .find((tree) => tree.ticketId === ticketId && tree.branch !== branch);
+  if (existing) {
+    notify.error(`Tree for ticket "${ticketId}" already exists (${existing.branch}).`);
+    return;
   }
 
   await ctx.stateManager.updateTree(ctx.repoPath, branch, { ticketId, title });

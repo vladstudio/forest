@@ -21,7 +21,11 @@ import * as ai from "./cli/ai";
 import { cleanupMerged, deleteTree } from "./commands/cleanup";
 import { update, rebase, pull, push } from "./commands/update";
 import { list } from "./commands/list";
-import { deleteWorkspaceFiles, focusOrOpenWindow } from "./commands/shared";
+import {
+	deleteWorkspaceFiles,
+	focusOrOpenWindow,
+	openTreeWindow,
+} from "./commands/shared";
 import * as gh from "./cli/gh";
 import * as linear from "./cli/linear";
 import { notify } from "./notify";
@@ -593,6 +597,11 @@ function registerCommands(
 	reg("forest.todoCreateTree", async (arg: any) => {
 		const issue = arg instanceof TodoItem ? arg.issue : arg as linear.LinearIssue;
 		if (!issue) return;
+		const state = await ctx.stateManager.load();
+		const existing = ctx.stateManager
+			.getTreesForRepo(state, ctx.repoPath)
+			.find((tree) => tree.ticketId === issue.id && tree.path);
+		if (existing) return openTreeWindow(existing);
 		const shown = await ctx.forestProvider.showCreateFormWithIssue(issue);
 		if (!shown) {
 			await start(ctx, { ticketId: issue.id, title: issue.title });
