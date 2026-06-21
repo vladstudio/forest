@@ -1,4 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../src/notify", () => ({
   notify: {
@@ -36,6 +39,8 @@ function ctx(repoPath: string, trees: any[]): ForestContext {
       load: vi.fn(async () => state),
       getTreesForRepo: (s: typeof state, rp: string) =>
         Object.values(s.trees).filter((t: any) => t.repoPath === rp),
+      getTree: (s: typeof state, rp: string, branch: string) =>
+        s.trees[`${rp}:${branch}`],
       findTreeByTicket: (
         s: typeof state,
         rp: string,
@@ -55,7 +60,20 @@ function ctx(repoPath: string, trees: any[]): ForestContext {
 }
 
 describe("linkTicket", () => {
-  beforeEach(() => vi.clearAllMocks());
+  const originalHome = process.env.HOME;
+  let home = "";
+
+  beforeEach(() => {
+    home = fs.mkdtempSync(path.join(os.tmpdir(), "forest-home-"));
+    process.env.HOME = home;
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    fs.rmSync(home, { recursive: true, force: true });
+    if (originalHome) process.env.HOME = originalHome;
+    else delete process.env.HOME;
+  });
 
   it("blocks linking a ticket already used by another branch", async () => {
     vi.mocked(pickIssue).mockResolvedValue({ ticketId: "KAD-1", title: "x" });

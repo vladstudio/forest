@@ -29,6 +29,7 @@ import {
 import * as gh from "./cli/gh";
 import * as linear from "./cli/linear";
 import { notify } from "./notify";
+import { gcForestFiles } from "./utils/gc";
 
 const emptyProvider: vscode.TreeDataProvider<never> = {
 	getTreeItem: () => {
@@ -172,6 +173,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		stateManager,
 		outputChannel,
 	);
+	gcForestFiles(postPruneState, (msg) => outputChannel.appendLine(`[Forest] ${msg}`));
 
 	// Detect if current workspace is a tree (reuse state after pruning).
 	// getHostWorkspacePath maps remote (dev container) workspace URIs back to the host tree path.

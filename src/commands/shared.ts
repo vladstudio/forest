@@ -262,7 +262,6 @@ function resolveTreePath(
 	ticketId?: string,
 ): string {
 	const treesDir = getTreesDir(repoPath);
-	fs.mkdirSync(treesDir, { recursive: true });
 	// Sanitize ticketId too: in practice it's a Linear ID (TEAM-123) or
 	// extracted via a strict regex, but the asymmetry with the branch
 	// fallback would let a malformed ID produce a path-traversal segment.
@@ -400,6 +399,7 @@ export async function createTree(opts: {
 				},
 				async (progress) => {
 					progress.report({ message: "Creating worktree..." });
+					fs.mkdirSync(path.dirname(treePath), { recursive: true });
 					if (existingBranch) {
 						await git.checkoutWorktree(repoPath, treePath, branch);
 					} else {

@@ -3,7 +3,7 @@ import type { ForestContext } from '../context';
 import { notify } from '../notify';
 import { duplicateTicketMessage } from '../state';
 import { pickIssue, createIssue } from './create';
-import { updateLinear } from './shared';
+import { deleteWorkspaceFiles, ensureWorkspaceFile, updateLinear, workspaceFilePath } from './shared';
 
 export async function linkTicket(ctx: ForestContext, branch: string, mode?: 'select' | 'create'): Promise<void> {
   let resolved = mode;
@@ -41,6 +41,10 @@ export async function linkTicket(ctx: ForestContext, branch: string, mode?: 'sel
     return;
   }
 
+  const tree = ctx.stateManager.getTree(state, ctx.repoPath, branch);
+  const updated = tree && { ...tree, ticketId, title };
+  if (updated?.path) ensureWorkspaceFile(updated);
   await ctx.stateManager.updateTree(ctx.repoPath, branch, { ticketId, title });
+  if (tree && updated && workspaceFilePath(tree) !== workspaceFilePath(updated)) deleteWorkspaceFiles(tree);
   await updateLinear(ctx, ticketId, ctx.config.linear.statuses.onNew);
 }

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../src/cli/git", () => ({
 	branchExists: vi.fn(),
@@ -14,7 +14,7 @@ vi.mock("../../src/cli/git", () => ({
 	stashDrop: vi.fn(),
 }));
 
-import { getTreesDir } from "../../src/config";
+import { clearTreesDirCache, getTreesDir } from "../../src/config";
 import * as git from "../../src/cli/git";
 import { createTree } from "../../src/commands/shared";
 
@@ -61,11 +61,24 @@ function stateManager(trees: any[] = []) {
 }
 
 describe("createTree", () => {
+	const originalHome = process.env.HOME;
+	let home = "";
+
 	beforeEach(() => {
+		home = fs.mkdtempSync(path.join(os.tmpdir(), "forest-home-"));
+		process.env.HOME = home;
+		clearTreesDirCache();
 		vi.resetAllMocks();
 		vi.mocked(git.branchExists).mockResolvedValue(false);
 		vi.mocked(git.deleteBranch).mockResolvedValue();
 		vi.mocked(git.removeWorktree).mockResolvedValue();
+	});
+
+	afterEach(() => {
+		fs.rmSync(home, { recursive: true, force: true });
+		if (originalHome) process.env.HOME = originalHome;
+		else delete process.env.HOME;
+		clearTreesDirCache();
 	});
 
 	it("rejects duplicate ticket ids before touching git", async () => {
