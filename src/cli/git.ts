@@ -15,6 +15,10 @@ function isUnregisteredWorktreeError(message: string): boolean {
   return /not a working tree|no such worktree/i.test(message);
 }
 
+function isMissingRemoteBranchDeleteError(message: string): boolean {
+  return /remote ref does not exist|unable to delete .*remote ref does not exist/i.test(message);
+}
+
 export async function createWorktree(
   repoPath: string, worktreePath: string, branch: string, baseRef: string,
   opts?: { from?: string },
@@ -69,7 +73,11 @@ export async function removeWorktree(repoPath: string, worktreePath: string): Pr
 export async function deleteBranch(repoPath: string, branch: string, opts?: { skipRemote?: boolean }): Promise<void> {
   await exec('git', ['branch', '-D', branch], { cwd: repoPath });
   if (!opts?.skipRemote) {
-    await exec('git', ['push', 'origin', '--delete', branch], { cwd: repoPath, timeout: NET_TIMEOUT });
+    try {
+      await exec('git', ['push', 'origin', '--delete', branch], { cwd: repoPath, timeout: NET_TIMEOUT });
+    } catch (e: any) {
+      if (!isMissingRemoteBranchDeleteError(gitErrorMessage(e))) throw e;
+    }
   }
 }
 

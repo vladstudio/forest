@@ -5,6 +5,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
 	createWorktree,
+	deleteBranch,
 	diffFilesBetweenRefs,
 	listBranches,
 	removeWorktree,
@@ -116,6 +117,17 @@ describe.sequential("git cli helpers", () => {
 		expect(changes).toEqual([
 			{ status: "R", originalPath: "old.txt", path: "new.txt" },
 		]);
+	});
+
+	it("treats missing remote branch during delete as success", async () => {
+		const { repo } = makeRepo();
+		git(repo, "checkout", "-b", "feature-missing-remote");
+		git(repo, "push", "-u", "origin", "feature-missing-remote");
+		git(repo, "checkout", "main");
+		git(repo, "push", "origin", "--delete", "feature-missing-remote");
+
+		await expect(deleteBranch(repo, "feature-missing-remote")).resolves.toBeUndefined();
+		expect(git(repo, "branch", "--list", "feature-missing-remote")).toBe("");
 	});
 
 	it("rejects dangerous worktree paths before deleting", async () => {
