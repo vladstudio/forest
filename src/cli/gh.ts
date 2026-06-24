@@ -4,6 +4,18 @@ import { tmpdir } from 'os';
 import { exec, commandExists } from '../utils/exec';
 import { notify } from '../notify';
 
+function ghErrorMessage(e: any): string {
+  return [e?.stderr, e?.stdout, e?.message].filter(Boolean).map(String).join('\n').trim() || 'Unknown gh error';
+}
+
+function isNoPullRequestError(message: string): boolean {
+  return /no pull requests found|no associated pull requests|could not find pull request/i.test(message);
+}
+
+function isAuthError(message: string): boolean {
+  return /auth login|authentication required|not logged into any hosts|token .* expired/i.test(message);
+}
+
 let _available: boolean | null = null;
 let _authWarned = false;
 const automergeCache = new Map<string, boolean>();
@@ -25,11 +37,13 @@ export async function prStatus(worktreePath: string): Promise<{ state: string; r
     const data = JSON.parse(stdout);
     return { state: data.state || 'OPEN', reviewDecision: data.reviewDecision || null, number: data.number, url: data.url };
   } catch (e: any) {
-    if (!_authWarned && (e.stderr || e.message || '').includes('auth login')) {
+    const message = ghErrorMessage(e);
+    if (isNoPullRequestError(message)) return null;
+    if (!_authWarned && isAuthError(message)) {
       _authWarned = true;
       notify.warn('Forest: GitHub CLI auth expired. Run "gh auth login" in your terminal.');
     }
-    return null;
+    throw new Error(`GitHub PR status failed: ${message.split('\n')[0]}`);
   }
 }
 

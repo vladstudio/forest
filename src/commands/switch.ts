@@ -28,7 +28,12 @@ export async function switchTree(ctx: ForestContext, branchArg?: string): Promis
 
   // Auto-allow direnv if .envrc exists
   if (fs.existsSync(path.join(tree.path, '.envrc'))) {
-    try { await execShell('direnv allow', { cwd: tree.path, timeout: 10_000 }); } catch { /* direnv not installed or .envrc invalid — non-fatal */ }
+    try {
+      await execShell('direnv allow', { cwd: tree.path, timeout: 10_000 });
+    } catch (e: any) {
+      ctx.outputChannel.appendLine(`[Forest] direnv allow failed for ${tree.branch}: ${e.message}`);
+      notify.warn(`direnv allow failed for ${displayName(tree)}. Run it manually if needed.`);
+    }
   }
 
   await openTreeWindow(tree);

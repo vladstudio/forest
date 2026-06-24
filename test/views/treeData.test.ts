@@ -20,14 +20,21 @@ vi.mock("../../src/cli/gh", () => ({
 	repoHasAutomergeCached: vi.fn(),
 }));
 
+vi.mock("../../src/cli/linear", () => ({
+	isAvailable: vi.fn(() => false),
+	updateIssueState: vi.fn(),
+}));
+
 import { getHostWorkspacePath } from "../../src/context";
 import * as gh from "../../src/cli/gh";
 import * as git from "../../src/cli/git";
+import * as linear from "../../src/cli/linear";
 import { TreeDataService, treeKey } from "../../src/views/treeData";
 
 describe("TreeDataService", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		vi.mocked(linear.isAvailable).mockReturnValue(false);
 	});
 
 	it("groups trees, prefers current tree ordering, and caches fetches", async () => {
@@ -187,6 +194,46 @@ describe("TreeDataService", () => {
 		expect(afterRefresh?.loading).toBe(false);
 		expect(afterRefresh?.stale).toBe(false);
 		expect(events.length).toBeGreaterThan(0);
+	});
+
+	it("moves the linked Linear ticket to onShip when it detects an open PR", async () => {
+		const repoPath = fs.mkdtempSync(path.join(os.tmpdir(), "forest-repo-"));
+		const treePath = path.join(repoPath, "tree");
+		fs.mkdirSync(treePath, { recursive: true });
+		vi.mocked(getHostWorkspacePath).mockReturnValue(treePath);
+		vi.mocked(gh.repoHasAutomergeCached).mockReturnValue(false);
+		vi.mocked(git.commitsAhead).mockResolvedValue({ count: 1, hasTrackingRef: true });
+		vi.mocked(git.commitsBehindRemote).mockResolvedValue(0);
+		vi.mocked(git.localChanges).mockResolvedValue(null);
+		vi.mocked(git.remoteBranchExists).mockResolvedValue(true);
+		vi.mocked(gh.prStatus).mockResolvedValue({ state: "OPEN", reviewDecision: null, number: 1, url: "https://pr/1" });
+		vi.mocked(linear.isAvailable).mockReturnValue(true);
+		vi.mocked(linear.updateIssueState).mockResolvedValue(undefined);
+
+		const tree = {
+			branch: "feature",
+			repoPath,
+			path: treePath,
+			createdAt: "2024-01-01T00:00:00.000Z",
+			ticketId: "KAD-9627",
+		};
+		const stateManager = {
+			load: vi.fn(async () => ({ version: 1, trees: {} })),
+			getTreesForRepo: vi.fn(() => [tree]),
+			updateTree: vi.fn(async () => undefined),
+		};
+		const service = new TreeDataService(
+			stateManager as any,
+			{ baseBranch: "main", github: { enabled: true }, linear: { enabled: true, statuses: { onShip: "in review" } } } as any,
+			() => repoPath,
+			() => {},
+		);
+
+		await service.build();
+		expect(linear.updateIssueState).toHaveBeenCalledWith("KAD-9627", "in review");
+
+		await service.refreshRepo(repoPath, { force: true });
+		expect(linear.updateIssueState).toHaveBeenCalledTimes(1);
 	});
 
 	it("preserves last-known snapshot and marks stale on refresh failure", async () => {

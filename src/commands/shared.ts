@@ -154,11 +154,14 @@ export async function updateLinear(
 	ctx: ForestContext,
 	ticketId: string,
 	status: string | undefined,
-): Promise<void> {
-	if (!status) return;
-	if (!ctx.config.linear.enabled) return;
-	if (!linear.isAvailable()) return;
-	await runStep(ctx, `Linear ${ticketId} → ${status}`, () =>
+): Promise<boolean> {
+	if (!status) return true;
+	if (!ctx.config.linear.enabled) return true;
+	if (!linear.isAvailable()) {
+		notify.warn("Forest: Linear API key not configured. Ticket was not updated.");
+		return false;
+	}
+	return runStep(ctx, `Linear ${ticketId} → ${status}`, () =>
 		linear.updateIssueState(ticketId, status),
 	);
 }
@@ -175,9 +178,10 @@ export async function revertLinear(
 	const statuses = ctx.config.linear.statuses.issueList;
 	const status = statuses[statuses.length - 1];
 	if (!status) return;
-	await updateLinear(ctx, ticketId, status).catch((e) =>
-		ctx.outputChannel.appendLine(`[Forest] Linear revert failed: ${e.message}`),
-	);
+	const ok = await updateLinear(ctx, ticketId, status);
+	if (!ok) {
+		ctx.outputChannel.appendLine(`[Forest] Linear revert failed: ${ticketId} → ${status}`);
+	}
 }
 
 export function copyConfigFiles(
@@ -230,6 +234,7 @@ async function postWorktreeSetup(
 	treePath: string,
 	tree: TreeState,
 	progress?: ProgressReporter,
+	log?: (msg: string) => void,
 ): Promise<void> {
 	progress?.report({ message: "Copying config files..." });
 	copyConfigFiles(config, repoPath, treePath);
@@ -241,8 +246,9 @@ async function postWorktreeSetup(
 	if (hasDirenv) {
 		progress?.report({ message: "Running direnv allow..." });
 		await execShell("direnv allow", { cwd: treePath, timeout: 10_000 }).catch(
-			() => {
-				/* non-fatal */
+			(e: any) => {
+				log?.(`direnv allow failed for ${tree.branch}: ${e.message}`);
+				notify.warn(`direnv allow failed for ${displayName(tree)}. Run it manually if needed.`);
 			},
 		);
 	}
@@ -440,7 +446,7 @@ export async function createTree(opts: {
 						}
 					}
 
-					await postWorktreeSetup(config, repoPath, treePath, tree, progress);
+					await postWorktreeSetup(config, repoPath, treePath, tree, progress, log);
 
 					progress.report({ message: "Opening window..." });
 					await openTreeWindow(tree, { forceNewWindow: true });

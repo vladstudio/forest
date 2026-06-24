@@ -89,7 +89,8 @@ export async function start(ctx: ForestContext, arg: { ticketId: string; title: 
 
   try {
     await createTree({ branch, config, stateManager: ctx.stateManager, repoPath: ctx.repoPath, ticketId, title, existingBranch, carryChanges: stashed, outputChannel: ctx.outputChannel });
-    await updateLinear(ctx, ticketId, config.linear.statuses.onNew);
+    const updated = await updateLinear(ctx, ticketId, config.linear.statuses.onNew);
+    if (!updated) notify.warn(`Tree created, but ${ticketId} was not moved to ${config.linear.statuses.onNew}.`);
   } catch (e: any) {
     notify.error(e.message);
   }
@@ -155,7 +156,10 @@ async function createFromNewBranch(ctx: ForestContext): Promise<void> {
 
   try {
     await createTree({ branch: branchName, config, stateManager: ctx.stateManager, repoPath: ctx.repoPath, ticketId, title, carryChanges: stashed, outputChannel: ctx.outputChannel });
-    if (ticketId) await updateLinear(ctx, ticketId, config.linear.statuses.onNew);
+    if (ticketId) {
+      const updated = await updateLinear(ctx, ticketId, config.linear.statuses.onNew);
+      if (!updated) notify.warn(`Tree created, but ${ticketId} was not moved to ${config.linear.statuses.onNew}.`);
+    }
   } catch (e: any) {
     if (revertOnCancel && ticketId) await revertLinear(ctx, ticketId);
     notify.error(e.message);
@@ -188,12 +192,17 @@ async function createFromExistingBranch(ctx: ForestContext): Promise<void> {
 
   ticketId = parseTicketId(branch, config.branchFormat);
   if (ticketId && linearEnabled) {
-    const issue = await linear.getIssue(ticketId);
-    if (issue) {
-      title = issue.title;
+    try {
+      const issue = await linear.getIssue(ticketId);
+      if (issue) {
+        title = issue.title;
+      } else {
+        ticketId = undefined;
+      }
+      linkedLinear = !!ticketId;
+    } catch (e: any) {
+      notify.warn(`Could not load Linear ticket ${ticketId}: ${e.message}`);
       linkedLinear = true;
-    } else {
-      ticketId = undefined;
     }
   }
 
@@ -229,7 +238,10 @@ async function createFromExistingBranch(ctx: ForestContext): Promise<void> {
 
   try {
     await createTree({ branch, config, stateManager: ctx.stateManager, repoPath: ctx.repoPath, ticketId, title, existingBranch: true, carryChanges: stashed, outputChannel: ctx.outputChannel });
-    if (linkedLinear && ticketId) await updateLinear(ctx, ticketId, config.linear.statuses.onNew);
+    if (linkedLinear && ticketId) {
+      const updated = await updateLinear(ctx, ticketId, config.linear.statuses.onNew);
+      if (!updated) notify.warn(`Tree created, but ${ticketId} was not moved to ${config.linear.statuses.onNew}.`);
+    }
   } catch (e: any) {
     if (revertOnCancel && ticketId) await revertLinear(ctx, ticketId);
     notify.error(e.message);

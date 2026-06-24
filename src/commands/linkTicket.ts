@@ -46,5 +46,8 @@ export async function linkTicket(ctx: ForestContext, branch: string, mode?: 'sel
   if (updated?.path) ensureWorkspaceFile(updated);
   await ctx.stateManager.updateTree(ctx.repoPath, branch, { ticketId, title });
   if (tree && updated && workspaceFilePath(tree) !== workspaceFilePath(updated)) deleteWorkspaceFiles(tree);
-  await updateLinear(ctx, ticketId, ctx.config.linear.statuses.onNew);
+  const linearUpdated = await updateLinear(ctx, ticketId, ctx.config.linear.statuses.onNew);
+  if (!linearUpdated) {
+    notify.warn(`Linked ${ticketId}, but it was not moved to ${ctx.config.linear.statuses.onNew}.`);
+  }
 }

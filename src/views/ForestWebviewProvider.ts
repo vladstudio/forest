@@ -391,8 +391,21 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
       case 'openTicket': {
         if (!tree?.ticketId) { bail(); return; }
         await this.runPending(async (signal) => {
-          const issue = await linear.getIssue(tree.ticketId!, { signal }).catch(() => null);
-          if (issue?.url) vscode.env.openExternal(vscode.Uri.parse(issue.url));
+          try {
+            const issue = await linear.getIssue(tree.ticketId!, { signal });
+            if (!issue) {
+              notify.warn(`Linear ticket ${tree.ticketId} was not found.`);
+              return;
+            }
+            if (!issue.url) {
+              notify.warn(`Linear ticket ${tree.ticketId} has no URL.`);
+              return;
+            }
+            vscode.env.openExternal(vscode.Uri.parse(issue.url));
+          } catch (e: any) {
+            if (signal.aborted) return;
+            notify.warn(`Could not open Linear ticket ${tree.ticketId}: ${e.message}`);
+          }
         });
         break;
       }
@@ -674,14 +687,11 @@ export class ForestWebviewProvider implements vscode.WebviewViewProvider {
         return;
       }
       const success = await executeDeletePlan(ctx, tree as TreeState & { path: string }, plan);
-      if (!success) {
-        notify.error('Delete was interrupted. Check notifications for details.');
-      }
       this.postMessage({
         type: 'deleteResult',
         key,
         success,
-        error: success ? null : 'Delete was interrupted. Check notifications for details.',
+        error: null,
       });
     } catch (e: any) {
       notify.error(`Delete failed: ${e.message}`);

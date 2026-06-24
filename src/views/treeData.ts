@@ -4,6 +4,7 @@ import type { ForestConfig } from '../config';
 import { getHostWorkspacePath } from '../context';
 import * as gh from '../cli/gh';
 import * as git from '../cli/git';
+import * as linear from '../cli/linear';
 import type { StateManager, TreeState } from '../state';
 
 export interface TreeCardData {
@@ -113,6 +114,7 @@ export class TreeDataService implements Disposable {
   readonly onDidChangeSnapshots = this.onDidChangeSnapshotsEmitter.event;
   private refreshTimer?: ReturnType<typeof setInterval>;
   private refreshRunning = false;
+  private readonly linearPrSync = new Map<string, string>();
 
   constructor(
     private stateManager: StateManager,
@@ -265,12 +267,31 @@ export class TreeDataService implements Disposable {
       git.commitsBehindRemote(tree.path, this.config.baseBranch),
       git.commitsAhead(tree.path, tree.branch),
       git.commitsBehindRemote(tree.path, tree.branch),
-      this.config.github.enabled ? gh.prStatus(tree.path) : Promise.resolve(null),
+      this.config.github.enabled
+        ? gh.prStatus(tree.path).catch((e: any) => {
+            this.log(`PR status failed for ${tree.branch}: ${e.message}`);
+            return null;
+          })
+        : Promise.resolve(null),
       git.localChanges(tree.path),
       git.remoteBranchExists(tree.repoPath, tree.branch).catch(() => false),
     ]);
+    const key = treeKey(tree);
     if (pr?.url && !tree.prUrl) {
       this.stateManager.updateTree(tree.repoPath, tree.branch, { prUrl: pr.url }).catch((e) => this.log(`PR URL save failed: ${e.message}`));
+    }
+    if (tree.ticketId && pr?.state === 'OPEN' && pr.url && this.config.linear.enabled && linear.isAvailable()) {
+      const syncedUrl = this.linearPrSync.get(key);
+      if (syncedUrl !== pr.url) {
+        linear.updateIssueState(tree.ticketId, this.config.linear.statuses.onShip)
+          .then(() => {
+            this.linearPrSync.set(key, pr.url!);
+            this.log(`Linear synced from PR: ${tree.ticketId} → ${this.config.linear.statuses.onShip}`);
+          })
+          .catch((e) => this.log(`Linear PR sync failed for ${tree.ticketId}: ${e.message}`));
+      }
+    } else {
+      this.linearPrSync.delete(key);
     }
     return { ...base, prNumber: pr?.number, prState: pr?.state, prUrl: pr?.url, hasRemoteBranch, behind, ahead: ahead.count, hasTrackingRef: ahead.hasTrackingRef, remoteBehind, localChanges };
   }

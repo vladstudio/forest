@@ -285,15 +285,15 @@ export async function activate(context: vscode.ExtensionContext) {
 	}
 
 	// Helper: setInterval with a guard flag to prevent overlapping runs
-	const guardedInterval = (fn: () => Promise<void>, ms: number) => {
+	const guardedInterval = (label: string, fn: () => Promise<void>, ms: number) => {
 		let running = false;
 		const id = setInterval(async () => {
 			if (running) return;
 			running = true;
 			try {
 				await fn();
-			} catch {
-				/* guarded */
+			} catch (e: any) {
+				outputChannel.appendLine(`[Forest] ${label} failed: ${e.message}`);
 			} finally {
 				running = false;
 			}
@@ -367,7 +367,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
 	// Periodic orphan check: detect worktree folders deleted externally
 	context.subscriptions.push(
-		guardedInterval(async () => {
+		guardedInterval("Orphan prune", async () => {
 			const before = stateManager.getTreesForRepo(
 				await stateManager.load(),
 				repoPath,
@@ -569,8 +569,21 @@ function registerCommands(
 	reg("forest.openPR", () => ctx.currentTree?.prUrl && vscode.env.openExternal(vscode.Uri.parse(ctx.currentTree.prUrl)));
 	reg("forest.openTicket", async () => {
 		if (!ctx.currentTree?.ticketId) return;
-		const issue = await linear.getIssue(ctx.currentTree.ticketId);
-		if (issue?.url) vscode.env.openExternal(vscode.Uri.parse(issue.url));
+		try {
+			const issue = await linear.getIssue(ctx.currentTree.ticketId);
+			if (!issue) {
+				notify.warn(`Linear ticket ${ctx.currentTree.ticketId} was not found.`);
+				return;
+			}
+			if (!issue.url) {
+				notify.warn(`Linear ticket ${ctx.currentTree.ticketId} has no URL.`);
+				return;
+			}
+			vscode.env.openExternal(vscode.Uri.parse(issue.url));
+		} catch (e: any) {
+			outputChannel.appendLine(`[Forest] Open ticket failed: ${e.message}`);
+			notify.warn(`Could not open Linear ticket ${ctx.currentTree.ticketId}: ${e.message}`);
+		}
 	});
 	reg("forest.linkTicket", (branch?: string) => {
 		const b = branch ?? ctx.currentTree?.branch;

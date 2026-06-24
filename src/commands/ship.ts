@@ -46,7 +46,12 @@ export async function shipCore(
   const ghEnabled = config.github.enabled && await gh.isAvailable();
 
   const pushPromise = git.pushBranch(tree.path, tree.branch, { signal });
-  const prStatusPromise = ghEnabled && !tree.prUrl ? gh.prStatus(tree.path) : Promise.resolve(null);
+  const prStatusPromise = ghEnabled && !tree.prUrl
+    ? gh.prStatus(tree.path).catch((e: any) => {
+        ctx.outputChannel.appendLine(`[Forest] PR lookup failed for ${tree.branch}: ${e.message}`);
+        return null;
+      })
+    : Promise.resolve(null);
 
   let url: string | null = null;
   if (ghEnabled) {
@@ -80,13 +85,20 @@ export async function shipCore(
   // Post-ship: automerge, Linear update, state save — all independent
   const postShip: Promise<void>[] = [];
   if (url && automerge) postShip.push(gh.enableAutomerge(tree.path, { signal }));
-  if (tree.ticketId) postShip.push(updateLinear(ctx, tree.ticketId, config.linear.statuses.onShip));
+  if (tree.ticketId) {
+    postShip.push((async () => {
+      const ok = await updateLinear(ctx, tree.ticketId!, config.linear.statuses.onShip);
+      if (!ok) throw new Error(`Linear ${tree.ticketId} → ${config.linear.statuses.onShip} failed`);
+    })());
+  }
   if (url) postShip.push(ctx.stateManager.updateTree(tree.repoPath, tree.branch, { prUrl: url }));
 
   const results = await Promise.allSettled(postShip);
-  for (const r of results) if (r.status === 'rejected') {
-    const msg = r.reason?.message ?? String(r.reason);
-    notify.warn(`Post-ship task failed: ${msg}`);
+  const failures = results
+    .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+    .map((r) => r.reason?.message ?? String(r.reason));
+  if (failures.length) {
+    notify.warn(`${url ? 'PR created' : 'Ship succeeded'}, but follow-up steps failed: ${failures.join('; ')}`);
   }
 
   return url;

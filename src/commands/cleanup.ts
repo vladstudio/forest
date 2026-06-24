@@ -17,11 +17,17 @@ interface TeardownOpts {
   deleteRemote?: boolean;
 }
 
-async function teardownTree(ctx: ForestContext, tree: TreeState, opts: TeardownOpts = {}): Promise<boolean> {
+interface TeardownResult {
+  success: boolean;
+  error?: string;
+}
+
+async function teardownTree(ctx: ForestContext, tree: TreeState, opts: TeardownOpts = {}): Promise<TeardownResult> {
   const key = `${tree.repoPath}:${tree.branch}`;
-  if (teardownInProgress.has(key)) return false;
+  if (teardownInProgress.has(key)) return { success: false };
   teardownInProgress.add(key);
   let removedFromState = false;
+  let branchCleanupOk = true;
   const clearCleaning = () =>
     ctx.stateManager.updateTree(tree.repoPath, tree.branch, {
       cleaning: undefined,
@@ -67,14 +73,14 @@ async function teardownTree(ctx: ForestContext, tree: TreeState, opts: TeardownO
           const action = await vscode.window.showWarningMessage(`Could not remove worktree: ${e.message}`, "Retry", "Cancel");
           if (action !== "Retry") {
             await clearCleaning();
-            return false;
+            return { success: false };
           }
         }
       }
     }
     if (opts.deleteLocal) {
-      // Non-fatal: worktree is already gone so always clean up state regardless
-      await runStep(ctx, "Delete branch", () =>
+      // Tree is already gone, so branch cleanup can only surface partial failure now.
+      branchCleanupOk = await runStep(ctx, "Delete branch", () =>
         git.deleteBranch(tree.repoPath, tree.branch, {
           skipRemote: !opts.deleteRemote,
         }),
@@ -87,7 +93,15 @@ async function teardownTree(ctx: ForestContext, tree: TreeState, opts: TeardownO
     if (shouldClose) {
       await vscode.commands.executeCommand("workbench.action.closeWindow");
     }
-    return true;
+    if (!branchCleanupOk) {
+      return {
+        success: false,
+        error: opts.deleteRemote
+          ? "Tree deleted, but branch cleanup failed. The remote branch may still exist."
+          : "Tree deleted, but local branch cleanup failed.",
+      };
+    }
+    return { success: true };
   } catch (e) {
     if (!removedFromState) {
       await clearCleaning().catch((err) => ctx.outputChannel.appendLine(`[Forest] Clear cleaning flag failed: ${err.message}`));
@@ -105,7 +119,11 @@ export async function cleanupMerged(ctx: ForestContext, tree: TreeState): Promis
     notify.warn("Tree has uncommitted changes. Commit or discard first.");
     return;
   }
-  if (!(await teardownTree(ctx, tree, { deleteLocal: true, deleteRemote: true }))) return;
+  const result = await teardownTree(ctx, tree, { deleteLocal: true, deleteRemote: true });
+  if (!result.success) {
+    if (result.error) notify.error(result.error);
+    return;
+  }
   if (tree.ticketId) await updateLinear(ctx, tree.ticketId, ctx.config.linear.statuses.onCleanup);
 }
 
@@ -247,12 +265,16 @@ export async function executeDeletePlan(
 
       progress.report({ message: "Removing tree..." });
       const removed = await teardownTree(ctx, tree, branchesToTeardownOpts(plan.branches));
-      if (!removed) return false;
+      if (!removed.success) {
+        if (removed.error) notify.error(removed.error);
+        return false;
+      }
 
       const linearStatus = linearStatusForPlan(ctx, plan);
       if (tree.ticketId && linearStatus) {
         progress.report({ message: "Updating ticket..." });
-        await updateLinear(ctx, tree.ticketId, linearStatus);
+        const updated = await updateLinear(ctx, tree.ticketId, linearStatus);
+        if (!updated) return false;
       }
 
       return true;
@@ -267,7 +289,15 @@ export async function deleteTree(ctx: ForestContext, branchArg?: string, isDone?
 
   if (ctx.forestProvider.showDeleteForm && (await ctx.forestProvider.showDeleteForm(tree.branch))) return;
 
-  const prState = ctx.config.github.enabled ? ((await gh.prStatus(tree.path).catch(() => null))?.state ?? null) : null;
+  let prState: string | null = null;
+  if (ctx.config.github.enabled) {
+    try {
+      prState = (await gh.prStatus(tree.path))?.state ?? null;
+    } catch (e: any) {
+      ctx.outputChannel.appendLine(`[Forest] PR status lookup failed for ${tree.branch}: ${e.message}`);
+      notify.warn(`Could not load PR status for ${displayName(tree)}. Delete options may be incomplete.`);
+    }
+  }
   const plan = await fallbackDeletePlan(ctx, tree, isDone && prState !== "CLOSED" ? "MERGED" : prState);
   if (!plan) return;
   await executeDeletePlan(ctx, tree, plan);

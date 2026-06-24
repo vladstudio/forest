@@ -106,17 +106,16 @@ export async function listMyIssues(states: string[], teams?: string[], opts?: { 
 }
 
 export async function getIssue(issueId: string, opts?: { signal?: AbortSignal }): Promise<LinearIssue | null> {
-  try {
-    const data = await gql<{ issue: { identifier: string; title: string; state: { name: string; type: string }; priority: number; url: string } }>(
-      `query($id: String!) {
-        issue(id: $id) { identifier title state { name type } priority url }
-      }`,
-      { id: issueId },
-      opts?.signal,
-    );
-    const i = data.issue;
-    return { id: i.identifier, title: i.title, state: i.state.type, priority: i.priority, url: i.url };
-  } catch { return null; }
+  const data = await gql<{ issue: { identifier: string; title: string; state: { name: string; type: string }; priority: number; url: string } | null }>(
+    `query($id: String!) {
+      issue(id: $id) { identifier title state { name type } priority url }
+    }`,
+    { id: issueId },
+    opts?.signal,
+  );
+  const i = data.issue;
+  if (!i) return null;
+  return { id: i.identifier, title: i.title, state: i.state.type, priority: i.priority, url: i.url };
 }
 
 export async function getIssueDescription(issueId: string, opts?: { signal?: AbortSignal }): Promise<string> {
