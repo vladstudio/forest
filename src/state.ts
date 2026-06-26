@@ -151,10 +151,12 @@ export class StateManager {
           const [pidStr, tsStr] = content.split(':');
           const pid = parseInt(pidStr, 10);
           const ts = parseInt(tsStr, 10);
-          // Stale if: holder process is dead OR lock is older than 10 seconds
+          const bootTime = Date.now() - os.uptime() * 1000;
+          // Stale if: holder process is dead, the lock predates this boot, or it is older than 10 seconds.
           const holderDead = Number.isFinite(pid) && !this.isProcessAlive(pid);
+          const preBoot = Number.isFinite(ts) && ts < bootTime;
           const lockStale = Number.isFinite(ts) && Date.now() - ts > 10_000;
-          if (holderDead || lockStale) {
+          if (holderDead || preBoot || lockStale) {
             try { await fs.promises.rm(lock, { recursive: true, force: true }); } catch { /* raced */ }
             continue;
           }
